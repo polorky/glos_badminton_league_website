@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Admin{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+  <h1>Team Nominations</h1>
+
+  {% if noteams %}
+
+    <p>Your club has no teams that require nominations (because you don't have multiple teams in any league) so there is nothing for you to do!</p>
+
+  {% else %}
+
+      <p>Below is the list of teams your club has confirmed for the upcoming season.</p>
+      <p>Please select the players you want to nominate for each team and click "Save Nominations" to update the nominations.</p>
+      <p>If any players are not present in the dropdown, please add them on the <a href="/clubadmin">Club Admin</a> page.</p>
+      <p>NOTE: each button will ONLY save the nominations for the team whose section is it in.</p>
+      <p>You can return to this page at any time and adjust your nominations up until the closing date of TBC</p>
+
+      {% for team_list in forms %}
+        <h3>{{ team_list.0 }}</h3>
+        <p>Currently nominated:</p>
+        <table id="table" class="table">
+            <tr><th>Player</th></tr>
+            <tr><td>{{ team_list.4.nom_player1 }}</td></tr>
+            <tr><td>{{ team_list.4.nom_player2 }}</td></tr>
+            <tr><td>{{ team_list.4.nom_player3 }}</td></tr>
+            <tr><td>{{ team_list.4.nom_player4 }}</td></tr>
+            {% if team_list.3 == "Mixed" %}
+                <tr><td>{{ team_list.4.nom_player5 }}</td></tr>
+                <tr><td>{{ team_list.4.nom_player6 }}</td></tr>
+            {% endif %}
+        </table>
+        <br>
+        <p>Add or change nominations:</p>
+        <form action="/nominations/{{ team_list.1 }}" method="post">
+          {% csrf_token %}
+          <table class="table" id="table">
+            <tr><td>Player 1</td><td>{{ team_list.2.nom_player1 }}</td></tr>
+            <tr><td>Player 2</td><td>{{ team_list.2.nom_player2 }}</td></tr>
+            <tr><td>Player 3</td><td>{{ team_list.2.nom_player3 }}</td></tr>
+            <tr><td>Player 4</td><td>{{ team_list.2.nom_player4 }}</td></tr>
+            {% if team_list.3 == "Mixed" %}
+              <tr><td>Player 5</td><td>{{ team_list.2.nom_player5 }}</td></tr>
+              <tr><td>Player 6</td><td>{{ team_list.2.nom_player6 }}</td></tr>
+            {% endif %}
+          </table>
+          {% if team_list.2.non_field_errors %}
+            {% for error in team_list.2.non_field_errors %}
+              <p style="color:red;">{{ error }}</p>
+            {% endfor %}
+          {% endif %}
+          <br>
+          <input class="button" type="submit" value="Save {{ team_list.0 }} Nominations">
+        </form>
+      {% endfor %}
+
+    {% endif %}
+
+{% endblock content %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Admin{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+    <h1>Player Stats</h1>
+
+    <table id="table" class="table">
+        <tr><th onclick="sortTableNumbers(0)">Player</th><th onclick="sortTableNumbers(1)">RP</th><th onclick="sortTableNumbers(2)">RW</th><th onclick="sortTableNumbers(3)">%</th>
+            <th onclick="sortTableNumbers(4)">PF</th><th onclick="sortTableNumbers(5)">PA</th><th onclick="sortTableNumbers(6)">Diff</th><th onclick="sortTableNumbers(7)">RP</th>
+            <th onclick="sortTableNumbers(8)">RW</th><th onclick="sortTableNumbers(9)">%</th><th onclick="sortTableNumbers(10)">PF</th><th onclick="sortTableNumbers(11)">PA</th>
+            <th onclick="sortTableNumbers(12)">Diff</th></tr>
+        {% for player in stats.values %}
+            <tr><td>{{ player.obj.name }}</td><td>{{ player.mixed.played }}</td><td>{{ player.mixed.won }}</td><td>{{ player.mixed.percent }}</td><td>{{ player.mixed.pf }}</td><td>{{ player.mixed.pa }}</td><td>{{ player.mixed.diff }}</td>
+                <td>{{ player.level.played }}</td><td>{{ player.level.won }}</td><td>{{ player.level.percent }}</td><td>{{ player.level.pf }}</td><td>{{ player.level.pa }}</td><td>{{ player.level.diff }}</td></tr>
+        {% endfor %}
+    </table>
+
+{% endblock content %}

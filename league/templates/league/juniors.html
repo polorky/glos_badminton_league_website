@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Juniors{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav active" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+    <h1>Junior Badminton</h1>
+
+    <p>The Gloucestershire Badminton League is predominately an adult league although some clubs may play older junior players. The resources below are provided on a
+    best endeavour basis so please follow the links and/or contacts below to confirm the current situation as regrettably demand is often higher than capacity.
+    If you can help improve the information on this page, please contact: glosbadwebsite@gmail.com</p>
+
+    <p>Clubs which run junior sessions are:</p>
+
+    <ul>
+        <li>
+            <h3>Pittville Badminton Club</h3>
+            <p>Website: <a href="https://pittvillebadminton.co.uk/">https://pittvillebadminton.co.uk/</a></p>
+        </li>
+        <li>
+            <h3>Falcons Badminton Club</h3>
+            <p><a href="https://gloubadleague.pythonanywhere.com/clubs/Falcons%20Badminton%20Club">Club page on this site</a></p>
+        </li>
+    </ul>
+    <p>Other junior badminton opportunities include:</p>
+    <ul>
+        <li>
+            <h3>Gloucestershire Badminton Bears Junior Club</h3>
+            <p><a href="https://www.facebook.com/profile.php?id=61570516499431">Club Facebook page</a></p>
+            <p>Email: <a href="mailto:badbears@live.co.uk">badbears@live.co.uk</a></p>
+        </li>
+        <li>
+            <h3>Oxstalls Badminton Academy</h3>
+            <p>Website: <a href="https://www.gloucesterbadmintoncoach.com/oxstalls-badminton-academy">https://www.gloucesterbadmintoncoach.com/oxstalls-badminton-academy</a></p>
+        </li>
+    </ul>
+    <br><br>
+
+{% endblock content %}

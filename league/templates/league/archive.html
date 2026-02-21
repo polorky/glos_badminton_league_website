@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Archive{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav active" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+{% if view == "home" %}
+
+    <h2>Previous Seasons</h2>
+    <p>Note that it can take a short while to load these pages as all the divisions are loaded together.</p>
+    <ul>
+        {% for season in seasons %}
+            <li><a href="/archive/{{ season }}">{{ season }}</a></li>
+        {% endfor %}
+    </ul>
+
+{% else %}
+
+    <h2>{{ season }}</h2>
+
+    {% if season.archive_info %}
+        <p>{{ season.archive_info }}</p>
+    {% endif %}
+
+    <form method="post">
+    {% csrf_token %}
+    <input class="button" type="submit" value="Download All Results">
+    </form>
+
+    {% for divdict in divisions %}
+
+        {% if season.historic_divs %}
+            <h3>{{ divdict.division.get_historic_name }}</h3>
+        {% else %}
+            <h3>{{ divdict.division }}</h3>
+        {% endif %}
+
+        <table id="resultstable" class="resultstable">
+            <tr>
+              <th>Team</th>
+              <th><abbr title="Played">P</abbr></th>
+              <th><abbr title="Won">W</abbr></th>
+              <th><abbr title="Drawn">D</abbr></th>
+              <th><abbr title="Lost">L</abbr></th>
+              <th><abbr title="Points For">PF*</abbr></th>
+              <th><abbr title="Points Against">PA</abbr></th>
+              <th><abbr title="Penalties">Pen*</abbr></th>
+            </tr>
+            {% for team_tuple in divdict.table %}
+                <tr>
+                    <td><a href="{% url 'teams' team_tuple.1.Object.get_team_url %}">{{ team_tuple.0 }}</a></td>
+                    <td>{{ team_tuple.1.Played }}</td>
+                    <td>{{ team_tuple.1.Won }}</td>
+                    <td>{{ team_tuple.1.Drawn }}</td>
+                    <td>{{ team_tuple.1.Lost }}</td>
+                    <td>{{ team_tuple.1.PFor }}</td>
+                    <td>{{ team_tuple.1.PAgainst }}</td>
+                    <td>{{ team_tuple.1.Penalties }}</td>
+                </tr>
+            {% endfor %}
+         </table>
+
+        <h3>Results</h3>
+
+        <table id="table" class="table">
+            <tr class="headings" style="cursor:pointer;">
+                <th onclick="sortTable(3)">Home Team ↕</th>
+                <th colspan="2">Scores</th>
+                <th onclick="sortTable(7)">Away Team ↕</th>
+                <th>Link</th>
+            </tr>
+            {% for fix in divdict.fixtures %}
+                <tr>
+                  <td><a href="/teams/{{ fix.home_team.get_team_url }}">{{ fix.home_team }}</a></td>
+                  <td>{{ fix.home_points }}</td>
+                  <td>{{ fix.away_points }}</td>
+                  <td><a href="/teams/{{ fix.away_team.get_team_url }}">{{ fix.away_team }}</a></td>
+                  <td><a href="/fixtures/{{ fix.id }}/fix">View</a></td>
+                </tr>
+            {% endfor %}
+        </table>
+
+    {% endfor %}
+
+{% endif %}
+
+{% endblock content %}

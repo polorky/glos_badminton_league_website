@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Clubs{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav active" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+{% if status == "home" %}
+
+  <h1>Gloucestershire Badminton Clubs</h1>
+  <div style="text-align:center;" class="mapmain">
+      <iframe src="https://www.google.com/maps/d/u/0/embed?mid=1-Ss_nuZtJxhR8s74hIJyHq2sfe0H4AY&ehbc=2E312F" width="640" height="480"></iframe>
+  </div>
+  <div style="text-align:center;" class="mapmobile">
+      <iframe src="https://www.google.com/maps/d/u/0/embed?mid=1-Ss_nuZtJxhR8s74hIJyHq2sfe0H4AY&ehbc=2E312F"></iframe>
+  </div>
+  <br>
+  <h3>Current Clubs</h3>
+  <div>
+    <ul class="clublist">
+      {% for club in clubs %}
+        <li><a href="{{ club.get_club_url }}">{{ club.name }}</a></li><br>
+      {% endfor %}
+    </ul>
+  </div>
+  <h3>Historic Clubs</h3>
+  <div>
+    <ul class="clublist">
+      {% for club in old_clubs %}
+        <li><a href="{{ club.get_club_url }}">{{ club.name }}</a></li><br>
+      {% endfor %}
+    </ul>
+  </div>
+
+{% elif status == "doesnotexist" %}
+
+  <h1>Club does not exist</h1>
+  <p>Not sure how you got to this page but a club of this name does not exist.</p>
+
+{% else %}
+
+  <h1>{{ club.name }}</h1>
+  {% if club.blurb %}
+    <p>{{ club.blurb }}</p>
+  {% endif %}
+  {% if club.website %}
+    <p><b>Club Website: </b><a href="{{ club.website }}">{{ club.website }}</a></p>
+  {% endif %}
+
+  {% if public_info %}
+    <h3>Public Contact</h3>
+    {% if club.public_contact_name %}
+      <p><b>Club Contact: </b>{{ club.public_contact_name }}</p>
+    {% endif %}
+    {% if club.public_email %}
+      <p><b>Club Email: </b>{{ club.public_email }}</p>
+    {% endif %}
+    {% if club.public_num %}
+      <p><b>Club Phone Number: </b>{{ club.public_num }}</p>
+    {% endif %}
+  {% endif %}
+  {% if user.is_authenticated %}
+    <h3>Contacts for League Communications</h3>
+    <p><b>1st Contact: </b>{{ club.contact1_name }}</p>
+    <p><b>Phone Number: </b>{{ club.contact1_num }}</p>
+    <p><b>Email: </b>{{ club.contact1_email }}</p>
+    <p><b>2nd Contact: </b>{{ club.contact2_name }}</p>
+    <p><b>Phone Number: </b>{{ club.contact2_num }}</p>
+    <p><b>Email: </b>{{ club.contact2_email }}</p>
+  {% else %}
+    <p>To view league contacts for this club, please <a href="{% url 'login' %}?next=/clubadmin">log in</a>.</p>
+  {% endif %}
+  <br>
+  {% if clubnights %}
+    <h3>Club Nights</h3>
+    <table id="table" class="table">
+      <tr><th>Venue</th><th>Timings</th></tr>
+      {% for clubnight in clubnights %}
+        <tr><td><a href="\venues\{{ clubnight.venue.get_venue_url }}">{{ clubnight.venue }}</a></td><td>{{ clubnight.timings }}</td></tr>
+      {% endfor %}
+    </table>
+    <br>
+  {% endif %}
+
+  <h3>League Match Venues</h3>
+  <p>This is a list of venues that the club currently has league matches scheduled for:</p>
+  <ul>
+  {% for venue in venues %}
+    <li><a href="\venues\{{ venue.get_venue_url }}">{{ venue.name }}</a></li>
+  {% endfor %}
+  </ul>
+  {% if teams %}
+    <br>
+    <h3>Current Teams</h3>
+    {% for team in teams %}
+        <p><a href="\teams\{{ team.get_team_url }}">{{ team }}</a></p>
+    {% endfor %}
+  {% endif %}
+  {% if ex_teams %}
+    <br>
+    <h3>Historic Teams</h3>
+    {% for team in ex_teams %}
+        <p><a href="\teams\{{ team.get_team_url }}">{{ team }}</a></p>
+    {% endfor %}
+  {% endif %}
+  <br>
+  <h3>Club Fixtures</h3>
+  <p>This is the list of club fixtures for the current season.</p>
+  <br>
+  <form method="post">
+    {% csrf_token %}
+    <input class="button" type="submit" value="Download Fixtures">
+  </form>
+  <br>
+  <table id="table" class="table">
+    <tr class="headings" style="cursor:pointer;">
+      <th onclick="sortTable(0)">Date ↕</th><th onclick="sortTable(1)">Day ↕</th><th>Start</th><th>End</th>
+      <th onclick="sortTable(4)">Home Team ↕</th><th colspan="2">Scores</th><th onclick="sortTable(8)">Away Team ↕</th>
+      <th onclick="sortTable(9)">Venue ↕</th><th onclick="sortTable(10)">Status ↕</th><th>View</th><th>Update</th></tr>
+    {% for fix in fixtures %}
+      {% if fix.0.status == "Postponed" %}
+        <tr class="postponed">
+      {% elif fix.0.status == "Proposed" %}
+        <tr class="proposed">
+      {% elif fix.0.status == "Rearranged" %}
+        <tr class="rearranged">
+      {% elif fix.0.status == "Played" %}
+        <tr class="played">
+      {% elif fix.0.status == "Conceded (H)" %}
+        <tr class="conceded">
+      {% elif fix.0.status == "Conceded (A)" %}
+        <tr class="conceded">
+      {% else %}
+        <tr class="unplayed">
+      {% endif %}
+          <td>{{ fix.0.date_time|date:'Y-m-d' }}</td>
+          <td>{{ fix.0.date_time|date:'D' }}</td>
+          <td>{{ fix.0.date_time|date:'H:i' }}</td>
+          <td>{{ fix.0.end_time|date:'H:i' }}</td>
+          <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team }}</a></td>
+          <td>{{ fix.0.home_points }}</td>
+          <td>{{ fix.0.away_points }}</td>
+          <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team }}</a></td>
+          <td><a href="/venues/{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td>
+          <td>{{ fix.0.get_status_display }}</td>
+          <td><a href="/fixtures/{{ fix.0.id }}/div">View</a></td>
+          {% if fix.1 %}
+            <td><a href="/fixtures/{{ fix.0.id }}/update/div">Update</a></td>
+          {% else %}
+            <td></td>
+          {% endif %}
+        </tr>
+    {% endfor %}
+  </table>
+{% endif %}
+
+{% endblock content %}

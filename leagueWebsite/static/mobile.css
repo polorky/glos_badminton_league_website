@@ -1,0 +1,180 @@
+body {
+  font-family: Helvetica;
+  background-color: #8CCFE7;
+}
+
+header {
+  background-color: #FFFFFF;
+  opacity: 90%;
+  padding: 10px 10px 10px 10px;
+  margin: 10px 0px 0px 0px;
+  text-align: center;
+}
+
+section {
+  background-color: #FFFFFF;
+  opacity: 90%;
+  padding: 10px 10px 10px 10px;
+}
+
+h1 {
+  color: #154c79;
+  text-align: center;
+  text-shadow: 2px 2px #2596be;
+}
+
+h2 {
+  color: #154c79;
+  text-shadow: 2px 2px #2596be;
+}
+
+h3 {
+  color: #154c79;
+  text-decoration: underline;
+}
+
+a {
+  text-decoration: underline;
+}
+
+.postponed {
+  background-color: #EF9A9A;
+}
+.proposed {
+  background-color: #FFCC80;
+}
+.rearranged {
+  background-color: #80CBC4;
+}
+.played {
+  background-color: #EEEEEE;
+}
+.conceded {
+  background-color: #9EAFBE;
+}
+.unplayed {
+  background-color: #A5D6A7;
+}
+
+.button {
+  background-color: #4CAF50;
+  color: white;
+  transition-duration: 0.4s;
+  border-radius: 4px;
+  /*font-size: 14px*/
+}
+
+.button:hover {
+  background-color: #A6EFA8;
+  color: black;
+}
+
+.buttonred {
+  background-color: #F72117;
+  color: white;
+  transition-duration: 0.4s;
+  border-radius: 4px;
+  font-size: 14px
+}
+
+.buttonred:hover {
+  background-color: #F9AAA6;
+  color: black;
+}
+
+.buttonorange {
+  background-color: #FFA500;
+  color: white;
+  transition-duration: 0.4s;
+  border-radius: 4px;
+  font-size: 14px
+}
+
+.buttonorange:hover {
+  background-color: #FFDB99;
+  color: black;
+}
+
+/* Menu bar styling */
+ul.nav {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #2596be;
+}
+
+li.nav {
+  float: left;
+}
+
+a.nav {
+  display: block;
+  padding: 8px;
+  color: white;
+  text-align: center;
+  padding: 14px 16px;
+  text-decoration: none;
+}
+
+li a.nav:hover:not(.active) {
+  background-color: #063970;
+}
+
+.active {
+  background-color: #154c79;
+}
+
+.floating {
+  float: left;
+}
+
+.mapmain {
+    display: none;
+}
+
+#redcell {
+    background-color: #F37C65;
+}
+
+#greencell {
+    background-color: #6AE58D;
+}
+
+/* Table styling */
+#table {
+  border-collapse: collapse
+  width: 100%
+  display: block;
+}
+
+#table th {
+  background-color: #154c79;
+  color: white;
+  /*padding: 5px 15px 5px 15px;*/
+  border: 1px solid #ddd;
+}
+
+#table td {
+  text-align: center;
+  /*padding: 5px 15px 5px 15px;*/
+  border: 1px solid #ddd;
+}
+
+/* Results Table styling */
+#resultstable {
+  border-collapse: collapse;
+}
+
+#resultstable th {
+  background-color: #154c79;
+  color: white;
+  padding: 5px 15px 5px 15px;
+  border: 1px solid #ddd;
+}
+
+#resultstable td {
+  text-align: center;
+  padding: 5px 15px 5px 15px;
+  border: 1px solid #ddd;
+}

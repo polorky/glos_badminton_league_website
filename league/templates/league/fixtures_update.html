@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Fixtures{% endblock title %}
+
+{% block menubar %}
+    <li class="nav"><a class="nav" href="/">Home</a></li>
+    <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+    <li class="nav"><a class="nav active" href="/fixtures/home">Fixtures</a></li>
+    <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+    <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+    <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+    <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+    <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+    <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+    <li class="nav"><a class="nav" href="/help">Help!</a></li>
+    <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+    </li>
+{% endblock menubar %}
+
+{% block content %}
+
+{% if pagename == "options" %}
+
+    <h1>{{ fixture }}</h1>
+
+    <p>PLEASE NOTE: if you are intending to record a postponement or rearragement, please ensure that
+    you have contacted the other club BEFORE updating the website to ensure they are happy with the action. The club
+    will get a confirmation email but that is just to ensure the details are correct and are those that both clubs
+    believed had been mutually agreed.</p>
+    <p>What would you like to do?
+    <br><br>
+    <a href="/fixtures/update/{{ fixture.id }}/submit/{{ source }}">Submit Result</a>
+    <br><br>
+    <a href="/fixtures/update/{{ fixture.id }}/postpone/{{ source }}">Postpone Match</a>
+    <br><br>
+    <a href="/fixtures/update/{{ fixture.id }}/reschedule/{{ source }}">Reschedule Match</a>
+    <br><br>
+    <a href="/fixtures/update/{{ fixture.id }}/concede/{{ source }}">Record a Conceded Match</a>
+    </p>
+
+{% elif pagename == "submit" %}
+
+    <h1>{{ fixture }}</h1>
+
+    <h3>Submit Match Result</h3>
+    <form action="/fixtures/update/{{ fixture.id }}/result/{{ source }}" method="post">
+    {% csrf_token %}
+
+    <p>{{ fixture.home_team }}: {{ detform.home_points }}</p>
+    <p>{{ fixture.away_team }}: {{ detform.away_points }}</p>
+    {% if detform.non_field_errors and pagename == "errors" %}
+      {% if detform.non_field_errors.0 == "points" %}
+        <p style="color:red;">{{ detform.non_field_errors.1 }}</p>
+      {% endif %}
+    {% endif %}
+
+    <h4>Players</h4>
+    <p>Please ensure the correct players are chosen as this can affect availability for other teams as well as ensuring
+      those players nominated play two of the first three matches.</p>
+    <p>If a home player isn't in the dropdown list, please go to the <a href="/clubadmin/">club admin</a> page and add
+      them before submitting this result. For away players, please type their name in the box provided and this will be
+      checked against the away club's roster. If a player with that name is not found on the away club's roster, you will
+      be asked to tick a box to confirm the name has definitely been entered correctly. Please ensure the names are
+      entered as provided by the away team as any that aren't found will be created on the away club's roster.</p>
+    <p>If either team did not play the full complement of players, please leave the relevant player(s) blank.</p>
+
+    {% if fixture.division.type == "Mixed" %}
+
+        <table id="table" class="table">
+            <tr><th>Player</th><th>Home</th><th>Away</th></tr>
+            <tr><td>Lady 1</td><td>{{ detform.home_player1 }}</td><td>{{ detform.away_player1 }}</td></tr>
+            <tr><td>Lady 2</td><td>{{ detform.home_player2 }}</td><td>{{ detform.away_player2 }}</td></tr>
+            <tr><td>Lady 3</td><td>{{ detform.home_player3 }}</td><td>{{ detform.away_player3 }}</td></tr>
+            <tr><td>Man 1</td><td>{{ detform.home_player4 }}</td><td>{{ detform.away_player4 }}</td></tr>
+            <tr><td>Man 2</td><td>{{ detform.home_player5 }}</td><td>{{ detform.away_player5 }}</td></tr>
+            <tr><td>Man 3</td><td>{{ detform.home_player6 }}</td><td>{{ detform.away_player6 }}</td></tr>
+        </table>
+
+    {% else %}
+
+      <table id="table" class="table">
+        <tr><th>Player</th><th>Home</th><th>Away</th></tr>
+        <tr><td>Player 1</td><td>{{ detform.home_player1 }}</td><td>{{ detform.away_player1 }}</td></tr>
+        <tr><td>Player 2</td><td>{{ detform.home_player2 }}</td><td>{{ detform.away_player2 }}</td></tr>
+        <tr><td>Player 3</td><td>{{ detform.home_player3 }}</td><td>{{ detform.away_player3 }}</td></tr>
+        <tr><td>Player 4</td><td>{{ detform.home_player4 }}</td><td>{{ detform.away_player4 }}</td></tr>
+      </table>
+
+    {% endif %}
+
+    {% if detform.non_field_errors and pagename == "errors" %}
+      {% if detform.non_field_errors.0 == "player" %}
+        {% for error in detform.non_field_errors %}
+          {% if error != "player" %}
+            <p style="color:red;">{{ error }}</p>
+          {% endif %}
+        {% endfor %}
+        <p>I confirm the away player names have been entered as provided by the away team and any missing players are correct: {{ detform.player_name_check }}</p>
+      {% elif detform.non_field_errors.0 == "player_and_game" %}
+        {% for error in detform.non_field_errors %}
+          {% if error != "player_and_game" and error.0 == "A" %}
+            <p style="color:red;">{{ error }}</p>
+          {% endif %}
+        {% endfor %}
+        <p>I confirm the away player names have been entered as provided by the away team and any missing players are correct: {{ detform.player_name_check }}</p>
+      {% endif %}
+    {% endif %}
+    <br>
+
+    <h4>Individual Game Scores</h4>
+    <p>TIP: use the Tab key to move between fields</p>
+    <p>If any games were forfeited, please enter "FH" for games forfeited by the home team (so points go to away team) and "FA" for away forfeits as both the home and away score.</p>
+
+    <!--    <p>If the third rubber was not required for any of the games, please leave the fields blank, don't enter zeroes.</p>-->
+    <!--    <table class='table' id='table'>-->
+    <!--        <tr><th rowspan="2">Game</th><th colspan="2">R1</th><th colspan="2">R2</th><th colspan="2">R3</th></tr>-->
+    <!--        <tr><th>H</th><th>A</th><th>H</th><th>A</th><th>H</th><th>A</th></tr>-->
+    <!--        <tr><td>Mixed 3v2</td><td>{{ detform.g1r1h }}</td><td>{{ detform.g1r1a }}</td><td>{{ detform.g1r2h }}</td><td>{{ detform.g1r2a }}</td><td>{{ detform.g1r3h }}</td><td>{{ detform.g1r3a }}</td></tr>-->
+    <!--        <tr><td>Mixed 2v3</td><td>{{ detform.g2r1h }}</td><td>{{ detform.g2r1a }}</td><td>{{ detform.g2r2h }}</td><td>{{ detform.g2r2a }}</td><td>{{ detform.g2r3h }}</td><td>{{ detform.g2r3a }}</td></tr>-->
+    <!--        <tr><td>Mixed 1v1</td><td>{{ detform.g3r1h }}</td><td>{{ detform.g3r1a }}</td><td>{{ detform.g3r2h }}</td><td>{{ detform.g3r2a }}</td><td>{{ detform.g3r3h }}</td><td>{{ detform.g3r3a }}</td></tr>-->
+    <!--        <tr><td>Mixed 2v2</td><td>{{ detform.g4r1h }}</td><td>{{ detform.g4r1a }}</td><td>{{ detform.g4r2h }}</td><td>{{ detform.g4r2a }}</td><td>{{ detform.g4r3h }}</td><td>{{ detform.g4r3a }}</td></tr>-->
+    <!--        <tr><td>Mixed 3v3</td><td>{{ detform.g5r1h }}</td><td>{{ detform.g5r1a }}</td><td>{{ detform.g5r2h }}</td><td>{{ detform.g5r2a }}</td><td>{{ detform.g5r3h }}</td><td>{{ detform.g5r3a }}</td></tr>-->
+    <!--        <tr><td>Mens 1&2</td><td>{{ detform.g6r1h }}</td><td>{{ detform.g6r1a }}</td><td>{{ detform.g6r2h }}</td><td>{{ detform.g6r2a }}</td><td>{{ detform.g6r3h }}</td><td>{{ detform.g6r3a }}</td></tr>-->
+    <!--        <tr><td>Ladies 1&2</td><td>{{ detform.g7r1h }}</td><td>{{ detform.g7r1a }}</td><td>{{ detform.g7r2h }}</td><td>{{ detform.g7r2a }}</td><td>{{ detform.g7r3h }}</td><td>{{ detform.g7r3a }}</td></tr>-->
+    <!--        <tr><td>Mens 1&3</td><td>{{ detform.g8r1h }}</td><td>{{ detform.g8r1a }}</td><td>{{ detform.g8r2h }}</td><td>{{ detform.g8r2a }}</td><td>{{ detform.g8r3h }}</td><td>{{ detform.g8r3a }}</td></tr>-->
+    <!--        <tr><td>Ladies 1&3</td><td>{{ detform.g9r1h }}</td><td>{{ detform.g9r1a }}</td><td>{{ detform.g9r2h }}</td><td>{{ detform.g9r2a }}</td><td>{{ detform.g9r3h }}</td><td>{{ detform.g9r3a }}</td></tr>-->
+    <!--    </table>-->
+
+    {% if fixture.division.type == "Mixed" %}
+
+        <table class='table' id='table'>
+            <tr><th rowspan="2">Game</th><th colspan="2">R1</th><th colspan="2">R2</th></tr>
+            <tr><th>H</th><th>A</th><th>H</th><th>A</th></tr>
+            <tr><td>Mixed 3v2</td><td>{{ detform.g1r1h }}</td><td>{{ detform.g1r1a }}</td><td>{{ detform.g1r2h }}</td><td>{{ detform.g1r2a }}</td></tr>
+            <tr><td>Mixed 2v3</td><td>{{ detform.g2r1h }}</td><td>{{ detform.g2r1a }}</td><td>{{ detform.g2r2h }}</td><td>{{ detform.g2r2a }}</td></tr>
+            <tr><td>Mixed 1v1</td><td>{{ detform.g3r1h }}</td><td>{{ detform.g3r1a }}</td><td>{{ detform.g3r2h }}</td><td>{{ detform.g3r2a }}</td></tr>
+            <tr><td>Mixed 2v2</td><td>{{ detform.g4r1h }}</td><td>{{ detform.g4r1a }}</td><td>{{ detform.g4r2h }}</td><td>{{ detform.g4r2a }}</td></tr>
+            <tr><td>Mixed 3v3</td><td>{{ detform.g5r1h }}</td><td>{{ detform.g5r1a }}</td><td>{{ detform.g5r2h }}</td><td>{{ detform.g5r2a }}</td></tr>
+            <tr><td>Men 1&2</td><td>{{ detform.g6r1h }}</td><td>{{ detform.g6r1a }}</td><td>{{ detform.g6r2h }}</td><td>{{ detform.g6r2a }}</td></tr>
+            <tr><td>Women 1&2</td><td>{{ detform.g7r1h }}</td><td>{{ detform.g7r1a }}</td><td>{{ detform.g7r2h }}</td><td>{{ detform.g7r2a }}</td></tr>
+            <tr><td>Men 1&3</td><td>{{ detform.g8r1h }}</td><td>{{ detform.g8r1a }}</td><td>{{ detform.g8r2h }}</td><td>{{ detform.g8r2a }}</td></tr>
+            <tr><td>Women 1&3</td><td>{{ detform.g9r1h }}</td><td>{{ detform.g9r1a }}</td><td>{{ detform.g9r2h }}</td><td>{{ detform.g9r2a }}</td></tr>
+        </table>
+
+    {% else %}
+
+        <table class='table' id='table'>
+            <tr><th rowspan="2">Game</th><th colspan="2">R1</th><th colspan="2">R2</th></tr>
+            <tr><th>H</th><th>A</th><th>H</th><th>A</th></tr>
+            <tr><td>2+3 v 2+3</td><td>{{ detform.g1r1h }}</td><td>{{ detform.g1r1a }}</td><td>{{ detform.g1r2h }}</td><td>{{ detform.g1r2a }}</td></tr>
+            <tr><td>1+4 v 1+4</td><td>{{ detform.g2r1h }}</td><td>{{ detform.g2r1a }}</td><td>{{ detform.g2r2h }}</td><td>{{ detform.g2r2a }}</td></tr>
+            <tr><td>2+4 v 2+4</td><td>{{ detform.g3r1h }}</td><td>{{ detform.g3r1a }}</td><td>{{ detform.g3r2h }}</td><td>{{ detform.g3r2a }}</td></tr>
+            <tr><td>1+3 v 1+3</td><td>{{ detform.g4r1h }}</td><td>{{ detform.g4r1a }}</td><td>{{ detform.g4r2h }}</td><td>{{ detform.g4r2a }}</td></tr>
+            <tr><td>3+4 v 3+4</td><td>{{ detform.g5r1h }}</td><td>{{ detform.g5r1a }}</td><td>{{ detform.g5r2h }}</td><td>{{ detform.g5r2a }}</td></tr>
+            <tr><td>1+2 v 1+2</td><td>{{ detform.g6r1h }}</td><td>{{ detform.g6r1a }}</td><td>{{ detform.g6r2h }}</td><td>{{ detform.g6r2a }}</td></tr>
+        </table>
+
+    {% endif %}
+
+    {% if detform.non_field_errors and pagename == "errors" %}
+      {% if detform.non_field_errors.0 == "game" %}
+        {% for error in detform.non_field_errors %}
+          {% if error != "game" %}
+            <p style="color:red;">{{ error }}</p>
+          {% endif %}
+        {% endfor %}
+        <p>Override score validation - if a game was shortened, please tick this box (please double check that all the other scores are correct): {{ detform.score_check }}</p>
+      {% endif %}
+      {% if detform.non_field_errors.0 == "away_and_game" %}
+        {% for error in detform.non_field_errors %}
+          {% if error != "away_and_game" and error.0 == "G" %}
+            <p style="color:red;">{{ error }}</p>
+          {% endif %}
+        {% endfor %}
+        <p>Override score validation - if a game was shortened, please tick this box (please double check that all the other scores are correct): {{ detform.score_check }}</p>
+      {% endif %}
+    {% endif %}
+    <br>
+    <input class="button" type="submit" value="Submit Result">
+    </form>
+    <br>
+    {% if source == "fix" %}
+    <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+    <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% elif pagename == "postpone" %}
+
+    <h1>{{ fixture }}</h1>
+
+    <h3>Postpone Match</h3>
+    <p>If this match has been postponed without a new date, please click the button below:</p>
+    <form action="/fixtures/update/{{ fixture.id }}/postponed/{{ source }}" method="post">
+    {% csrf_token %}
+    <input class="button" type="submit" value="Postpone Match">
+    </form>
+
+{% elif pagename == "reschedule" %}
+
+    <h1>{{ fixture }}</h1>
+
+    <h3>Rearrange Match</h3>
+    <p>If you wish to rearrange this match, please enter the new date, time and venue below:</p>
+    <form action="/fixtures/update/{{ fixture.id }}/rescheduled/{{ source }}" method="post">
+    {% csrf_token %}
+    <p>Date and Time: {{ rform.date_time }}</p>
+    <p>Finish Time: {{rform.end_time }}</p>
+    <p>Venue: {{ rform.venue }}</p>
+    <input class="button" type="submit" value="Reschedule Match">
+    <p>These details will be sent to the away club for confirmation.</p>
+    </form>
+
+{% elif pagename == "concede" %}
+
+    <h1>{{ fixture }}</h1>
+
+    <h3>Match Conceded</h3>
+    <p>If one of the teams involved has had to forfeit the match, please click on the relevant button below to record this</p>
+    <p>Conceding teams will likely incur a penalty with the other team receiving points in proportion to those gained in their other matches.</p>
+    <form action="/fixtures/update/{{ fixture.id }}/concededhome/{{ source }}" method="post">
+    {% csrf_token %}
+    <input class="button" type="submit" value="Match conceded by home team">
+    </form>
+    <br>
+    <form action="/fixtures/update/{{ fixture.id }}/concededaway/{{ source }}" method="post">
+    {% csrf_token %}
+    <input class="button" type="submit" value="Match conceded by away team">
+    </form>
+
+{% elif pagename == "proposed" %}
+
+    <h1>{{ fixture }}</h1>
+
+    <p><b>Date Proposed:</b> {{ fixture.date_time }}</p>
+    {% if fixture.old_date_time %}
+        <p><b>Original Date:</b> {{ fixture.old_date_time }}</p>
+    {% endif %}
+    <p><b>Venue Proposed:</b> {{ fixture.venue }}</p>
+    <p>If this date and venue is acceptable to your club, please click the button below.</p>
+    <form action="/fixtures/{{ fixture.id }}/confirmed/{{ source }}" method="post">
+    {% csrf_token %}
+    <input class="button" type="submit" value="Confirm New Date/Venue">
+    </form>
+    <p>If the details are not those you were expecting or your team can no longer make the new date, click the button below to reject them.</p>
+    <form action="/fixtures/{{ fixture.id }}/rejected/{{ source }}" method="post">
+    {% csrf_token %}
+    <input class="button" type="submit" value="Reject New Date/Venue">
+    </form>
+
+{% elif pagename == "confirmed" %}
+
+    <br>
+    <p>The match has been successfully rescheduled. Any further changes will have to be proposed again by the home team</p>
+    <br>
+    {% if source == "fix" %}
+        <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% elif pagename == "postponed" %}
+
+    <br>
+    <p>The match has been postponed.</p>
+    <br>
+    {% if source == "fix" %}
+        <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% elif pagename == "rescheduled" %}
+
+    <br>
+    <p>The proposed date and venue has been sent to the away team for confirmation.</p>
+    <br>
+    {% if source == "fix" %}
+        <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% elif pagename == "concededhome" or pagename == "concededaway" %}
+
+    <br>
+    <p>The concession has been submitted.</p>
+    <br>
+    {% if source == "fix" %}
+        <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% elif pagename == "submitted" %}
+
+    <br>
+    <p>The result has been submitted.</p>
+    <br>
+    {% if source == "fix" %}
+        <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% elif pagename == "unupdateable" %}
+    <br>
+    <p>Sorry, you are unable to update that fixture, probably because the result has already been submitted or because it is not a home match for your club.</p>
+    <br>
+    {% if source == "fix" %}
+        <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% endif %}
+
+{% endblock content %}

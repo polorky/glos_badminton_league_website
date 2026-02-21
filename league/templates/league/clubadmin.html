@@ -1,0 +1,618 @@
+{% extends "base.html" %}
+
+{% block title %}Admin{% endblock title %}
+
+{% block menubar %}
+    <li class="nav"><a class="nav" href="/">Home</a></li>
+    <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+    <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+    <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+    <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+    <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+    <li class="nav"><a class="nav active" href="/clubadmin">Club Admin</a></li>
+    <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+    <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+    <li class="nav"><a class="nav" href="/help">Help!</a></li>
+    <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+    </li>
+{% endblock menubar %}
+
+{% block content %}
+
+{% if status == "nouser" %}
+
+    <p>Please login to view this page.</p>
+
+{% elif status == "leagueAdmin" %}
+
+    <h1>League Admin Options</h1>
+    <p>Click <a href="/admin">here</a> to access the league database.</p>
+
+    <h2>League Contacts</h2>
+    <ul>
+        {% for contact, email in club_contacts.items %}
+            <li>{{ contact }} - {{ email }}</li>
+        {% endfor %}
+    </ul>
+
+<!--
+    <p>To send an email to all club contacts, complete the form below below and click "Send Email".</p>
+    <p>Your message should at least be entered into the "Body" field; you can also enter HTML-formatted text into the "HTML" field but this is optional.</p>
+    <p>You can also choose the "Reply To" address. All emails will be sent from the website email address but if you select a different "Reply To" address,
+    when somebody replies to the email it will go to that address rather than the website email address.</p>
+    <form method="post" action="/clubadmin/massemail">
+    {% csrf_token %}
+    {{ email_form.as_p }}
+    <button type="Send Email">Send Email</button>
+    </form>
+-->
+    <br>
+    <h2>Penalties for current season</h2>
+    <br>
+    <table id="table" class="table">
+      <tr><th>Team</th><th>Penalty Type</th><th>Player Name</th><th>Fixture</th><th>Remove</th></tr>
+      {% for penalty in penalties %}
+        <tr>
+            <td>{{ penalty.team }}</td><td>{{ penalty.penalty_type }}</td><td>{{ penalty.player }}</td><td>{{ penalty.fixture }}</td>
+            <td><form action="/clubadmin/delpen{{ penalty.id }}" method="post">
+                {% csrf_token %}
+                <input class="buttonred" type="submit" value="Remove Penalty">
+            </form></td>
+        </tr>
+      {% endfor %}
+    </table>
+
+<!--
+    <h2>Players</h2>
+
+    {% for club, players in players.items %}
+    <h3>{{ club.name }}</h3>
+    <ul>
+      {% for player in players %}
+        <li><a href="/clubadmin/player{{ player.id }}">{{ player.name }}</a> - {{ player.club }}</li>
+      {% endfor %}
+    </ul>
+    {% endfor %}
+-->
+
+    <h2>Nominations</h2>
+    <h3>Teams which require nominations</h3>
+    <table id="table" class="table">
+      <tr><th>Team</th><th>Num of Nominations</th><th>Status</th></tr>
+      {% for team in nom_teams %}
+      <tr><td>{{ team.0 }}</td><td>{{ team.0.count_nominations }}{% if team.0.type == "Mixed" %}/6{% else %}/4{% endif %}</td><td>{{ team.1 }}</td></tr>
+      {% endfor %}
+    </table>
+
+    <h3>Teams not requiring nominations</h3>
+    <table id="table" class="table">
+      <tr><th>Team</th><th>Num of Nominations</th></tr>
+      {% for team in last_teams %}
+      <tr><td>{{ team }}</td><td>{{ team.count_nominations }}</td></tr>
+      {% endfor %}
+    </table>
+
+<!--
+    <h3>Inactive Teams</h3>
+    <table id="table" class="table">
+      <tr><th>Team</th><th>Num of Nominations</th></tr>
+      {% for team in inactive_teams %}
+      <tr><td>{{ team }}</td><td>{{ team.count_nominations }}</td></tr>
+      {% endfor %}
+    </table>
+    <br>
+-->
+
+{% elif status == "player" %}
+
+    <h2>{{ player.name }} - {{ player.club }}</h2>
+    <table id="table" class="table">
+    <tr><th rowspan="3">Name</th><th rowspan="3">Level</th>
+      <th colspan="2">Nominations</th><th colspan="{{ teams.Lengths.All }}">Teams Player For</th></tr>
+    <tr>
+      <th rowspan="2">Mixed</th><th rowspan="2">Level</th>
+      {% if teams.Lengths.Mixed > 0 %}
+        <th colspan="{{ teams.Lengths.Mixed }}">Mixed</th>
+      {% endif %}
+      {% if teams.Lengths.Ladies > 0 %}
+        <th colspan="{{ teams.Lengths.Ladies }}">Ladies</th>
+      {% endif %}
+      {% if teams.Lengths.Mens > 0 %}
+        <th colspan="{{ teams.Lengths.Mens }}">Mens</th>
+      {% endif %}
+    </tr>
+    <tr>
+      {% if teams.Lengths.Mixed > 0 %}
+        {% for team in teams.Mixed %}
+          <th>{{ team.number }}</th>
+        {% endfor %}
+      {% endif %}
+      {% if teams.Lengths.Ladies > 0 %}
+        {% for team in teams.Ladies %}
+          <th>{{ team.number }}</th>
+        {% endfor %}
+      {% endif %}
+      {% if teams.Lengths.Mens > 0 %}
+        {% for team in teams.Mens %}
+          <th>{{ team.number }}</th>
+        {% endfor %}
+      {% endif %}
+    </tr>
+    {% for player, stats in playerstats.items %}
+      <tr><td>{{ player.name }}</td><td>{{ player.level }}</td>
+        <td>{{ stats.noms.mixed }}</td><td>{{ stats.noms.level }}</td>
+      {% for stat in stats.teams.Mixed.values %}
+        {% if 'X' in stat %}
+            <td id="redcell">{{ stat }}</td>
+        {% elif stat > 0 %}
+            <td id="greencell">{{ stat }}</td>
+        {% else %}
+            <td>{{ stat }}</td>
+        {% endif %}
+      {% endfor %}
+      {% for stat in stats.teams.Ladies.values %}
+        {% if 'X' in stat %}
+            <td id="redcell">{{ stat }}</td>
+        {% elif stat > 0 %}
+            <td id="greencell">{{ stat }}</td>
+        {% else %}
+            <td>{{ stat }}</td>
+        {% endif %}
+      {% endfor %}
+      {% for stat in stats.teams.Mens.values %}
+        {% if 'X' in stat %}
+            <td id="redcell">{{ stat }}</td>
+        {% elif stat > 0 %}
+            <td id="greencell">{{ stat }}</td>
+        {% else %}
+            <td>{{ stat }}</td>
+        {% endif %}
+      {% endfor %}
+      </tr>
+    {% endfor %}
+    </table>
+
+    <ul>
+        {% for match in matches %}
+            <a href="https://gloubadleague.pythonanywhere.com/admin/league/fixture/{{ match.id }}/change/">{{ match }}</p>
+        {% endfor %}
+    </ul>
+
+{% elif status == "websiteAdmin" %}
+
+    <h1>Website Admin Options</h1>
+    <p>Click <a href="/admin">here</a> to access the league database.</p>
+
+    <p>This section is used to upload the fixture list (note that a particular format is required)</p>
+    <form method="post"  action="/clubadmin/upload" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="myfile">
+        <button type="submit">Upload</button>
+    </form>
+    <br>
+    <form method="post"  action="/clubadmin/getperm">
+        {% csrf_token %}
+        <button type="submit">Get Performances</button>
+    </form>
+    <br>
+    <!--<form method="post"  action="/clubadmin/clearnoms">
+        {% csrf_token %}
+        <button type="submit">Clear Nominations</button>
+    </form>
+    <br>-->
+    <h3>Single Games to 30</h3>
+    <ul>
+        {% for fix in s30 %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>Single Games to Other</h3>
+    <ul>
+        {% for fix in sother %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>Other Games to Other</h3>
+    <ul>
+        {% for fix in oother %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>Forfeited Games</h3>
+    <ul>
+        {% for fix in forfeits %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>Errors</h3>
+    <ul>
+        {% for fix in errors %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+
+{% elif status == "fileuploaded" %}
+
+    <p>Fixtures uploaded successfully</p>
+
+{% elif status == "gotperm" %}
+
+    <p>{{ log }}</p>
+
+{% elif status == "nomscleared" %}
+
+    <p>Nominations cleared</p>
+
+{% elif status == "emailsent" %}
+
+    <p>Email sent</p>
+
+{% elif status == "penaltydeleted" %}
+
+    <p>Penalty removed</p>
+
+{% elif status == "venueduplicated" %}
+
+    <p style="color: red;">Venue of that name already exists</p>
+    <p><a href="/clubadmin">Back to Club Admin</a></p>
+
+{% elif status == "duplicateplayer" %}
+
+    <h3>Duplicated Player</h3>
+    <p>You have noted that <b>{{ player.name }}</b> is a duplicate of an existing player in your roster, please select the correct player below:</p>
+    <p style="color:red;">Please choose carefully as this will update the fixture in question and delete the newly created player</p>
+    <form action="/clubadmin/duplicatesubmit" method="post">
+        {% csrf_token %}
+        <table>
+            <tr><td>{{ form.incorrect_player.label_tag }}</td><td>{{ form.incorrect_player }}</td></tr>
+            <tr><td>{{ form.correct_player.label_tag }}</td><td>{{ form.correct_player }}</td></tr>
+        </table>
+        <br>
+        <input class="button" type="submit" value="Submit">
+    </form>
+
+{% elif status == "duplicateerror" %}
+
+    <p style="color: red;">There was a error processing your request. Details have been sent to the website admin who will be in touch.</p>
+    <p>{{ errortext }}</p>
+    <p><a href="/clubadmin">Back to Club Admin</a></p>
+
+{% elif status == "duplicatedeleted" %}
+
+    <p>The correct player has been added to the fixture in question and the duplicate player has been deleted.</p>
+    <p><a href="/clubadmin">Back to Club Admin</a></p>
+
+{% else %}
+
+    {% if member %}
+
+        <h1>{{ member.club }}</h1>
+
+        <h3>Admin Functions</h3>
+        <p>This page is mostly for club admins. You are logged in as a club member so the admin functions are unavailable.</p>
+
+        <h3>Player Roster</h3>
+        <p>Below is the list of players at your club that have been added by your club's administrators. Players can also be created when a
+        result is submitted and a player that played in the match hadn't been previously added to your roster. Your club admin can add new players.
+        If there are any issues with the roster please contact the league. Players will a 'X' against a team mean they are not eligible to
+        play for that team. If there is a number after the 'X' it shows the number of matches they played before being ineligible (or after,
+        in which case the team may have incurred penalty points).</p>
+        <p>You can only delete players who have not played any matches and have not been nominated for any teams. If you need to make changes to
+        other players, please contact the website admin at GlosBadWebsite@gmail.com</p>
+        <p><b style="color:red;">Note: </b>in order to speed up the loading time for this page, eligibility is now only determined by team type
+        (e.g. a lady can't play for a mens team) and nominations. Players restricted from playing for lower teams because they have played four
+        or more matches for higher teams will NOT be shown as ineligible for the lower teams in the table below but will still incur an automatic
+        penalty if they do play down illegally.</p>
+        <table id="table" class="table">
+        <tr><th rowspan="3">Name</th><th rowspan="3">Level</th>
+          <th colspan="2">Nominations</th><th colspan="{{ teams.Lengths.All }}">Teams Player For</th></tr>
+        <tr>
+          <th rowspan="2">Mixed</th><th rowspan="2">Level</th>
+          {% if teams.Lengths.Mixed > 0 %}
+            <th colspan="{{ teams.Lengths.Mixed }}">Mixed</th>
+          {% endif %}
+          {% if teams.Lengths.Ladies > 0 %}
+            <th colspan="{{ teams.Lengths.Ladies }}">Ladies</th>
+          {% endif %}
+          {% if teams.Lengths.Mens > 0 %}
+            <th colspan="{{ teams.Lengths.Mens }}">Mens</th>
+          {% endif %}
+        </tr>
+        <tr>
+          {% if teams.Lengths.Mixed > 0 %}
+            {% for team in teams.Mixed %}
+              <th>{{ team.number }}</th>
+            {% endfor %}
+          {% endif %}
+          {% if teams.Lengths.Ladies > 0 %}
+            {% for team in teams.Ladies %}
+              <th>{{ team.number }}</th>
+            {% endfor %}
+          {% endif %}
+          {% if teams.Lengths.Mens > 0 %}
+            {% for team in teams.Mens %}
+              <th>{{ team.number }}</th>
+            {% endfor %}
+          {% endif %}
+        </tr>
+        {% for player, stats in playerstats.items %}
+          <tr><td>{{ player.name }}</td><td>{{ player.level }}</td>
+            <td>{{ stats.noms.mixed }}</td><td>{{ stats.noms.level }}</td>
+          {% for stat in stats.teams.Mixed.values %}
+            {% if 'X' in stat %}
+                <td id="redcell">{{ stat }}</td>
+            {% elif stat > 0 %}
+                <td id="greencell">{{ stat }}</td>
+            {% else %}
+                <td>{{ stat }}</td>
+            {% endif %}
+          {% endfor %}
+          {% for stat in stats.teams.Ladies.values %}
+            {% if 'X' in stat %}
+                <td id="redcell">{{ stat }}</td>
+            {% elif stat > 0 %}
+                <td id="greencell">{{ stat }}</td>
+            {% else %}
+                <td>{{ stat }}</td>
+            {% endif %}
+          {% endfor %}
+          {% for stat in stats.teams.Mens.values %}
+            {% if 'X' in stat %}
+                <td id="redcell">{{ stat }}</td>
+            {% elif stat > 0 %}
+                <td id="greencell">{{ stat }}</td>
+            {% else %}
+                <td>{{ stat }}</td>
+            {% endif %}
+          {% endfor %}
+          </tr>
+        {% endfor %}
+        </table>
+        <p>For a list of your club's teams, see your <a href="/clubs/{{ admin.club.get_club_url }}">club's page</a>
+        <br>
+
+    {% else %}
+
+        <h1>{{ admin.club }}</h1>
+        <br>
+
+<!--
+        <h3>Team Nominations</h3>
+        <p>You are now able to make nominations for your club's teams, <a href="/nominations/update">click here</a> to go to the nomination page.</p>
+        <p style="color:red;">Nominations must be made before the end of September or the team's first match, whichever is sooner.</p>
+        <br>
+        <hr>
+        <br>
+-->
+
+        <h3>Player Roster</h3>
+        <p>Below is the list of players at your club that have been added by your club's administrators. Players can also be created when a
+        result is submitted and a player that played in the match hadn't been previously added to your roster. You can add new players below.
+        If there are any issues with the roster please contact the league. Players will a 'X' against a team mean they are not eligible to
+        play for that team. If there is a number after the 'X' it shows the number of matches they played before being ineligible (or after,
+        in which case the team may have incurred penalty points).</p>
+        <p>You can only delete players who have not played any matches and have not been nominated for any teams. If you need to make changes to
+        other players, please contact the website admin at GlosBadWebsite@gmail.com</p>
+        <p><b style="color:red;">Note: </b>in order to speed up the loading time for this page, eligibility is now only determined by team type
+        (e.g. a lady can't play for a mens team) and nominations. Players restricted from playing for lower teams because they have played four
+        or more matches for higher teams will NOT be shown as ineligible for the lower teams in the table below but will still incur an automatic
+        penalty if they do play down illegally.</p>
+        <table id="table" class="table">
+        <tr><th rowspan="3">Name</th><th rowspan="3">Level</th><th colspan="2">Nominations</th>
+        <th colspan="{{ teams.Lengths.All }}">Teams Player For</th><th rowspan="3">Amend</th></tr>
+        <tr>
+          <th rowspan="2">Mixed</th><th rowspan="2">Level</th>
+          {% if teams.Lengths.Mixed > 0 %}
+            <th colspan="{{ teams.Lengths.Mixed }}">Mixed</th>
+          {% endif %}
+          {% if teams.Lengths.Ladies > 0 %}
+            <th colspan="{{ teams.Lengths.Ladies }}">Ladies</th>
+          {% endif %}
+          {% if teams.Lengths.Mens > 0 %}
+            <th colspan="{{ teams.Lengths.Mens }}">Mens</th>
+          {% endif %}
+        </tr>
+        <tr>
+          {% if teams.Lengths.Mixed > 0 %}
+            {% for team in teams.Mixed %}
+              <th>{{ team.number }}</th>
+            {% endfor %}
+          {% endif %}
+          {% if teams.Lengths.Ladies > 0 %}
+            {% for team in teams.Ladies %}
+              <th>{{ team.number }}</th>
+            {% endfor %}
+          {% endif %}
+          {% if teams.Lengths.Mens > 0 %}
+            {% for team in teams.Mens %}
+              <th>{{ team.number }}</th>
+            {% endfor %}
+          {% endif %}
+        </tr>
+        {% for player, stats in playerstats.items %}
+          <tr><td>{{ player.name }}</td><td>{{ player.level }}</td>
+            {% if stats.noms.mixed %}
+                <td id="greencell">{{ stats.noms.mixed }}</td>
+            {% else %}
+                <td>{{ stats.noms.mixed }}</td>
+            {% endif %}
+            {% if stats.noms.level %}
+                <td id="greencell">{{ stats.noms.level }}</td>
+            {% else %}
+                <td>{{ stats.noms.level }}</td>
+            {% endif %}
+          {% for stat in stats.teams.Mixed.values %}
+            {% if 'X' in stat %}
+                <td id="redcell">{{ stat }}</td>
+            {% elif stat > 0 %}
+                <td id="greencell">{{ stat }}</td>
+            {% else %}
+                <td>{{ stat }}</td>
+            {% endif %}
+          {% endfor %}
+          {% for stat in stats.teams.Ladies.values %}
+            {% if 'X' in stat %}
+                <td id="redcell">{{ stat }}</td>
+            {% elif stat > 0 %}
+                <td id="greencell">{{ stat }}</td>
+            {% else %}
+                <td>{{ stat }}</td>
+            {% endif %}
+          {% endfor %}
+          {% for stat in stats.teams.Mens.values %}
+            {% if 'X' in stat %}
+                <td id="redcell">{{ stat }}</td>
+            {% elif stat > 0 %}
+                <td id="greencell">{{ stat }}</td>
+            {% else %}
+                <td>{{ stat }}</td>
+            {% endif %}
+          {% endfor %}
+            <td>
+                {% if player.deletable %}
+                    <form action="/clubadmin/deleteplayer{{ player.id }}" method="post">
+                    {% csrf_token %}
+                    <input class="buttonred" type="submit" value="Delete">
+                    </form>
+                {% elif player.possible_duplicate %}
+                    <form action="/clubadmin/duplicateplayer{{ player.id }}" method="post">
+                    {% csrf_token %}
+                    <input class="buttonorange" type="submit" value="Mark as duplicate">
+                    </form>
+                {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </table>
+        <p>For a list of your club's teams, see your <a href="/clubs/{{ admin.club.get_club_url }}">club's page</a>
+        <br>
+        <hr>
+        <br>
+
+        <h3>Add a New Club Player</h3>
+        <p>Enter the <u>full</u> name of new players and their level doubles type.</p>
+        <p><b style="color:red;">Please ensure that the name format used here is also used on match scorecards so if you use nicknames or
+        shortened names here, also use them on scorecards.</b></p>
+        <form action="/clubadmin/players" method="post">
+        {% csrf_token %}
+        {% for field in playerform %}
+          <b>{{ field.name.title }}</b>: {{ field }}
+        {% endfor %}
+        <input class="button" type="submit" value="Add Player">
+        </form>
+        {% if status == "playeradded" %}
+        <p style="color: red;">Player added!</p>
+        {% elif status == "playerduplicated" %}
+        <p style="color: red;">A player of that name already exists</p>
+        {% endif %}
+        <br>
+        <hr>
+        <br>
+
+        <h3>Club Penalties</h3>
+        {% if penalties %}
+        <p>These are the penalties your club has incurred in the current season:</p>
+        <table id="table" class="table">
+            <tr><th>Penalty Type</th><th>Penalty Points</th><th>Team</th><th>Fixture</th><th>Player</th></tr>
+            {% for penalty in penalties %}
+                <tr><td>{{ penalty.penalty_type }}</td><td>{{ penalty.penalty_value }}</td><td>{{ penalty.team }}</td><td>{{ penalty.fixture }}</td><td>{{ penalty.player }}</td></tr>
+            {% endfor %}
+        </table>
+        {% else %}
+        <p>Your club has not incurred any penalties so far this season!</p>
+        {% endif %}
+        <br>
+        <hr>
+        <br>
+
+        <h3>Club Contacts</h3>
+        <p><b style="color:red;">Please Note: </b>The first five fields will be available to EVERYBODY accessing the website which will allow
+        people interested in joining your club to contact the club. The Club Information field can be used to introduce your club.<p>
+        <p>The league contacts, on the other, will only be available to people who are logged into the website which will only be league
+        administrators and other clubs.</p>
+        <form action="/clubadmin/contacts" method="post">
+        {% csrf_token %}
+        <table>
+          {% for field in clubform %}
+            <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
+          {% endfor %}
+        </table>
+        <br>
+        <input class="button" type="submit" value="Update Contact Details">
+        {% if status == "contactupdated" %}
+          <p style="color: red;">Contacts updated!</p>
+        {% endif %}
+        </form>
+        <br>
+        <hr>
+        <br>
+
+        <h3>Club Nights</h3>
+        <p>You can add your club nights here and these will be displayed in your club's page for anybody who is interested.</p>
+        <p>Select the venue from the drop-down list, if it is not in the list, you will need to add it in the venue section below.</p>
+        <p>In the timings box, enter the day and time of your club night, e.g. "Mondays 7-9pm"</p>
+        <form action="/clubadmin/clubnight" method="post">
+        {% csrf_token %}
+        <table>
+          {% for field in clubnightform %}
+            <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
+          {% endfor %}
+        </table>
+        <br>
+        <input class="button" type="submit" value="Add Club Night">
+        {% if status == "contactupdated" %}
+          <p style="color: red;">Club night added!</p>
+        {% endif %}
+        </form>
+        <p>Current club nights:</p>
+        <table id="table" class="table">
+          <tr><th>Venue</th><th>Timings</th><th>Delete</th></tr>
+          {% for clubnight in clubnights %}
+            <tr>
+                <td>{{ clubnight.venue }}</td><td>{{ clubnight.timings }}</td>
+                <td><form action="/clubadmin/deletecn{{ clubnight.id }}" method="post">
+                    {% csrf_token %}
+                    <input class="buttonred" type="submit" value="Delete">
+                </form></td>
+            </tr>
+          {% endfor %}
+        </table>
+        {% if status == "clubnightdeleted" %}
+        <p style="color: red;">Club night deleted!</p>
+        {% endif %}
+        <br>
+        <hr>
+        <br>
+
+        <h3>Change Club Password</h3>
+        <p>Click <a href="{% url 'change-password' %}">here</a> to change the password for your club's account.
+        Please ensure that any of your club's members who need it are aware of the new password.</p>
+        <br>
+        <hr>
+        <br>
+
+        <h3>Add a New Venue</h3>
+        <p>If your club has started to use a new venue for matches, you can add the details here. You will then be able to select the
+        new venue when rescheduling matches.</p><p>League admins will be notified and will add in the Google Map view.<p>
+        <form action="/clubadmin/venue" method="post">
+        {% csrf_token %}
+        {% for field in venueform %}
+          <p><b style="vertical-align:top;">{{ field.label_tag }} </b>{{ field }}</p>
+        {% endfor %}
+        <input class="button" type="submit" value="Add Venue">
+        </form>
+        {% if status == "venueadded" %}
+        <p style="color: red;">Venue added!</p>
+        {% endif %}
+        <br><br><br>
+
+    {% endif %}
+
+{% endif %}
+
+{% endblock content %}

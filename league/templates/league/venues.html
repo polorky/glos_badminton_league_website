@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Venues{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav active" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+{% if status == "home" %}
+  <h1>League Venues</h1>
+  <p>These are the match venues currently registered by clubs. If your club is planning on using a new venue for matches, even if
+    temporarily, please register it in the <a href="\clubadmin\home">Club Admin page</a> to help other clubs find it.</p>
+  <div style="text-align:center;" class="mapmain">
+      <iframe src="https://www.google.com/maps/d/u/0/embed?mid=1-Ss_nuZtJxhR8s74hIJyHq2sfe0H4AY&ehbc=2E312F" width="640" height="480"></iframe>
+  </div>
+  <div style="text-align:center;" class="mapmobile">
+      <iframe src="https://www.google.com/maps/d/u/0/embed?mid=1-Ss_nuZtJxhR8s74hIJyHq2sfe0H4AY&ehbc=2E312F"></iframe>
+  </div>
+  <ul class="clublist">
+    {% for venue in venues %}
+      <li><a href="{{ venue.get_venue_url }}">{{ venue.name }}</a></li><br>
+    {% endfor %}
+  </ul>
+
+{% elif status == "doesnotexist" %}
+
+  <h1>Venue does not exist</h1>
+  <p>Not sure how you got here but a venue of the name does not exist.</p>
+
+{% else %}
+
+  {% if updateable %}
+    <form action="/venues/{{ venue.get_venue_url }}" method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <input class="button" type="submit" value="Update Details">
+    </form>
+    {% if request.GET.updated == "true" %}
+        <p style="color:red;">Details updated!</p>
+    {% endif %}
+  {% else %}
+    <h2>{{ venue.name }}</h2>
+    <p><b>Address: </b>{{ venue.address }}</p>
+    <p><b>Additional Information: </b>{{ venue.additional_information }}</p>
+  {% endif %}
+
+  {% if clubs == '' %}
+    <p>No matches yet scheduled for this venue</p>
+  {% else %}
+    <p><b>Clubs: </b>{% for club in clubs %}<a href="/clubs/{{ club.get_club_url }}">{{ club.name }}</a> {% endfor %}</p>
+  {% endif %}
+  <br>
+  {% if venue.map == None %}
+    <p>Map view not yet available for this venue</p>
+  {% else %}
+    <iframe
+    src="{{ venue.map }}"
+    width="600"
+    height="450"
+    style="border:0;"
+    allowfullscreen=""
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade">
+    </iframe>
+  {% endif %}
+{% endif %}
+
+{% endblock content %}

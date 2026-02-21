@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav active" href="/login">Login</a></li>
+{% endblock menubar %}
+
+{% block content %}
+
+  <h2>Login</h2>
+
+  <p>Please enter your club's username and password:</p>
+
+  <form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    <table>
+        {{ form.as_table }}
+    </table>
+    <input type="submit" value="Login">
+    <input type="hidden" name="next" value="{{ next }}" />
+  </form>
+
+  <p>If your club login details have been mislaid, please contact the league to have the details resent to the registered club officials.</p>
+
+{% endblock content %}

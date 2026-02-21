@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav active" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+<h1>Help Page</h1>
+
+<p>If you have any difficulties navigating the wesbite, please see the sections below which will hopefully help you out. If you are still having issues or come across any bugs or
+would like to suggest improvements or for anything else related to the website, please email GlosBadWebsite@gmail.com</p>
+
+<h2>User Permissions</h2>
+<p>Most information on the website is available to anyone. The main exception to this is contact details which are mostly available only to users that are logged in to the
+website (although clubs have the option of entering public contact details for people wanting to join the club). There are then two levels of website users for each club. The
+first is Member level which can make changes to fixtures and view private contact details, the second is Admin level which has full control over the club. This is summarised
+in the table below:</p>
+
+<table id="table" class="table">
+    <tr><th>Action</th><th>Not Logged In</th><th>Member</th><th>Admin</th></tr>
+    <tr><td>Rearrange fixtures</td><td>NO</td><td>YES</td><td>YES</td></tr>
+    <tr><td>Submit results</td><td>NO</td><td>YES</td><td>YES</td></tr>
+    <tr><td>View clubs' league contacts</td><td>NO</td><td>YES</td><td>YES</td></tr>
+    <tr><td>View clubs' public contacts</td><td>YES</td><td>YES</td><td>YES</td></tr>
+    <tr><td>Add/update club contacts</td><td>NO</td><td>NO</td><td>YES</td></tr>
+    <tr><td>View captains' details</td><td>NO</td><td>YES</td><td>YES</td></tr>
+    <tr><td>Add captains' details</td><td>NO</td><td>YES</td><td>YES</td></tr>
+    <tr><td>Add new venue</td><td>NO</td><td>NO</td><td>YES</td></tr>
+    <tr><td>Update venue details</td><td>NO</td><td>NO</td><td>YES</td></tr>
+    <tr><td>Add players</td><td>NO</td><td>NO</td><td>YES</td></tr>
+    <tr><td>Add club nights</td><td>NO</td><td>NO</td><td>YES</td></tr>
+    <tr><td>Submit nominations</td><td>NO</td><td>NO</td><td>YES</td></tr>
+    <tr><td>Change passwords</td><td>NO</td><td>NO</td><td>YES</td></tr>
+</table>
+
+<h2>Fixtures</h2>
+<p>The main aim of the website is to manage league fixtures in a more automated way, allowing the postponing and rescheduling of matches online as well as an automatically updated
+league table upon submission of results. Therefore, fixtures can be in a number of different statuses:</p>
+<ul>
+    <li><b>Unplayed</b> - this is the default status so the match remains unchanged from the original fixture list and no result has been submitted.</li>
+    <li><b>Postponed</b> - simply means the match has been postponed and a new date has yet to be agreed by the teams involved.</li>
+    <li><b>New Date Proposed</b> - the home team have proposed a new date for a postponed match but the away team have not yet confirmed this date. Hopefully, you shouldn't see
+    this status much because the teams should have talked to eachother throughout and the noting of the new date on the website should just be a formality.</li>
+    <li><b>Rearranged</b> - match has been rearranged to a new date and/or venue but has not yet been played.</li>
+    <li><b>Played</b> - match result has been submitted (same status whether the match was played on the original date or rearranged).</li>
+    <li><b>Conceded (H)</b> - match has been conceded by the home team - points will be allocated at the end of the season.</li>
+    <li><b>Conceded (A)</b> - match has been conceded by the away team - points will be allocated at the end of the season.</li>
+</ul>
+
+<p>From fixture lists, you can view and fixture by clicking the "View" link under the View column. For matches not yet played, this will have little additional information
+but once the match has been played, you will be able to see the game breakdown of the match. For some fixtures, you will also see an "Update" link under the Update column,
+see below for more details.</p>
+
+<p>The fixture tables can be ordered by clicking on the relevant column heading. Under the main <a href="/fixtures/home">Fixtures page</a> you can also filter the fixtures
+by team using the search box at the top. There is also a button to "Download Fixtures" above the table although note that this will just download all fixtures and ignore
+any filtering you currently have on the table.</p>
+
+<h2>Updating Fixtures</h2>
+<p>To change the status of a fixture, you will need to navigate either to your team's division from the <a href="/divisions/home">Divisions page</a> or to the main
+<a href="/fixtures/home">Fixtures page</a>. Find the fixture you wish to update and click on the relevant "Update" link under the Update column.</p>
+<p>You will see that you are only able to update certain fixtures. These will mostly be the home matches for your club's teams since the home team is responsible for
+submitting the result and rearranging matches. However, if the home team in one of your away matches has proposed a new date/venue for a match then you will also be able
+to update those fixtures to either accept or reject the new date.</p>
+
+<h3>Rearranging Matches</h3>
+
+<p><b>Please ensure you contact the other club BEFORE postponing or rearranging a fixture on this site. Club contacts can be found under the relevant club's page on the
+<a href="/clubs/home">Clubs section</a>, some teams may also have entered contact details for their captain and these can be viewed under the relevant team's page on the
+<a href="/teams/home">Teams section</a>. Note that you will need to be logged in to see these details.</b></p>
+
+<p>After clicking the "Update" link next to the relevant fixture, you have several options available to you.</p>
+
+<p>If you have agreed with the away team to <b>postpone</b> a match, simply click the "Postpone Match" button in the "Postpone Match" section of the page.</p>
+
+<p>If you have already agreed a <b>new date and/or venue</b> with the away team, you can enter these under the "Rearrange Match" section and then click "Reschedule Match". Note
+that the away team will then be sent an email asking them to confirm the new date/venue. If they accept it then the match status will be set to "Rearranged" but if they
+reject the details then it will return to "Postponed" status.</p>
+
+<p>Matches can be rearranged as much as required though obviously please keep communicating directly with the other club involved so that the email updates the wesbite sends
+out are not a surprise.</p>
+
+<h3>Conceding Matches</h3>
+
+<p>Hopefully, this will be a rarely needed function, but there are two buttons to signify that a match has been conceded by either the home team or the away team. Due to the
+complicated way of dealing with these in terms of the league table, these fixtures will be marked "Conceded", no points will be allocated and the situation will be resolved
+by the league committee at the end of the season.</p>
+
+<h3>Submitting a Result</h3>
+
+<p>There are several sections to submitting a result and a few complexities. Here are the different bits of information required:</p>
+
+<p><b>Score</b></p>
+<p>Hopefully, this is the easy bit, you just need to enter the overall score of the match. Checks will be done to ensure that the total number of points matches what is
+expected for that league and to ensure they tally with the game scores you will enter below.</p>
+
+<p><b>Players</b></p>
+<p>Select your team's players (the home players) from the dropdowns provided which will show all club players not nominated for other teams. If a player is not on this list,
+you will need to add them to your roster in the <a href="/clubadmin">Club Admin page</a> before submitting the result.</p>
+<p>Due to data protection concerns, the away players cannot be selected from a dropdown and must instead be typed in. <b>Please be careful when typing in away players' names
+</b> as any player not found in the away club's roster will be automatically created. The site will do some fuzzy matching so if there are very small errors or typos in the
+names you enter, it should be able to find the relevant player on the away club's roster. However, if the site cannot find anybody matching or almost matching what you have
+entered then, after you have tried to submit the result, it will ask you to tick a box to confirm that you have double checked that the names you have entered match those
+entered on the scorecard by the away team's captain. If you are happy this is the case, tick the box and submit the result again.</p>
+
+<p><b>Game Scores</b></p>
+<p>Enter the scores for each team for each game played (you can use the Tab key on your keyboard to cycle through the fields quickly). The site will do some basic validation
+to make sure that the scores are valid and produce the overall result you entered above but this is probably not full proof so please double check the scores after you have
+entered them.</p>
+<p>There may be occasions that you need to override the validation (e.g. the match took too long and you had to shorten the last games). In this case, enter the score as
+recorded on the match scorecard and click "Submit Result". The site will flag a validation error for that game(s) but will also present you will a tick box asking if you
+want to override the validation. If you are sure that what you've entered accurately represents the match score then tick the box and click "Submit Result" again.</p>
+
+<p><b>Submit Result</b></p>
+<p>Once you have entered all the above information, click the "Submit Result" button. <b>If you do NOT get a screen that confirms that your result has been submitted
+successfully then there are likely errors on the form.</b> You may need to scroll down the page to find them but they should be in red text. There are two scenarios
+mentioned above when you will need to tick a box to confirm the information you have entered is correct but once these are ticked, you should be able to submit the result
+successfully, assuming there are no other issues.</p>
+<p>Once submitted, the result should be instantly viewable in the relevant division page with the division table updated accordingly.</p>
+
+<h2>Club Admin</h2>
+<p>The <a href="/clubadmin">Club Admin page</a> contains a number of administrative functions some more important than others. These are listed below in rough order of importance. Note that you
+will need to be logged in to view the Club Admin page for your club.</p>
+
+<h3>Player Roster</h3>
+<p>This is the most important part of the Club Admin page as it will record which players have been nominated for which teams and how many times they have played for each team.
+Also, players must be on your roster for them to be available to select when submitting a result for your club (see above). Further, if somebody plays in an away match for
+your club but is not on the roster then they will be automatically added to your roster when the home club submits the result so please try to add players before they play
+matches.</p>
+<p>The roster will also, hopefully, give you an easy way to track how many games each player has played and therefore which teams they are still eligible for.</p>
+<p>To <b>add a new player</b>, simply enter their full name in the box under the "Add a New Club Player" section and select their gender then click the "Add Player" button.
+You should see them immediately added to your club's roster.</p>
+<p><b>Please ensure player names are entered into the website in the <u>exact</u> same format as they will be recorded on match scorecards as when your club plays away
+matches, the away team will be typing the name in manually and the site will be looking for a match. If you've used different formats then it might fail to find the right
+player and created a new player instead.</b></p>
+<p>Please note that you cannot edit or delete a player because it would potentially cause issues with the database. If you do need to amend or delete a player, please contact
+the GlosBadWebsite@gmail.com address.</p>
+
+<h3>Team Nominations</h3>
+<p>At the beginning of the season, you will see a "Team Nomination" section at the top of the page. Clicking on the link in the text below will take you to the nomination
+forms.</p>
+<p>If you have no more than one team in each league then the site will notify you that you have no nominations to make. If you have multiple teams in any league, you should
+have a nomination form to complete for all but the lowest team.</p>
+<p>Simply select the players you wish to nominate for each team from the dropdown menus. Note that you will need to have added the players to your club roster before doing
+this (see above). Once happy with the selections, click the relevant "Save" button. <b>Note that each "Save" button only saves the nominations for the team immediately above
+it so you will need to click a button for each team that you want to save.</b></p>
+
+<h3>Club Contacts</h3>
+<p>You can use this section of the website to keep your club contacts up to date. Note that there are publicly available ones so if you have a generic club email address,
+you can enter it here. These contact details will be available to anybody accessing your club's page under the <a href="/clubs/home">Clubs section</a> and are mainly
+designed for use by new players interested in joining the club. You can also add a link to your club's website if you have one, as well as create a blurb giving some
+details about your club to prospective members. All this is completely optional so its up to your club how you use this.</p>
+<p>By contrast, the league contacts will only be available to people who are logged into the website so are designed for communication from other clubs or league admins.
+These are obviously more important to keep up to date to ensure a smooth running of the league.</p>
+<p>To update and details, just overwrite what is already there and click "Update Contact Details".</p>
+
+<h3>Change Club Password</h3>
+<p>As you might imagine, this section provides a link to change your club's password. Please note that as each club has a single login, if you do change the password,
+please ensure everybody at your club who needs to use the website has the new password. The website admin does not have access to these passwords but can reset it if
+required, please try not to forget your password too often!</p>
+
+<h3>Add a New Venue</h3>
+<p>If you start playing matches at a new venue during the season, then you will need to add this venue to th website before you can rearrange matches to that venue.
+Simply type in the name, address and any additional information you think would be useful to visiting teams (e.g. parking information) and click "Add Venue". It should
+be immediately available in the <a href="/venues/home">Venues section</a> and available to select when rearranging games. You will note that in various places, venues
+are shown on a map. New venues will not automatically show on this and will need to be added by the website admin who will get an email whenever a new venue is created.</p>
+
+<h3>Club Nights</h3>
+<p>This is a very optional function but if you want to record when your club nights are for prospective members, you can do it here. Simply pick the venue from the dropdown
+(or add it as mentioned above, if its not there) and enter the timings (e.g. Mondays 7-9pm) then click "Add Club Night". It should then instantly appear in the table below.
+You can also delete club nights if you've made a typo or something's changed.</p>
+
+<h2>Clubs</h2>
+<p>The <a href="/clubs/home">Clubs page</a> simply has a list of league clubs and a map of league venues with the clubs that play at them. This page is designed to help
+new players find a club. Clicking on a club name will take you to that club's page which might contain the following information (the items marked "optional" will depend
+on whether the club has entered details via the Club Admin page, see above):</p>
+<ul>
+    <li>Club infomation (optional)</li>
+    <li>Club website (optional)</li>
+    <li>Public contact information (optional)</li>
+    <li>League contact information (requires user to be logged in)</li>
+    <li>Club nights (optional)</li>
+    <li>League match venues (based on matches in current season)</li>
+    <li>Club teams</li>
+</ul>
+
+<h2>Teams</h2>
+<p>The <a href="/teams/home">Teams page</a> lists all the active league teams. Clicking on a team will give you links to their club's page, the page for the division
+the team plays in and the fixtures for that team. If you are logged into the site, you will also see contact details for the team captain if the club has entered any.
+If the team is from your club and you are logged in, you will be able to update the captain's details by entering them into the boxes provided and clicking "Update Details".</p>
+
+<h2>Venues</h2>
+<p>The <a href="/venues/home">Venues page</a> lists all league venues and shows them on a map. Clicking on a venue will show you it's address and any additional information
+the home club has provided. It will also list the clubs that play matches there and provide a Google map of the venue. If you are logged in and your club is one of those that
+have matches at that venue then you will be able to edit the details of the venue, clicking "Update Details" will save any changes you make. As noted above, if you need to
+add a new venue, you can do so from the Club Admin page.</p>
+
+{% endblock content %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav active" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+<h1>Gloucestershire Badminton League</h1>
+
+<h3>Welcome!</h3>
+<p>Welcome to the website for the Gloucestershire Badminton League!</p>
+
+<h3>New to Gloucestershire? Looking for a badminton club to join?</h3>
+<p>Head to our <a href="clubs/home">Clubs page</a> for further details on the clubs that play in the Gloucestershire league.</p>
+
+<h3>Introduction to the Website</h3>
+<p>For any issues surrounding league fixtures, please contact: <a href="mailto:GlosBadFixtures@outlook.com">GlosBadFixtures@outlook.com</a></p>
+<p>For any technical issues with this website, please contact: <a href="mailto:GlosBadWebsite@gmail.com">GlosBadWebsite@gmail.com</a></p>
+<p>For any other issues surrounding the league, please contact: <a href="mailto:GlosBadCorrespondence@outlook.com">GlosBadCorrespondence@outlook.com</a></p>
+
+<p>If you need to contact other clubs, you can find general club contact details on the <a href="/clubs/home">Clubs page</a> and potentially team captain details
+ on the <a href="/teams/home">Teams page</a> (if the club has entered these). Note that to see this information you will need to be logged in using your club's
+ credentials. These will have been sent to the club administrators registered with the league</p>
+
+<p>You will also need to be logged in to make changes to fixtures and submit results.</p>
+
+<h3>Scorecard</h3>
+<p><a href="static\New Scorecard.pdf" download>Click here</a> to download the scorecard for league matches.</p>
+
+<h3>Rules</h3>
+<p><a href="static\League Rules-2025-26.pdf">Click here</a> to download the rules for the 2025-26 season.</p>
+
+<h3> Club Administration</h3>
+<p>There is a <a href="\clubadmin">Club Admin</a> section which will allow club administrators to update club details such as
+  club contacts, player roster and match venues. You will need to be logged in to access this area.</p>
+
+{% endblock content %}

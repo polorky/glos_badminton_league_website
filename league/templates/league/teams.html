@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Teams{% endblock title %}
+
+{% block menubar %}
+  <li class="nav"><a class="nav" href="/">Home</a></li>
+  <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
+  <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
+  <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
+  <li class="nav"><a class="nav active" href="/teams/home">Teams</a></li>
+  <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
+  <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
+  <li class="nav"><a class="nav" href="/archive/home">Archive</a></li>
+  <li class="nav"><a class="nav" href="/juniors">Juniors</a></li>
+  <li class="nav"><a class="nav" href="/help">Help!</a></li>
+  <li class="nav" style="float:right;">
+    {% if user.is_authenticated %}
+        <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+    {% else %}
+        <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+    {% endif %}
+  </li>
+{% endblock menubar %}
+
+{% block content %}
+
+{% if status == "home" %}
+
+  <h1>Current Teams</h1>
+  <p>This is the list of current teams in the league.</p>
+  <ul class="teamlist">
+    {% for team in teams %}
+    <li><a href="{{ team.get_team_url }}">{{ team }}</a></li>
+    {% endfor %}
+  </ul>
+
+  <h3>Historic Teams</h3>
+  <p>This is the list of teams that have previously played in the league but either the club is no longer active or the club has withdrawn the team.</p>
+  <ul class="teamlist">
+    {% for team in old_teams %}
+    <li><a href="{{ team.get_team_url }}">{{ team }}</a></li>
+    {% endfor %}
+  </ul>
+
+{% elif status == "doesnotexist" %}
+
+    <h1>Team does not exist</h1>
+    <p>Not sure how you got here but a team with this ID does not exist.</p>
+
+{% else %}
+
+  <h1>{{ team }}</h1>
+
+  <p><b>Club: </b><a href="/clubs/{{ team.club.get_club_url }}">{{ team.club }}</a></p>
+  <p><b>Current Division: </b><a href="/divisions/{{ team.division.get_division_url }}">{{ team.division }}</a></p>
+
+  {% if updateable %}
+    <form action="/teams/{{ team.get_team_url }}" method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <input class="button" type="submit" value="Update Details">
+    </form>
+    {% if request.GET.updated == "true" %}
+        <p style="color:red;">Details updated!</p>
+    {% endif %}
+  {% elif user.is_authenticated %}
+    <p><b>Captain (if recorded): </b>{{ team.captain }}</p>
+    <p><b>Captain's Phone Number: </b>{{ team.captain_num }}</p>
+    <p><b>Captain's Email Address: </b>{{ team.captain_email }}</p>
+  {% else %}
+    <p>To see contact details for the team captain (if entered by the club), please <a href="{% url 'login' %}?next=/clubadmin">log in</a>.</p>
+  {% endif %}
+
+  <h3>Current Season - Fixtures and Results</h3>
+  <table id="table" class="table">
+    <tr><th onclick="sortTable(0)">Date ↕</th><th onclick="sortTable(1)">Day ↕</th><th>Start</th><th>End</th>
+      <th onclick="sortTable(4)">Home Team ↕</th><th colspan="2">Scores</th><th onclick="sortTable(8)">Away Team ↕</th>
+      <th onclick="sortTable(9)">Venue ↕</th><th onclick="sortTable(10)">Status ↕</th><th>View</th><th>Update</th></tr>
+    {% for fix in fixtures %}
+      {% if fix.0.status == "Postponed" %}
+        <tr class="postponed">
+      {% elif fix.0.status == "Proposed" %}
+        <tr class="proposed">
+      {% elif fix.0.status == "Rearranged" %}
+        <tr class="rearranged">
+      {% elif fix.0.status == "Played" %}
+        <tr class="played">
+      {% elif fix.0.status == "Conceded (H)" %}
+        <tr class="conceded">
+      {% elif fix.0.status == "Conceded (A)" %}
+        <tr class="conceded">
+      {% else %}
+        <tr class="unplayed">
+      {% endif %}
+          <td>{{ fix.0.date_time|date:'Y-m-d' }}</td>
+          <td>{{ fix.0.date_time|date:'D' }}</td>
+          <td>{{ fix.0.date_time|date:'H:i' }}</td>
+          <td>{{ fix.0.end_time|date:'H:i' }}</td>
+          <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team }}</a></td>
+          <td>{{ fix.0.home_points }}</td>
+          <td>{{ fix.0.away_points }}</td>
+          <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team }}</a></td>
+          <td><a href="/venues/{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td>
+          <td>{{ fix.0.get_status_display }}</td>
+          <td><a href="/fixtures/{{ fix.0.id }}/div">View</a></td>
+          {% if fix.1 %}
+            <td><a href="/fixtures/{{ fix.0.id }}/update/div">Update</a></td>
+          {% else %}
+            <td></td>
+          {% endif %}
+        </tr>
+    {% endfor %}
+  </table>
+  <h3>Past Performance</h3>
+  <ul>
+      {% for perm in performances %}
+        {% if perm.season.historic_divs %}
+            <li>{{ perm.season }} - {{ perm.division.get_historic_name }} - Position: {{ perm.position }}</li>
+        {% else %}
+            <li>{{ perm.season }} - {{ perm.division }} - Position: {{ perm.position }}</li>
+        {% endif %}
+      {% endfor %}
+  </ul>
+  <br>
+  <a href="/clubs/{{ team.club.get_club_url }}">Back to Club</a>
+
+{% endif %}
+
+{% endblock content %}
