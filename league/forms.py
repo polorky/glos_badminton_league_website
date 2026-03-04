@@ -2,8 +2,8 @@ from django.forms import ModelForm, BaseFormSet, Form, IntegerField, ChoiceField
 from django import forms
 from .models import Fixture, Club, ClubNight, Player, Venue, Team
 from django.core.exceptions import ValidationError
-from fuzzywuzzy import fuzz
 import league.constants as constants
+from .utilities import find_away_players
 
 
 class ClubForm(ModelForm):
@@ -129,11 +129,13 @@ class FixtureForm(ModelForm):
             raise ValidationError(['player','You have duplicated home player(s)'])
         
         # Check away players are not duplicated, are right gender and exist - CAN BE OVERRIDDEN
-        player_errors += check_away_players(cd, self.instance)
+        players_found, player_errors += find_away_players(cd, self.instance)
 
         # If errors and overrides not checked, raise error
         if player_errors and not cd['player_name_check']:
             raise ValidationError(['player',player_errors])
+
+        cd['players_found'] = players_found
 
         return cd
 
@@ -225,25 +227,96 @@ class MixedFixtureForm(FixtureForm):
         model = Fixture
         fields = ['home_points','away_points','home_player1','home_player2','home_player3','home_player4','home_player5','home_player6']
 
-    def clean(self):
-        cd = super().clean()
-
-        # Check score totals - MUST BE CORRECT
-        if cd.get('home_points') + cd.get('away_points') != constants.TOTAL_POINTS_MIXED:
-            raise ValidationError(['points','Points do not add up to the correct amount'])
-
 class LevelFixtureForm(FixtureForm):
 
     class Meta:
         model = Fixture
         fields = ['home_points','away_points','home_player1','home_player2','home_player3','home_player4']
 
+class BaseScoreFormSet(BaseFormSet):
     def clean(self):
-        cd = super().clean()
+        super().clean()
 
-        # Check score totals - MUST BE CORRECT
-        if cd.get('home_points') + cd.get('away_points') != constants.TOTAL_POINTS_LEVEL:
-            raise ValidationError(['points','Points do not add up to the correct amount'])
+        all_scores = []
+        for form in self.forms:
+            cd = form.cleaned_data
+            if cd['forfeit']:
+                all_scores.append([cd['forfeit'], cd['forfeit']])
+            else:
+                all_scores.append([cd['home_score'], cd['away_score']])
+        
+        # Check game scores - CAN BE OVERRIDDEN
+        game_errors = self.check_game_results(all_scores)
+
+        # If game errors and game override not checked, raise error
+        if game_errors and not cd['score_check']:
+            raise ValidationError(['game',game_errors])
+        
+    def check_game_results(self, game_results):
+        '''
+        Validate the scores submitted for matches
+        '''
+
+        def check_scores(pair, errors):
+            '''
+            Checks numeric values for a rubber's scores
+            '''
+
+            # If one score is 21 and other score is not 23 but is over 19, raise error
+            if pair[0] == '21' and pair[1] != '23' and int(pair[1]) > 19:
+                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
+            elif pair[1] == '21' and pair[0] != '23' and int(pair[0]) > 19:
+                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
+
+            # If one of the scores is over 21, check setting...
+            if int(pair[0]) > 21 or int(pair[1]) > 21:
+                # Difference must be two unless one score is 30, if not raise error
+                if abs(int(pair[0]) - int(pair[1])) != 2 and pair[0] != '30' and pair[1] != '30':
+                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
+                # If one score hit 30 the other one must be 28 or 29, if not raise error
+                elif pair[0] == '30' and pair[1] not in ['28','29']:
+                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
+                elif pair[1] == '30' and pair[0] not in ['28','29']:
+                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
+
+            return errors
+
+        errors = []
+
+        for i, pair in enumerate(game_results):
+
+            # Work out game and rubber
+            game = str((i+2) // 2)
+            rubber = str(i % 2 + 1)
+
+            # Check numeric values match expected scoring
+            if pair[0] not in ('FH','FA'):
+                errors = check_scores(pair, errors)
+
+            # Check scores aren't the same
+            if int(pair[0]) == int(pair[1]):
+                errors.append('Game ' + game + ' rubber ' + rubber + ' - scores the same, please check')
+
+        return errors
+
+class ScoreForm(Form):
+    home_score = IntegerField(
+        min_value=0, max_value=30, required=False,
+        widget=forms.NumberInput(attrs={'style': 'width:5ch', 'placeholder': 'H'})
+    )
+    away_score = IntegerField(
+        min_value=0, max_value=30, required=False,
+        widget=forms.NumberInput(attrs={'style': 'width:5ch', 'placeholder': 'A'})
+    )
+    forfeit = ChoiceField(
+        choices=[('', 'None'), ('FH', 'Home'), ('FA', 'Away')],
+        required=False,
+        widget=forms.Select(attrs={'style': 'width:8ch'})
+    )
+
+# Formsets for different match types
+MixedScoreFormSet = formset_factory(ScoreForm, extra=18, formset=BaseScoreFormSet)  # 9 games x 2 rubbers
+LevelScoreFormSet = formset_factory(ScoreForm, extra=12, formset=BaseScoreFormSet)  # 6 games x 2 rubbers
 
 class ClubNightForm(ModelForm):
 
@@ -276,103 +349,3 @@ class DuplicatePlayerForm(Form):
     incorrect_player = forms.ChoiceField(choices=[])
     correct_player = forms.ChoiceField(choices=[])
 
-class BaseScoreFormSet(BaseFormSet):
-    def clean(self):
-        super().clean()
-
-        all_scores = []
-        for form in self.forms:
-            cd = form.cleaned_data
-            if cd['forfeit']:
-                all_scores += [cd['forfeit'], cd['forfeit']]
-            else:
-                all_scores += [cd['home_score'], cd['away_score']]
-        
-        # Check game scores - CAN BE OVERRIDDEN
-        game_errors, score = check_game_results(all_scores)
-
-        # If game errors and game override not checked, raise error
-        if game_errors and not cd['score_check']:
-            raise ValidationError(['game',game_errors])
-        
-    def check_game_results(game_results, match_type):
-        '''
-        Validate the scores submitted for matches
-        '''
-
-        def check_scores(pair, errors):
-            '''
-            Checks numeric values for a rubber's scores
-            '''
-
-            # If one score is 21 and other score is not 23 but is over 19, raise error
-            if pair[0] == '21' and pair[1] != '23' and int(pair[1]) > 19:
-                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
-            elif pair[1] == '21' and pair[0] != '23' and int(pair[0]) > 19:
-                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
-
-            # If one of the scores is over 21, check setting...
-            if int(pair[0]) > 21 or int(pair[1]) > 21:
-                # Difference must be two unless one score is 30, if not raise error
-                if abs(int(pair[0]) - int(pair[1])) != 2 and pair[0] != '30' and pair[1] != '30':
-                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
-                # If one score hit 30 the other one must be 28 or 29, if not raise error
-                elif pair[0] == '30' and pair[1] not in ['28','29']:
-                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
-                elif pair[1] == '30' and pair[0] not in ['28','29']:
-                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
-
-            return errors
-
-        paired = [game_results[x:x + 2] for x in range(0, len(game_results), 2)]
-        errors = []
-        score = [0,0]
-
-        for i, pair in enumerate(paired):
-
-            # Work out game and rubber
-            game = str((i+2) // 2)
-            rubber = str(i % 2 + 1)
-
-            # Check the values are numeric or forfeits, otherwise raise an error
-            if pair[0] not in ('FH','FA') and (int(pair[0]) < 0 or int(pair[0]) > 30):
-                return ['Game ' + game + ' rubber ' + rubber + ' - home score is not a number or FH/FA'], score
-            elif pair[1] not in ('FH','FA') and (int(pair[1]) < 0 or int(pair[1]) > 30):
-                return ['Game ' + game + ' rubber ' + rubber + ' - away score is not a number or FH/FA'], score
-
-            # Check numeric values match expected scoring
-            if pair[0] not in ('FH','FA'):
-                errors = check_scores(pair, errors)
-
-            # Work out whether rubber scores for home or away
-            if pair[0] == 'FH':
-                score[1] += 1
-            elif pair[0] == 'FA':
-                score[0] += 1
-            elif int(pair[0]) > int(pair[1]):
-                score[0] += 1
-            elif int(pair[0]) < int(pair[1]):
-                score[1] += 1
-            else:
-                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
-
-        return errors, score
-
-class ScoreForm(Form):
-    home_score = IntegerField(
-        min_value=0, max_value=30, required=False,
-        widget=forms.NumberInput(attrs={'style': 'width:5ch', 'placeholder': 'H'})
-    )
-    away_score = IntegerField(
-        min_value=0, max_value=30, required=False,
-        widget=forms.NumberInput(attrs={'style': 'width:5ch', 'placeholder': 'A'})
-    )
-    forfeit = ChoiceField(
-        choices=[('', 'None'), ('FH', 'Home'), ('FA', 'Away')],
-        required=False,
-        widget=forms.Select(attrs={'style': 'width:8ch'})
-    )
-
-# Formsets for different match types
-MixedScoreFormSet = formset_factory(ScoreForm, extra=18, formset=BaseScoreFormSet)  # 9 games x 2 rubbers
-LevelScoreFormSet = formset_factory(ScoreForm, extra=12, formset=BaseScoreFormSet)  # 6 games x 2 rubbers

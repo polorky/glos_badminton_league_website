@@ -1,101 +1,57 @@
 from django.shortcuts import render, redirect
 from django.db.models import Q
 from django.core.mail import send_mail
+from django.core import signing
 from django.views import View
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 
-from .models import Administrator, Member, Club, ClubNight, Team, Player, Venue, Fixture, Division, Season, Penalty, Performance
+from .models import *
 from .forms import ClubForm, LevelScoreFormSet, MixedScoreFormSet, PlayerForm, MixedNominateForm, LevelNominateForm, VenueForm, EmailForm, DuplicatePlayerForm
 from .forms import TeamForm, RescheduleForm, MixedFixtureForm, LevelFixtureForm, ClubNightForm
 import league.constants as constants
 
 import urllib
 import pandas as pd
-from fuzzywuzzy import fuzz
 from io import BytesIO
 from datetime import datetime
 
 ##### Auxillary functions #####
 
-def check_away_players(fixture, detdata):
+def check_away_players(fixture, players_found):
     '''
         Takes data from results form and checks for matches for away players
         If a fuzzy match is not found, a new player is created for the club
         The updated Fixture object is returned
     '''
 
-    match_dict = {}
-    club = fixture.away_team.club
-    players = ['away_player1','away_player2','away_player3','away_player4']
-    level = ['Ladies','Ladies','Ladies','Mens','Mens','Mens']
+    div_type = fixture.division.type
+    mixed_player_type = ['Ladies','Ladies','Ladies','Men','Men','Men']
+    verifications = []
 
-    if fixture.division.type == "Mixed":
-        players += ['away_player5','away_player6']
-
-    for i, player_title in enumerate(players):
-
-        player_name = detdata[player_title]
-
-        if not player_name:
-            continue
-
-        # Try direct match
-        try:
-            match_dict[player_title] = Player.objects.get(club=club,name=player_name)
-        # Else try fuzzy match with all club players
-        except:
-            fuzzy_max = ('',0)
-            for player in Player.objects.filter(club=club):
-                if fuzz.ratio(player_name.upper(),player.name.upper()) > fuzzy_max[1]:
-                    fuzzy_max = (player,fuzz.ratio(player_name.upper(),player.name.upper()))
-            if fuzzy_max[1] >= constants.PLAYER_NAME_FUZZY_MATCH_RATIO:
-                match_dict[player_title] = fuzzy_max[0]
-            else:
-                # Else try replacing name with long/short version
-                player_found = False
-                for name_tuple in constants.ALTERNATE_NAMES:
-                    if name_tuple[0] in player_name:
-                        try:
-                            match_dict[player_title] = Player.objects.get(club=club,name=player_name.replace(name_tuple[0],name_tuple[1]))
-                            player_found = True
-                        except:
-                            pass
-                    elif name_tuple[1] in player_name:
-                        try:
-                            match_dict[player_title] = Player.objects.get(club=club,name=player_name.replace(name_tuple[1],name_tuple[0]))
-                            player_found = True
-                        except:
-                            pass
-
-                # If player still not found, create them
-                if not player_found:
-                    if fixture.division.type == "Mixed":
-                        player_level = level[i]
-                    else:
-                        player_level = fixture.division.type
-                    new_player = Player(club=club,name=player_name.title(),level=player_level)
-                    new_player.save()
-                    email_notification('new_player',fixture,player_name=player_name)
-                    match_dict[player_title] = new_player
-
-    if "away_player1" in match_dict.keys():
-        fixture.away_player1 = match_dict["away_player1"]
-    if "away_player2" in match_dict.keys():
-        fixture.away_player2 = match_dict["away_player2"]
-    if "away_player3" in match_dict.keys():
-        fixture.away_player3 = match_dict["away_player3"]
-    if "away_player4" in match_dict.keys():
-        fixture.away_player4 = match_dict["away_player4"]
-    if fixture.division.type == "Mixed":
-        if "away_player5" in match_dict.keys():
-            fixture.away_player5 = match_dict["away_player5"]
-        if "away_player6" in match_dict.keys():
-            fixture.away_player6 = match_dict["away_player6"]
-
-    return fixture
+    for player_title, player_dict in players_found:
+        if player_dict['player'] and not player_dict['suggest_only']:
+            setattr(fixture, player_title, player_dict['player'])
+            fixture.save()
+        else:
+            level = div_type if div_type != 'Mixed' else mixed_player_type[int(player_title[-1])]
+            verification = PendingPlayerVerification.objects.create(
+                fixture=fixture,
+                submitted_name=player_dict['name'],
+                level=level,
+                token=''
+            )
+            verification.token = signing.dumps({'verification_id': verification.id})
+            verification.save()
+            if player_dict['player']:
+                verification.suggested_player = player_dict['player']
+                verification.save()
+            verifications.append(verification)
+    
+    if verifications:
+        email_notification('playernotfound', verifications)
 
 def email_notification(status, fix, sender='GlosBadWebsite@gmail.com', player_name=''):
 
@@ -658,6 +614,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             if resform.is_valid() and resformset.is_valid():
 
                 # Find matches for away players or create new ones
+                found_players = resformset.cleaned_data['found_players']
                 fixture = check_away_players(fixture, resform.cleaned_data)
                 # Change fixture status
                 fixture.status = 'Played'

@@ -365,7 +365,7 @@ class Member(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE)
 
 class Player(models.Model):
-    name = models.CharField(max_length=30)
+    name = models.CharField(max_length=50)
     level = models.CharField(max_length=10,choices=(('Ladies','Ladies'),('Mens','Mens')))
     club = models.ForeignKey(Club,on_delete=models.CASCADE)
 
@@ -929,5 +929,13 @@ class Performance(models.Model):
     division = models.ForeignKey(Division,on_delete=models.CASCADE)
     position = models.CharField(max_length=100)
 
-
+class PendingPlayerVerification(models.Model):
+    fixture = models.ForeignKey(Fixture, on_delete=models.CASCADE)
+    submitted_name = models.CharField(max_length=50)
+    level = models.CharField(max_length=10,choices=(('Mixed','Mixed'),('Ladies','Ladies'),('Mens','Mens')))
+    suggested_player = models.ForeignKey(Player, null=True, blank=True, on_delete=models.SET_NULL)
+    token = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved = models.BooleanField(default=False)
+    resolved_player = models.ForeignKey(Player, null=True, blank=True, on_delete=models.SET_NULL, related_name='resolved_verifications')
 
