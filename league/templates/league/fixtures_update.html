@@ -51,11 +51,11 @@
     <form action="/fixtures/update/{{ fixture.id }}/result/{{ source }}" method="post">
     {% csrf_token %}
 
-    <p>{{ fixture.home_team }}: {{ detform.home_points }}</p>
-    <p>{{ fixture.away_team }}: {{ detform.away_points }}</p>
-    {% if detform.non_field_errors and pagename == "errors" %}
-      {% if detform.non_field_errors.0 == "points" %}
-        <p style="color:red;">{{ detform.non_field_errors.1 }}</p>
+    <p>{{ fixture.home_team }}: {{ resform.home_points }}</p>
+    <p>{{ fixture.away_team }}: {{ resform.away_points }}</p>
+    {% if resform.non_field_errors and pagename == "errors" %}
+      {% if resform.non_field_errors.0 == "points" %}
+        <p style="color:red;">{{ resform.non_field_errors.1 }}</p>
       {% endif %}
     {% endif %}
 
@@ -73,36 +73,36 @@
 
         <table id="table" class="table">
             <tr><th>Player</th><th>Home</th><th>Away</th></tr>
-            <tr><td>Lady 1</td><td>{{ detform.home_player1 }}</td><td>{{ detform.away_player1 }}</td></tr>
-            <tr><td>Lady 2</td><td>{{ detform.home_player2 }}</td><td>{{ detform.away_player2 }}</td></tr>
-            <tr><td>Lady 3</td><td>{{ detform.home_player3 }}</td><td>{{ detform.away_player3 }}</td></tr>
-            <tr><td>Man 1</td><td>{{ detform.home_player4 }}</td><td>{{ detform.away_player4 }}</td></tr>
-            <tr><td>Man 2</td><td>{{ detform.home_player5 }}</td><td>{{ detform.away_player5 }}</td></tr>
-            <tr><td>Man 3</td><td>{{ detform.home_player6 }}</td><td>{{ detform.away_player6 }}</td></tr>
+            <tr><td>Lady 1</td><td>{{ resform.home_player1 }}</td><td>{{ resform.away_player1 }}</td></tr>
+            <tr><td>Lady 2</td><td>{{ resform.home_player2 }}</td><td>{{ resform.away_player2 }}</td></tr>
+            <tr><td>Lady 3</td><td>{{ resform.home_player3 }}</td><td>{{ resform.away_player3 }}</td></tr>
+            <tr><td>Man 1</td><td>{{ resform.home_player4 }}</td><td>{{ resform.away_player4 }}</td></tr>
+            <tr><td>Man 2</td><td>{{ resform.home_player5 }}</td><td>{{ resform.away_player5 }}</td></tr>
+            <tr><td>Man 3</td><td>{{ resform.home_player6 }}</td><td>{{ resform.away_player6 }}</td></tr>
         </table>
 
     {% else %}
 
       <table id="table" class="table">
         <tr><th>Player</th><th>Home</th><th>Away</th></tr>
-        <tr><td>Player 1</td><td>{{ detform.home_player1 }}</td><td>{{ detform.away_player1 }}</td></tr>
-        <tr><td>Player 2</td><td>{{ detform.home_player2 }}</td><td>{{ detform.away_player2 }}</td></tr>
-        <tr><td>Player 3</td><td>{{ detform.home_player3 }}</td><td>{{ detform.away_player3 }}</td></tr>
-        <tr><td>Player 4</td><td>{{ detform.home_player4 }}</td><td>{{ detform.away_player4 }}</td></tr>
+        <tr><td>Player 1</td><td>{{ resform.home_player1 }}</td><td>{{ resform.away_player1 }}</td></tr>
+        <tr><td>Player 2</td><td>{{ resform.home_player2 }}</td><td>{{ resform.away_player2 }}</td></tr>
+        <tr><td>Player 3</td><td>{{ resform.home_player3 }}</td><td>{{ resform.away_player3 }}</td></tr>
+        <tr><td>Player 4</td><td>{{ resform.home_player4 }}</td><td>{{ resform.away_player4 }}</td></tr>
       </table>
 
     {% endif %}
 
-    {% if detform.non_field_errors and pagename == "errors" %}
-      {% if detform.non_field_errors.0 == "player" %}
-        {% for error in detform.non_field_errors %}
+    {% if resform.non_field_errors and pagename == "errors" %}
+      {% if resform.non_field_errors.0 == "player" %}
+        {% for error in resform.non_field_errors %}
           {% if error != "player" %}
             <p style="color:red;">{{ error }}</p>
           {% endif %}
         {% endfor %}
-        <p>I confirm the away player names have been entered as provided by the away team and any missing players are correct: {{ detform.player_name_check }}</p>
-      {% elif detform.non_field_errors.0 == "player_and_game" %}
-        {% for error in detform.non_field_errors %}
+        <p>I confirm the away player names have been entered as provided by the away team and any missing players are correct: {{ resform.player_name_check }}</p>
+      {% elif resform.non_field_errors.0 == "player_and_game" %}
+        {% for error in resform.non_field_errors %}
           {% if error != "player_and_game" and error.0 == "A" %}
             <p style="color:red;">{{ error }}</p>
           {% endif %}
@@ -114,70 +114,39 @@
 
     <h4>Individual Game Scores</h4>
     <p>TIP: use the Tab key to move between fields</p>
-    <p>If any games were forfeited, please enter "FH" for games forfeited by the home team (so points go to away team) and "FA" for away forfeits as both the home and away score.</p>
 
-    <!--    <p>If the third rubber was not required for any of the games, please leave the fields blank, don't enter zeroes.</p>-->
-    <!--    <table class='table' id='table'>-->
-    <!--        <tr><th rowspan="2">Game</th><th colspan="2">R1</th><th colspan="2">R2</th><th colspan="2">R3</th></tr>-->
-    <!--        <tr><th>H</th><th>A</th><th>H</th><th>A</th><th>H</th><th>A</th></tr>-->
-    <!--        <tr><td>Mixed 3v2</td><td>{{ detform.g1r1h }}</td><td>{{ detform.g1r1a }}</td><td>{{ detform.g1r2h }}</td><td>{{ detform.g1r2a }}</td><td>{{ detform.g1r3h }}</td><td>{{ detform.g1r3a }}</td></tr>-->
-    <!--        <tr><td>Mixed 2v3</td><td>{{ detform.g2r1h }}</td><td>{{ detform.g2r1a }}</td><td>{{ detform.g2r2h }}</td><td>{{ detform.g2r2a }}</td><td>{{ detform.g2r3h }}</td><td>{{ detform.g2r3a }}</td></tr>-->
-    <!--        <tr><td>Mixed 1v1</td><td>{{ detform.g3r1h }}</td><td>{{ detform.g3r1a }}</td><td>{{ detform.g3r2h }}</td><td>{{ detform.g3r2a }}</td><td>{{ detform.g3r3h }}</td><td>{{ detform.g3r3a }}</td></tr>-->
-    <!--        <tr><td>Mixed 2v2</td><td>{{ detform.g4r1h }}</td><td>{{ detform.g4r1a }}</td><td>{{ detform.g4r2h }}</td><td>{{ detform.g4r2a }}</td><td>{{ detform.g4r3h }}</td><td>{{ detform.g4r3a }}</td></tr>-->
-    <!--        <tr><td>Mixed 3v3</td><td>{{ detform.g5r1h }}</td><td>{{ detform.g5r1a }}</td><td>{{ detform.g5r2h }}</td><td>{{ detform.g5r2a }}</td><td>{{ detform.g5r3h }}</td><td>{{ detform.g5r3a }}</td></tr>-->
-    <!--        <tr><td>Mens 1&2</td><td>{{ detform.g6r1h }}</td><td>{{ detform.g6r1a }}</td><td>{{ detform.g6r2h }}</td><td>{{ detform.g6r2a }}</td><td>{{ detform.g6r3h }}</td><td>{{ detform.g6r3a }}</td></tr>-->
-    <!--        <tr><td>Ladies 1&2</td><td>{{ detform.g7r1h }}</td><td>{{ detform.g7r1a }}</td><td>{{ detform.g7r2h }}</td><td>{{ detform.g7r2a }}</td><td>{{ detform.g7r3h }}</td><td>{{ detform.g7r3a }}</td></tr>-->
-    <!--        <tr><td>Mens 1&3</td><td>{{ detform.g8r1h }}</td><td>{{ detform.g8r1a }}</td><td>{{ detform.g8r2h }}</td><td>{{ detform.g8r2a }}</td><td>{{ detform.g8r3h }}</td><td>{{ detform.g8r3a }}</td></tr>-->
-    <!--        <tr><td>Ladies 1&3</td><td>{{ detform.g9r1h }}</td><td>{{ detform.g9r1a }}</td><td>{{ detform.g9r2h }}</td><td>{{ detform.g9r2a }}</td><td>{{ detform.g9r3h }}</td><td>{{ detform.g9r3a }}</td></tr>-->
-    <!--    </table>-->
+    <table class='table' id='table'>
+        <tr><th rowspan="2">Game</th><th colspan="2">R1</th><th colspan="2">R2</th><th colspan="2">Forfeits</th></tr>
+        <tr><th>H</th><th>A</th><th>H</th><th>A</th><th>R1 Forfeit</th><th>R2 Forfeit</th></tr>
+        {% for game in games_fields %}
+            <tr>
+                <td>{{ game.0 }}</td>
+                <td>{{ game.1.0.home_score }}</td>
+                <td>{{ game.1.0.away_score }}</td>
+                <td>{{ game.1.1.home_score }}</td>
+                <td>{{ game.1.1.away_score }}</td>
+                <td>{{ game.1.0.forfeit }}</td>
+                <td>{{ game.1.1.forfeit }}</td>
+            </tr>
+        {% endfor %}
+    </table>
 
-    {% if fixture.division.type == "Mixed" %}
-
-        <table class='table' id='table'>
-            <tr><th rowspan="2">Game</th><th colspan="2">R1</th><th colspan="2">R2</th></tr>
-            <tr><th>H</th><th>A</th><th>H</th><th>A</th></tr>
-            <tr><td>Mixed 3v2</td><td>{{ detform.g1r1h }}</td><td>{{ detform.g1r1a }}</td><td>{{ detform.g1r2h }}</td><td>{{ detform.g1r2a }}</td></tr>
-            <tr><td>Mixed 2v3</td><td>{{ detform.g2r1h }}</td><td>{{ detform.g2r1a }}</td><td>{{ detform.g2r2h }}</td><td>{{ detform.g2r2a }}</td></tr>
-            <tr><td>Mixed 1v1</td><td>{{ detform.g3r1h }}</td><td>{{ detform.g3r1a }}</td><td>{{ detform.g3r2h }}</td><td>{{ detform.g3r2a }}</td></tr>
-            <tr><td>Mixed 2v2</td><td>{{ detform.g4r1h }}</td><td>{{ detform.g4r1a }}</td><td>{{ detform.g4r2h }}</td><td>{{ detform.g4r2a }}</td></tr>
-            <tr><td>Mixed 3v3</td><td>{{ detform.g5r1h }}</td><td>{{ detform.g5r1a }}</td><td>{{ detform.g5r2h }}</td><td>{{ detform.g5r2a }}</td></tr>
-            <tr><td>Men 1&2</td><td>{{ detform.g6r1h }}</td><td>{{ detform.g6r1a }}</td><td>{{ detform.g6r2h }}</td><td>{{ detform.g6r2a }}</td></tr>
-            <tr><td>Women 1&2</td><td>{{ detform.g7r1h }}</td><td>{{ detform.g7r1a }}</td><td>{{ detform.g7r2h }}</td><td>{{ detform.g7r2a }}</td></tr>
-            <tr><td>Men 1&3</td><td>{{ detform.g8r1h }}</td><td>{{ detform.g8r1a }}</td><td>{{ detform.g8r2h }}</td><td>{{ detform.g8r2a }}</td></tr>
-            <tr><td>Women 1&3</td><td>{{ detform.g9r1h }}</td><td>{{ detform.g9r1a }}</td><td>{{ detform.g9r2h }}</td><td>{{ detform.g9r2a }}</td></tr>
-        </table>
-
-    {% else %}
-
-        <table class='table' id='table'>
-            <tr><th rowspan="2">Game</th><th colspan="2">R1</th><th colspan="2">R2</th></tr>
-            <tr><th>H</th><th>A</th><th>H</th><th>A</th></tr>
-            <tr><td>2+3 v 2+3</td><td>{{ detform.g1r1h }}</td><td>{{ detform.g1r1a }}</td><td>{{ detform.g1r2h }}</td><td>{{ detform.g1r2a }}</td></tr>
-            <tr><td>1+4 v 1+4</td><td>{{ detform.g2r1h }}</td><td>{{ detform.g2r1a }}</td><td>{{ detform.g2r2h }}</td><td>{{ detform.g2r2a }}</td></tr>
-            <tr><td>2+4 v 2+4</td><td>{{ detform.g3r1h }}</td><td>{{ detform.g3r1a }}</td><td>{{ detform.g3r2h }}</td><td>{{ detform.g3r2a }}</td></tr>
-            <tr><td>1+3 v 1+3</td><td>{{ detform.g4r1h }}</td><td>{{ detform.g4r1a }}</td><td>{{ detform.g4r2h }}</td><td>{{ detform.g4r2a }}</td></tr>
-            <tr><td>3+4 v 3+4</td><td>{{ detform.g5r1h }}</td><td>{{ detform.g5r1a }}</td><td>{{ detform.g5r2h }}</td><td>{{ detform.g5r2a }}</td></tr>
-            <tr><td>1+2 v 1+2</td><td>{{ detform.g6r1h }}</td><td>{{ detform.g6r1a }}</td><td>{{ detform.g6r2h }}</td><td>{{ detform.g6r2a }}</td></tr>
-        </table>
-
-    {% endif %}
-
-    {% if detform.non_field_errors and pagename == "errors" %}
-      {% if detform.non_field_errors.0 == "game" %}
-        {% for error in detform.non_field_errors %}
+    {% if resform.non_field_errors and pagename == "errors" %}
+      {% if resform.non_field_errors.0 == "game" %}
+        {% for error in resform.non_field_errors %}
           {% if error != "game" %}
             <p style="color:red;">{{ error }}</p>
           {% endif %}
         {% endfor %}
-        <p>Override score validation - if a game was shortened, please tick this box (please double check that all the other scores are correct): {{ detform.score_check }}</p>
+        <p>Override score validation - if a game was shortened, please tick this box (please double check that all the other scores are correct): {{ resform.score_check }}</p>
       {% endif %}
-      {% if detform.non_field_errors.0 == "away_and_game" %}
-        {% for error in detform.non_field_errors %}
+      {% if resform.non_field_errors.0 == "away_and_game" %}
+        {% for error in resform.non_field_errors %}
           {% if error != "away_and_game" and error.0 == "G" %}
             <p style="color:red;">{{ error }}</p>
           {% endif %}
         {% endfor %}
-        <p>Override score validation - if a game was shortened, please tick this box (please double check that all the other scores are correct): {{ detform.score_check }}</p>
+        <p>Override score validation - if a game was shortened, please tick this box (please double check that all the other scores are correct): {{ resform.score_check }}</p>
       {% endif %}
     {% endif %}
     <br>

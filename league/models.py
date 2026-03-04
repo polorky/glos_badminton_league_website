@@ -3,21 +3,7 @@ from django.db.models import Q
 from django.core.mail import send_mail
 from django.contrib.auth.models import User
 import urllib
-
-#################### Constants ####################
-max_plays_for_higher_teams = 3
-ineligible_player_penalty_value = 5
-nomination_penalty_value = 5
-late_submission_penalty_value = 5
-penaltyDict = {"Ineligible Player":ineligible_player_penalty_value,
-               "Nomination Violation":nomination_penalty_value,
-               "Late Submission":late_submission_penalty_value,}
-cardinal_dict = {'1':'st','2':'nd','3':'rd'}
-mixed_game_format = ["Mixed 3v2","Mixed 2v3","Mixed 1v1","Mixed 2v2","Mixed 3v3","Men 1&2","Women 1&2","Men 1&3","Women 1&3"]
-level_game_format = ["2+3 v 2+3","1+4 v 1+4","2+4 v 2+4","1+3 v 1+3","3+4 v 3+4","1+2 v 1+2"]
-mixed_scoring_format = 'point per game'
-level_scoring_format = 'point per rubber'
-scoring_options = (('point per game','point per game'),('point per rubber','point per rubber'))
+import league.constants as constants
 
 def sort_table(team_list):
 
@@ -55,22 +41,22 @@ def email_notification(status, fix, team, sender='GlosBadWebsite@gmail.com', pla
         subject = 'Nomination Penalty Applied'
         recipients = get_recipients(fix, team)
         body = 'Hi,\n\nFollowing the submission of the result for the match ' + str(fix) + ", your club's team has played their first three matches." \
-        + 'However, nominated player ' + player_name + ' has not played at least two of these matches and so the team has been penalised ' + str(nomination_penalty_value) \
+        + 'However, nominated player ' + player_name + ' has not played at least two of these matches and so the team has been penalised ' + str(constants.PENALTY_NOMINATION_VIOLATION) \
         + ' points. Please contact the League Committee at GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.' \
         + '\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
         html =  'Hi,<br><br>Following the submission of the result for the match ' + str(fix) + ", your club's team has played their first three matches." \
-        + 'However, nominated player <b>' + player_name + '</b> has not played at least two of these matches and so the team has been penalised ' + str(nomination_penalty_value) \
+        + 'However, nominated player <b>' + player_name + '</b> has not played at least two of these matches and so the team has been penalised ' + str(constants.PENALTY_NOMINATION_VIOLATION) \
         + ' points. Please contact the League Committee at GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.' \
         + '<br><br>Regards<br><br>League Committee<br><br>***This is an automated email from the league website***'
     elif status == 'eligibility_penalty':
         subject = 'Eligibility Penalty Applied'
         recipients = get_recipients(fix, team)
         body = 'Hi,\n\nFollowing the submission of the result for the match ' + str(fix) + ', it has been identified that player ' + player_name + ' was ineligible' \
-        + " to play and so your club's team has been penalised " + str(ineligible_player_penalty_value) + ' points. Please contact the League Committee at' \
+        + " to play and so your club's team has been penalised " + str(constants.PENALTY_INELIGIBLE_PLAYER) + ' points. Please contact the League Committee at' \
         + ' GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.\n\nRegards\n\nLeague Committee\n\n***This is an automated' \
         + 'email from the league website***'
         html = 'Hi,<br><br>Following the submission of the result for the match ' + str(fix) + ', it has been identified that player <b>' + player_name + '</b> was ineligible' \
-        + " to play and so your club's team has been penalised " + str(ineligible_player_penalty_value) + ' points. Please contact the League Committee at' \
+        + " to play and so your club's team has been penalised " + str(constants.PENALTY_INELIGIBLE_PLAYER) + ' points. Please contact the League Committee at' \
         + ' GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.<br><br>Regards<br><br>League Committee<br><br>***This is an' \
         + 'automated email from the league website***'
 
@@ -91,7 +77,7 @@ class Season(models.Model):
     current = models.BooleanField()
     archive_info = models.TextField(blank=True,null=True)
     historic_divs = models.BooleanField(default=False)
-    mixed_scoring = models.CharField(max_length=20,null=True,choices=scoring_options,default=scoring_options[0][0])
+    mixed_scoring = models.CharField(max_length=20,null=True,choices=constants.SCORING_OPTIONS,default=constants.SCORING_MIXED)
 
     def __str__(self):
         return self.year
@@ -320,9 +306,9 @@ class Club(models.Model):
             mixed_nom_str = ''
             level_nom_str = ''
             if mixed_nom:
-                mixed_nom_str = str(mixed_nom[0].number) + cardinal_dict.get(str(mixed_nom[0].number),'th')
+                mixed_nom_str = str(mixed_nom[0].number) + {'1':'st','2':'nd','3':'rd'}.get(str(mixed_nom[0].number),'th')
             if level_nom:
-                level_nom_str = str(level_nom[0].number) + cardinal_dict.get(str(level_nom[0].number),'th')
+                level_nom_str = str(level_nom[0].number) + {'1':'st','2':'nd','3':'rd'}.get(str(level_nom[0].number),'th')
 
             player_dict[player] = {"teams":{"Mixed":{},"Ladies":{},"Mens":{}},"noms":{"mixed":mixed_nom_str,"level":level_nom_str}}
 
@@ -446,9 +432,9 @@ class Player(models.Model):
                         level_nom = str(team.number)
 
         if mixed_nom != '':
-            mixed_nom += cardinal_dict.get(mixed_nom,'th')
+            mixed_nom += {'1':'st','2':'nd','3':'rd'}.get(mixed_nom,'th')
         if level_nom != '':
-            level_nom += cardinal_dict.get(level_nom,'th')
+            level_nom += {'1':'st','2':'nd','3':'rd'}.get(level_nom,'th')
 
         team_dict["noms"] = {"mixed":mixed_nom,"level":level_nom}
 
@@ -510,10 +496,7 @@ class Player(models.Model):
             if team_type == type and num < team_num:
                 above_teams += 1
 
-        if above_teams > max_plays_for_higher_teams:
-            return False
-        else:
-            return True
+        return above_teams <= constants.MAX_PLAYS_FOR_HIGHER_TEAMS
 
     def deletable(self):
 
@@ -799,7 +782,7 @@ class Fixture(models.Model):
         if violations:
             for violation in violations:
                 email_notification('nomination_penalty', self, violation[0], player_name=violation[1].name)
-                p = Penalty(season=self.season, team=violation[0], penalty_value=nomination_penalty_value, penalty_type='Nomination Violation', player=violation[1].name, fixture=self)
+                p = Penalty(season=self.season, team=violation[0], penalty_value=constants.PENALTY_NOMINATION_VIOLATION, penalty_type='Nomination Violation', player=violation[1].name, fixture=self)
                 p.save()
 
     def check_player_eligibility(self):
@@ -811,12 +794,12 @@ class Fixture(models.Model):
         for player in self.get_players('home'):
             if not player.check_eligibility(self.home_team):
                 email_notification('eligibility_penalty', self, self.home_team, player_name=player.name)
-                p = Penalty(season=self.season, team=self.home_team, penalty_value=ineligible_player_penalty_value, penalty_type='Ineligible Player', player=player.name, fixture=self)
+                p = Penalty(season=self.season, team=self.home_team, penalty_value=constants.PENALTY_INELIGIBLE_PLAYER, penalty_type='Ineligible Player', player=player.name, fixture=self)
                 p.save()
         for player in self.get_players('away'):
             if not player.check_eligibility(self.away_team):
                 email_notification('eligibility_penalty', self, self.away_team, player_name=player.name)
-                p = Penalty(season=self.season, team=self.away_team, penalty_value=ineligible_player_penalty_value, penalty_type='Ineligible Player', player=player.name, fixture=self)
+                p = Penalty(season=self.season, team=self.away_team, penalty_value=constants.PENALTY_INELIGIBLE_PLAYER, penalty_type='Ineligible Player', player=player.name, fixture=self)
                 p.save()
 
     def get_scores(self):
@@ -828,11 +811,11 @@ class Fixture(models.Model):
         game_split = self.game_results.split(',')
 
         if self.division.type == 'Mixed' and len(game_split) == 54:
-            batched_games = {mixed_game_format[int(i/6)]: game_split[i:i + 6] for i in range(0, len(game_split), 6)}
+            batched_games = {constants.GAME_NAMES_MIXED[int(i/6)]: game_split[i:i + 6] for i in range(0, len(game_split), 6)}
         elif self.division.type == 'Mixed' and len(game_split) == 36:
-            batched_games = {mixed_game_format[int(i/4)]: game_split[i:i + 4] for i in range(0, len(game_split), 4)}
+            batched_games = {constants.GAME_NAMES_MIXED[int(i/4)]: game_split[i:i + 4] for i in range(0, len(game_split), 4)}
         else:
-            batched_games = {level_game_format[int(i/4)]: game_split[i:i + 4] for i in range(0, len(game_split), 4)}
+            batched_games = {constants.GAME_NAMES_LEVEL[int(i/4)]: game_split[i:i + 4] for i in range(0, len(game_split), 4)}
 
         for game in batched_games.keys():
 
@@ -856,7 +839,7 @@ class Fixture(models.Model):
             if self.division.type == 'Mixed':
                 scoring_format = self.season.mixed_scoring
             else:
-                scoring_format = level_scoring_format
+                scoring_format = constants.SCORING_LEVEL
 
             if scoring_format == 'point per game':
                 if home_score > away_score:

@@ -8,35 +8,15 @@ from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 
 from .models import Administrator, Member, Club, ClubNight, Team, Player, Venue, Fixture, Division, Season, Penalty, Performance
-from .forms import ClubForm, PlayerForm, MixedNominateForm, LevelNominateForm, VenueForm, EmailForm, DuplicatePlayerForm
+from .forms import ClubForm, LevelScoreFormSet, MixedScoreFormSet, PlayerForm, MixedNominateForm, LevelNominateForm, VenueForm, EmailForm, DuplicatePlayerForm
 from .forms import TeamForm, RescheduleForm, MixedFixtureForm, LevelFixtureForm, ClubNightForm
+import league.constants as constants
 
 import urllib
 import pandas as pd
 from fuzzywuzzy import fuzz
 from io import BytesIO
 from datetime import datetime
-
-
-##### Constants #####
-fuzzy_match_ratio = 85
-alt_names_list = (('David','Dave'),('Stuart','Stu'),('Richard','Rich'),('Alexander','Alex'),('Christopher','Chris'),('Andrew','Andy'),('Daniel','Dan'),('Matthew','Matt'),
-('Michael','Mike'),('Oliver','Oli'),('Oliver','Ollie'),('Phillip','Phil'),('Philip','Phil'),('Robert','Rob'),('Simon','Si'),('Thomas','Tom'),('William','Will'),
-('Rebecca','Becky'))
-conceded_penalty_mixed = 5
-conceded_penalty_level = 7
-cardinal_dict = {1:'st',2:'nd',3:'rd'}
-
-##### Change of season checklist #####
-# Code up any changes in league rules
-# Create new season and untick 'active' flag on previous season
-# Download full results for previous season
-# Get perfomances for teams (on league admin Club Admin page)
-# Create new clubs/teams
-# Update teams with new divisions and 'active' flag
-# Upload fixtures
-# Open nominations
-# Close nominations and apply any penalties
 
 ##### Auxillary functions #####
 
@@ -71,12 +51,12 @@ def check_away_players(fixture, detdata):
             for player in Player.objects.filter(club=club):
                 if fuzz.ratio(player_name.upper(),player.name.upper()) > fuzzy_max[1]:
                     fuzzy_max = (player,fuzz.ratio(player_name.upper(),player.name.upper()))
-            if fuzzy_max[1] >= fuzzy_match_ratio:
+            if fuzzy_max[1] >= constants.PLAYER_NAME_FUZZY_MATCH_RATIO:
                 match_dict[player_title] = fuzzy_max[0]
             else:
                 # Else try replacing name with long/short version
                 player_found = False
-                for name_tuple in alt_names_list:
+                for name_tuple in constants.ALTERNATE_NAMES:
                     if name_tuple[0] in player_name:
                         try:
                             match_dict[player_title] = Player.objects.get(club=club,name=player_name.replace(name_tuple[0],name_tuple[1]))
@@ -183,9 +163,9 @@ def email_notification(status, fix, sender='GlosBadWebsite@gmail.com', player_na
         recipients = get_recipients(fix, 'away')
     elif status == 'concededhome':
         if fix.division.type == "Mixed":
-            penalty_value = conceded_penalty_mixed
+            penalty_value = constants.PENALTY_MIXED_CONCEDED
         else:
-            penalty_value = conceded_penalty_level
+            penalty_value = constants.PENALTY_LEVEL_CONCEDED
         subject = str(fix) + ' - Match Conceded'
         body = 'Hi,\n\nThe home team have conceded the match ' + str(fix) + ' scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
         + 'The home team will be penalised ' + str(penalty_value) + ". The away team's points will not be updated to reflect the concession until the end of the season " \
@@ -193,9 +173,9 @@ def email_notification(status, fix, sender='GlosBadWebsite@gmail.com', player_na
         recipients = get_recipients(fix, 'both')
     elif status == 'concededaway':
         if fix.division.type == "Mixed":
-            penalty_value = conceded_penalty_mixed
+            penalty_value = constants.PENALTY_MIXED_CONCEDED
         else:
-            penalty_value = conceded_penalty_level
+            penalty_value = constants.PENALTY_LEVEL_CONCEDED
         subject = str(fix) + ' - Match Conceded'
         body = 'Hi,\n\nThe away team have conceded the match ' + str(fix) + ' scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
         + 'The away team will be penalised ' + str(penalty_value) + ". The home team's points will not be updated to reflect the concession until the end of the season " \
@@ -549,22 +529,32 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
             # Get relevant results form for fixture type
             if fixture.division.type == "Mixed":
-                detform = MixedFixtureForm(None, instance=fixture)
+                resform = MixedFixtureForm(instance=fixture)
+                resformset = MixedScoreFormSet()
             else:
-                detform = LevelFixtureForm(None, instance=fixture)
+                resform = LevelFixtureForm(instance=fixture)
+                resformset = LevelScoreFormSet()
+            
+            games_fields = []
+            games_names = constants.GAME_NAMES_MIXED if fixture.division.type == "Mixed" else constants.GAME_NAMES_LEVEL
+            for i, game_name in enumerate(games_names):
+                rubbers = [resformset.forms[2*i], resformset.forms[2*i+1]]
+                games_fields.append((game_name, rubbers))
 
             if fixture.division.type == "Mixed":
                 home_ladies, home_men = fixture.get_eligible_players()
                 for i in range(1,4):
-                    detform.fields['home_player'+str(i)].choices = home_ladies
-                    detform.fields['home_player'+str(i+3)].choices = home_men
+                    resform.fields['home_player'+str(i)].choices = home_ladies
+                    resform.fields['home_player'+str(i+3)].choices = home_men
             else:
                 home_players = fixture.get_eligible_players()
                 home_fields = ['home_player1','home_player2','home_player3','home_player4']
                 for field in home_fields:
-                    detform.fields[field].choices = home_players
+                    resform.fields[field].choices = home_players
 
-            context.update({'detform':detform})
+            context.update({'resform':resform, 
+                            'resformset':resformset,
+                            'games_fields': games_fields,})
 
         elif pagename == 'reschedule':
 
@@ -635,9 +625,9 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             fixture.status = 'Conceded (H)'
             fixture.save()
             if fixture.division.type == "Mixed":
-                penalty_value = conceded_penalty_mixed
+                penalty_value = constants.PENALTY_MIXED_CONCEDED
             else:
-                penalty_value = conceded_penalty_level
+                penalty_value = constants.PENALTY_LEVEL_CONCEDED
             p = Penalty(season=fixture.season, team=fixture.home_team, penalty_value=penalty_value, penalty_type='Match Conceded', fixture=fixture)
             p.save()
             email_notification('concededhome',fixture)
@@ -647,9 +637,9 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             fixture.status = 'Conceded (A)'
             fixture.save()
             if fixture.division.type == "Mixed":
-                penalty_value = conceded_penalty_mixed
+                penalty_value = constants.PENALTY_MIXED_CONCEDED
             else:
-                penalty_value = conceded_penalty_level
+                penalty_value = constants.PENALTY_LEVEL_CONCEDED
             p = Penalty(season=fixture.season, team=fixture.away_team, penalty_value=penalty_value, penalty_type='Match Conceded', fixture=fixture)
             p.save()
             email_notification('concededaway',fixture)
@@ -659,25 +649,30 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
             # Get relevant results form for fixture type
             if fixture.division.type == "Mixed":
-                detform = MixedFixtureForm(self.request.POST, instance=fixture)
+                resform = MixedFixtureForm(self.request.POST, instance=fixture)
+                resformset = MixedScoreFormSet(self.request.POST)
             else:
-                detform = LevelFixtureForm(self.request.POST, instance=fixture)
+                resform = LevelFixtureForm(self.request.POST, instance=fixture)
+                resformset = LevelScoreFormSet(self.request.POST)
 
-            if detform.is_valid():
+            if resform.is_valid() and resformset.is_valid():
 
-                # Get form data
-                detdata = detform.cleaned_data
                 # Find matches for away players or create new ones
-                fixture = check_away_players(fixture,detdata)
+                fixture = check_away_players(fixture, resform.cleaned_data)
                 # Change fixture status
                 fixture.status = 'Played'
                 # Bundle up game results
-                game_results = [detdata[x] for x in detdata.keys() if 'player' not in x and 'points' not in x and 'score' not in x]
-                game_results = ['' if x==None else str(x) for x in game_results]
-                game_results = ','.join(game_results)
-                fixture.game_results = game_results
+                game_results = [
+                    (f'{form.cleaned_data.get("forfeit")},{form.cleaned_data.get("forfeit")}' if form.cleaned_data.get("forfeit") else f"{form.cleaned_data.get('home_score')},{form.cleaned_data.get('away_score')}")
+                    for form in resformset if form.cleaned_data
+                    ]
+                scores_concatenated = ','.join(game_results)
+                #game_results = [resdata[x] for x in resdata.keys() if 'player' not in x and 'points' not in x and 'score' not in x]
+                #game_results = ['' if x==None else str(x) for x in game_results]
+                #game_results = ','.join(game_results)
+                fixture.game_results = scores_concatenated
                 # Save form and fixture data
-                detform.save()
+                resform.save()
                 fixture.save()
                 # Check for illegal players and apply any penalties
                 if fixture.season.current:
@@ -956,198 +951,6 @@ class ArchivesView(GenericViewMixin, TemplateView):
 
 ################ Old function based views ################
 
-def divisions(request, pagename, season=''):
-    '''
-        View for Divisions page
-        If 'Home' view accessed then lists of divisions are returned
-        Otherwise, specific division information is returned
-    '''
-
-    # For home page return list of divisions
-    if pagename == 'home':
-        mixed_divs = Division.objects.filter(type="Mixed",active=True).order_by("number")
-        ladies_divs = Division.objects.filter(type="Ladies",active=True).order_by("number")
-        mens_divs = Division.objects.filter(type="Mens",active=True).order_by("number")
-        old_mixed_divs = Division.objects.filter(type="Mixed",active=False).order_by("number")
-        old_ladies_divs = Division.objects.filter(type="Ladies",active=False).order_by("number")
-        old_mens_divs = Division.objects.filter(type="Mens",active=False).order_by("number")
-
-        context = {
-            'status': 'home',
-            'mixed_divs': mixed_divs,
-            'ladies_divs': ladies_divs,
-            'mens_divs': mens_divs,
-            'old_mixed_divs': old_mixed_divs,
-            'old_ladies_divs': old_ladies_divs,
-            'old_mens_divs': old_mens_divs,
-        }
-
-    # Otherwise return specific division
-    else:
-
-        # Check user
-        if request.user.is_authenticated:
-            user = request.user
-        else:
-            user = None
-
-        # Check whether requested division exists
-        try:
-            type_dict = {'X':'Mixed','L':'Ladies','M':'Mens'}
-            division = Division.objects.get(number=pagename[1:],type=type_dict[pagename[0]])
-        except:
-            return render(request, "league/divisions.html", {'status':'doesnotexist'})
-
-        # Get current season
-        current_season = Season.objects.get(current=True)
-
-        # If current season or no specific season requested get current table
-        if season == '' or season == current_season.year:
-            table = division.get_table()
-        # Else work out table for requested season
-        else:
-            current_season = Season.objects.get(year=season)
-            table = division.get_table(season=current_season)
-
-        # Work out previous/next season/division for links
-        prev_season, next_season = current_season.get_adj_seasons()
-        prev_div = Division.objects.filter(number=division.number - 1, type=division.type)
-        next_div = Division.objects.filter(number=division.number + 1, type=division.type)
-        fixtures = Fixture.objects.filter(season=current_season).filter(division=division.id).order_by("date_time")
-        fix_list = [(fix,fix.updateable(user)) for fix in fixtures]
-        concessions = False
-
-        # If no fixtures found and not current season, division did not exist in requested season
-        if len(fixtures) == 0 and not division.active:
-            exist = False
-        else:
-            exist = True
-
-        # If concessions exist a note will be added next to table
-        for fix in fixtures:
-            if fix.status == "Conceded (H)" or fix.status == "Conceded (A)":
-                concessions = True
-                break
-
-        # Download fixtures to Excel
-        if request.method == 'POST':
-            if len(fixtures) != 0:
-                df = build_dataframe(fixtures)
-                with BytesIO() as b:
-                    with pd.ExcelWriter(b) as writer:
-                        df.to_excel(writer)
-                    filename = "fixtures.xlsx"
-                    res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                    res['Content-Disposition'] = f'attachment; filename={filename}'
-                    return res
-
-        context = {
-            'status': 'view',
-            'division': division,
-            'fixtures': fix_list,
-            'table': table,
-            'concessions': concessions,
-            'cur_season': current_season,
-            'prev_season': prev_season,
-            'next_season': next_season,
-            'prev_div': prev_div,
-            'next_div': next_div,
-            'exist': exist
-        }
-
-    return render(request, "league/divisions.html", context)
-
-def fixtures(request, pagename, source=''):
-    '''
-        View for the Fixtures page
-        If 'Home' view requested, full fixture list is returned
-        Otherwise details of a specific fixture are returned
-        Note that updating fixtures is done by the 'fixupdate' view
-    '''
-
-    # Check user
-    if request.user.is_authenticated:
-        user = request.user
-    else:
-        user = None
-
-    # Check for admin
-    try:
-        admin = Administrator.objects.get(user=user)
-    except:
-        try:
-            admin = Member.objects.get(user=user)
-        except:
-            admin = None
-
-    # Get current season
-    current_season = Season.objects.get(current=True)
-
-    # If home page requested, return all fixtures
-    if pagename == 'home':
-
-        # Download fixtures
-        if request.method == 'POST':
-            fixtures = Fixture.objects.filter(season=current_season).order_by('date_time')
-            df = build_dataframe(fixtures)
-            with BytesIO() as b:
-                with pd.ExcelWriter(b) as writer:
-                    df.to_excel(writer)
-                filename = "fixtures.xlsx"
-                res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                res['Content-Disposition'] = f'attachment; filename={filename}'
-                return res
-
-        # Get all fixtures ordered by date
-        fixtures = Fixture.objects.filter(season=current_season).order_by('date_time')
-        fix_list = [(fix,fix.updateable(user)) for fix in fixtures]
-
-        context = {
-            'pageview': 'home',
-            'fixtures': fix_list,
-            'season': current_season,
-        }
-
-    # Otherwise return requested fixture for viewing
-    else:
-
-        # Check fixture exists
-        try:
-            fixture = Fixture.objects.get(id=pagename)
-        except:
-            return render(request, "league/fixtures.html", {'pageview':'doesnotexist'})
-
-        # Get players in user is club admin
-        players = []
-
-        if admin and admin.club == fixture.home_team.club:
-            players += fixture.get_players(side='home')
-        if admin and admin.club == fixture.away_team.club:
-            players += fixture.get_players(side='away')
-
-        # Get games for played matches
-        if fixture.status == "Played" and fixture.game_results:
-            batched_games = fixture.get_scores()
-        else:
-            batched_games = None
-
-        # Work out number of rubbers expected per game
-        if fixture.division.type == "Mixed" and fixture.season.mixed_scoring == "point per game":
-            rubber_number = 3
-        else:
-            rubber_number = 2
-
-        context = {
-            'pageview': 'view',
-            'fixture': fixture,
-            'game_results': batched_games,
-            'players': players,
-            'source': source,
-            'rubber_number': rubber_number,
-        }
-
-    return render(request, "league/fixtures.html", context)
-
 @login_required
 def fixupdate(request, pagename, status='', source=''):
     '''
@@ -1212,9 +1015,9 @@ def fixupdate(request, pagename, status='', source=''):
             fixture.status = 'Conceded (H)'
             fixture.save()
             if fixture.division.type == "Mixed":
-                penalty_value = conceded_penalty_mixed
+                penalty_value = constants.PENALTY_MIXED_CONCEDED
             else:
-                penalty_value = conceded_penalty_level
+                penalty_value = constants.PENALTY_LEVEL_CONCEDED
             p = Penalty(season=fixture.season, team=fixture.home_team, penalty_value=penalty_value, penalty_type='Match Conceded', fixture=fixture)
             p.save()
             email_notification('concededhome',fixture)
@@ -1224,9 +1027,9 @@ def fixupdate(request, pagename, status='', source=''):
             fixture.status = 'Conceded (A)'
             fixture.save()
             if fixture.division.type == "Mixed":
-                penalty_value = conceded_penalty_mixed
+                penalty_value = constants.PENALTY_MIXED_CONCEDED
             else:
-                penalty_value = conceded_penalty_level
+                penalty_value = constants.PENALTY_LEVEL_CONCEDED
             p = Penalty(season=fixture.season, team=fixture.away_team, penalty_value=penalty_value, penalty_type='Match Conceded', fixture=fixture)
             p.save()
             email_notification('concededaway',fixture)
@@ -1286,231 +1089,6 @@ def fixupdate(request, pagename, status='', source=''):
         context['detform'] = detform
 
     return render(request, "league/fixtures.html", context)
-
-def clubs(request, pagename):
-    '''
-        View for Clubs page
-        If 'Home' view accessed then lists of clubs are returned
-        Otherwise, specific club information is returned
-    '''
-
-    if request.user.is_authenticated:
-        user = request.user
-    else:
-        user = None
-
-    # If home page requested, return all clubs
-    if pagename == 'home':
-        context = {
-            'status': 'home',
-            'clubs': Club.objects.filter(active=True).order_by("name"),
-            'old_clubs': Club.objects.filter(active=False).order_by("name"),
-        }
-
-    # Otherwise return requested club details
-    else:
-        name = urllib.parse.unquote(pagename)
-
-        # Check requested club exists
-        try:
-            club = Club.objects.get(name=name)
-        except:
-            return render(request, "league/clubs.html", {'status':'doesnotexist'})
-
-        # Get teams and fixtures
-        teams = Team.objects.filter(active=True).filter(club=club).order_by("type", "number")
-        ex_teams = Team.objects.filter(active=False).filter(club=club).order_by("type", "number")
-        current_season = Season.objects.get(current=True)
-        club_fixtures = Fixture.objects.filter(season=current_season).filter(Q(home_team__club=club)|Q(away_team__club=club)).order_by("date_time")
-        fix_list = [(fix,fix.updateable(user)) for fix in club_fixtures]
-
-        # Get list of venues used
-        venues = set()
-        for team in teams:
-            fixtures = Fixture.objects.filter(season=current_season).filter(home_team=team)
-            for fix in fixtures:
-                venues.add(fix.venue)
-
-        # Get contacts
-        if club.public_contact_name or club.public_email or club.public_num:
-            public_info = True
-        else:
-            public_info = False
-
-        # Download fixtures
-        if request.method == 'POST':
-            df = build_dataframe(club_fixtures)
-            with BytesIO() as b:
-                with pd.ExcelWriter(b) as writer:
-                    df.to_excel(writer)
-                filename = "fixtures.xlsx"
-                res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                res['Content-Disposition'] = f'attachment; filename={filename}'
-                return res
-
-        context = {
-            'status': 'view',
-            'club': club,
-            'teams': teams,
-            'ex_teams': ex_teams,
-            'venues': venues,
-            'fixtures': fix_list,
-            'clubnights': ClubNight.objects.filter(club=club),
-            'public_info': public_info,
-        }
-
-    return render(request, "league/clubs.html", context)
-
-def teams(request, pagename):
-    '''
-        View for Teams page
-        If 'Home' view accessed then lists of teams are returned
-        Otherwise, specific team information is returned
-    '''
-
-    # If home page requested, return all teams
-    if pagename == 'home':
-        context = {
-            'status': 'home',
-            'teams': Team.objects.filter(active=True).order_by("club__name", "type", "number"),
-            'old_teams': Team.objects.filter(active=False).order_by("club__name", "type", "number"),
-        }
-
-    # Otherwise return team requested
-    else:
-
-        # Check user
-        if request.user.is_authenticated:
-            user = request.user
-        else:
-            user = None
-
-        # Check for admin
-        try:
-            admin = Administrator.objects.get(user=user)
-        except:
-            try:
-                admin = Member.objects.get(user=user)
-            except:
-                admin = None
-
-        # Check team exists
-        id = urllib.parse.unquote(pagename)
-        try:
-            team = Team.objects.get(id=id)
-        except:
-            return render(request, "league/teams.html", {'status':'doesnotexist'})
-
-        # Create form for captain details
-        form = TeamForm(request.POST or None,instance=team)
-
-        # Get fixtures
-        current_season = Season.objects.get(current=True)
-        fixtures = Fixture.objects.filter(season=current_season).filter(Q(home_team=team)|Q(away_team=team)).order_by('date_time')
-        fix_list = [(fix,fix.updateable(user)) for fix in fixtures]
-
-        # Get performances
-        performances = Performance.objects.filter(team=team).order_by('season__year').reverse()
-
-        # Check whether captain details have been updated
-        updated = False
-
-        # Process updated form
-        if request.method == 'POST':
-            if form.is_valid():
-                form.save()
-                updated = True
-
-        # If admin, captain's details are updateable
-        if admin and admin.club == team.club:
-            updateable = True
-        else:
-            updateable = False
-
-        context = {
-            'status': 'view',
-            'team': team,
-            'updateable': updateable,
-            'updated': updated,
-            'form': form,
-            'fixtures': fix_list,
-            'performances': performances,
-        }
-
-    return render(request, "league/teams.html", context)
-
-def venues(request, pagename):
-    '''
-        View for Venue page
-        If 'Home' view accessed then lists of venues are returned
-        Otherwise, specific venue information is returned
-    '''
-    # If home page requested, return all venues
-    if pagename == 'home':
-        context = {
-            'status': 'home',
-            'venues': Venue.objects.all().order_by("name"),
-        }
-
-    # Otherwise return requested venue
-    else:
-
-        # Check user
-        if request.user.is_authenticated:
-            user = request.user
-        else:
-            user = None
-
-        # Check for admin
-        try:
-            admin = Administrator.objects.get(user=user)
-        except:
-            admin = None
-
-        # Check venue exists
-        name = urllib.parse.unquote(pagename)
-        try:
-            venue = Venue.objects.get(name=name)
-        except:
-            return render(request, "league/venues.html", {'status':'doesnotexist'})
-
-        # Create venue form
-        form = VenueForm(request.POST or None,instance=venue)
-
-        # Get fixtures at venue
-        current_season = Season.objects.get(current=True)
-        fixtures = Fixture.objects.filter(season=current_season).filter(venue=venue)
-
-        # Find clubs with fixtures at venue
-        clubs = [fix.home_team.club for fix in fixtures]
-        clubs += [cn.club for cn in ClubNight.objects.filter(venue=venue)]
-        clubs = list(set(clubs))
-
-        # Check whether venue details have been updated
-        updated = False
-
-        # Process updated form
-        if request.method == 'POST':
-            if form.is_valid():
-                form.save()
-                updated = True
-
-        # If admin, captain's details are updateable
-        if admin and admin.club in clubs:
-            updateable = True
-        else:
-            updateable = False
-
-        context = {
-            'status': 'view',
-            'venue': venue,
-            'form': form,
-            'clubs': clubs,
-            'updateable': updateable,
-            'updated': updated,
-        }
-
-    return render(request, "league/venues.html", context)
 
 @login_required
 def clubadmin(request, update=''):
@@ -1894,61 +1472,6 @@ def player_stats(request, pagename):
 
     return render(request, "league/playerstats.html", context)
 
-def archive(request, pagename):
-
-    if pagename == 'home':
-
-        seasons = list(Season.objects.filter(current=False))
-        seasons = sorted(seasons, key=lambda x: int(x.year[:4]), reverse=True)
-
-        context = {'view': 'home',
-                   'seasons': seasons}
-
-    else:
-
-        season = Season.objects.get(year=pagename)
-        fixtures = Fixture.objects.filter(season=season).order_by('date_time')
-
-        if request.method == 'POST':
-
-            if request.user.is_authenticated:
-                user = request.user
-            else:
-                user = None
-            if user and user.username == "websiteAdmin":
-                df = build_dataframe(fixtures, admin=True)
-            else:
-                df = build_dataframe(fixtures)
-            with BytesIO() as b:
-                with pd.ExcelWriter(b) as writer:
-                    df.to_excel(writer)
-                filename = f"fixtures_{str(season)}.xlsx"
-                res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                res['Content-Disposition'] = f'attachment; filename={filename}'
-                return res
-
-
-        divisions = []
-        for fix in fixtures:
-            if fix.division not in divisions:
-                divisions.append(fix.division)
-
-        divisions.sort(key=lambda div: (div.type, div.number))
-
-        full_divs = []
-        for div in divisions:
-            table = div.get_table(season)
-            divfixs = fixtures.filter(division=div)
-            full_divs.append({'division':div, 'table':table, 'fixtures':divfixs})
-
-
-        context = {'view': 'season',
-                   'season': season,
-                   'divisions': full_divs}
-
-    return render(request, "league/archive.html", context)
-
-
 ############################### Admin Functions ##################################
 
 def clear_nominations():
@@ -1995,7 +1518,7 @@ def get_performances():
             for row in table:
                 team = row[1]['Object']
                 if not Performance.objects.filter(team=team,season=season,division=division):
-                    cardinal = str(position) + cardinal_dict.get(position,'th') + ' out of ' + str(len(table))
+                    cardinal = str(position) + {1:'st',2:'nd',3:'rd'}.get(position,'th') + ' out of ' + str(len(table))
                     p = Performance(team=team,season=season,division=division,position=cardinal)
                     p.save()
                 position += 1
