@@ -312,7 +312,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
                 # Find matches for away players or create new ones
                 found_players = resformset.cleaned_data['found_players']
-                check_away_players(fixture, found_players)
+                verify_away_players(fixture, found_players)
                 # Change fixture status
                 fixture.status = 'Played'
                 # Bundle up game results
