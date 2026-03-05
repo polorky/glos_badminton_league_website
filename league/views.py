@@ -1,235 +1,21 @@
 from django.shortcuts import render, redirect
 from django.db.models import Q
 from django.core.mail import send_mail
-from django.core import signing
 from django.views import View
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
 from django.utils.decorators import method_decorator
 
 from .models import *
-from .forms import ClubForm, LevelScoreFormSet, MixedScoreFormSet, PlayerForm, MixedNominateForm, LevelNominateForm, VenueForm, EmailForm, DuplicatePlayerForm
-from .forms import TeamForm, RescheduleForm, MixedFixtureForm, LevelFixtureForm, ClubNightForm
+from .forms import *
+from .utilities import email_notification, email_admin, verify_away_players, download_fixtures, get_all_club_contacts
 import league.constants as constants
 
 import urllib
 import pandas as pd
-from io import BytesIO
 from datetime import datetime
 
 ##### Auxillary functions #####
-
-def check_away_players(fixture, players_found):
-    '''
-        Takes data from results form and checks for matches for away players
-        If a fuzzy match is not found, a new player is created for the club
-        The updated Fixture object is returned
-    '''
-
-    div_type = fixture.division.type
-    mixed_player_type = ['Ladies','Ladies','Ladies','Men','Men','Men']
-    verifications = []
-
-    for player_title, player_dict in players_found:
-        if player_dict['player'] and not player_dict['suggest_only']:
-            setattr(fixture, player_title, player_dict['player'])
-            fixture.save()
-        else:
-            level = div_type if div_type != 'Mixed' else mixed_player_type[int(player_title[-1])]
-            verification = PendingPlayerVerification.objects.create(
-                fixture=fixture,
-                submitted_name=player_dict['name'],
-                level=level,
-                token=''
-            )
-            verification.token = signing.dumps({'verification_id': verification.id})
-            verification.save()
-            if player_dict['player']:
-                verification.suggested_player = player_dict['player']
-                verification.save()
-            verifications.append(verification)
-    
-    if verifications:
-        email_notification('playernotfound', verifications)
-
-def email_notification(status, fix, sender='GlosBadWebsite@gmail.com', player_name=''):
-
-    def get_recipients(fix, team):
-
-        if team == 'home':
-            recipients = [fix.home_team.club.contact1_email, fix.home_team.club.contact2_email, fix.home_team.captain_email]
-        elif team == 'away':
-            recipients = [fix.away_team.club.contact1_email, fix.away_team.club.contact2_email, fix.away_team.captain_email]
-        else:
-            recipients = [fix.home_team.club.contact1_email, fix.home_team.club.contact2_email, fix.home_team.captain_email]
-            recipients += [fix.away_team.club.contact1_email, fix.away_team.club.contact2_email, fix.away_team.captain_email]
-        for i in range(len(recipients),0,-1):
-            if not recipients[i-1]:
-                recipients.pop(i-1)
-
-        return recipients
-
-    html = ''
-
-    if status == 'new_player':
-        subject = 'New Club Player Created'
-        body = 'Hi,\n\nFollowing the submission of the result for the match ' + str(fix) + ' a new player called ' + player_name \
-        + ' was created due to this being the name supplied on the match scorecard and there not being a player of that name already ' \
-        + 'recorded in your club roster. If this is correct then no further action is required. However, if this player already exists ' \
-        + 'you can mark the incorrect player as a duplicate by pressing the orange button next to their name on the Club Admin page and then selecting the correct ' \
-        + 'player. The system will swap them on the match result and delete the incorrect player.\n\nRegards\n\nLeague Committee\n\n' \
-        + '***This is an automated email from the league website***'
-        html = 'Hi,<br><br>Following the submission of the result for the match ' + str(fix) + ' a new player called <b>' + player_name \
-        + '</b> was created due to this being the name supplied on the match scorecard and there not being a player of that name already ' \
-        + 'recorded in your club roster. If this is correct then no further action is required. However, if this player already exists ' \
-        + 'you can mark the incorrect player as a duplicate by pressing the orange button next to their name on the Club Admin page and then selecting the correct ' \
-        + 'player. The system will swap them on the match result and delete the incorrect player.<br><br>Regards<br><br>League Committee<br><br>' \
-        + '***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'away')
-    elif status == 'confirmed':
-        subject = str(fix) + ' - Rearrangement Confirmed'
-        body = 'Hi,\n\nThe away team have confirmed the rearrangement of the match ' + str(fix) + ' originally scheduled for ' \
-        + fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' and now scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + ' at ' + str(fix.venue) + '.\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'home')
-    elif status == 'rejected':
-        subject = str(fix) + ' - Rearrangement Rejected'
-        body = 'Hi,\n\nThe away team have REJECTED the proposed rearrangement of the match ' + str(fix) + ' originally scheduled for ' \
-        + fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' and proposed to be rearranged for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' at ' \
-        + str(fix.venue) + '.\n\nPlease contact the away team to discuss why the rearrangement was rejected and agree a new date/venue. Fixture status has ' \
-        + 'been returned to "Postponed".\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'home')
-    elif status == 'postponed':
-        subject = str(fix) + ' - Match Postponed'
-        body = 'Hi,\n\nThe home team have postponed the match ' + str(fix) + ' originally scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + '. Hopefully, they have been in touch to explain why and to initiate the process of finding a new date/venue.\n\nRegards\n\nLeague Committee\n\n' \
-        + '***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'away')
-    elif status == 'reschedule':
-        subject = str(fix) + ' - New Date Proposed'
-        body = 'Hi,\n\nThe home team have proposed a new date/venue for the match ' + str(fix) + ' originally scheduled for ' \
-        + fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S") + '. The proposed new date is ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' at ' + str(fix.venue) \
-        + '.\n\nPlease confirm or reject this rearrangement via this page: https://gloubadleague.pythonanywhere.com/fixtures/' \
-        + str(fix.id) + '/update/div\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        html = 'Hi,<br><br>The home team have proposed a new date/venue for the match ' + str(fix) + ' originally scheduled for ' \
-        + fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S") + '. The proposed new date is ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' at ' + str(fix.venue) \
-        + '.<br><br>Please confirm or reject this rearrangement by clicking ' + '<a href="https://gloubadleague.pythonanywhere.com/fixtures/' \
-        + str(fix.id) + '/update/div">here</a>.<br><br>Regards<br><br>League Committee<br><br>***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'away')
-    elif status == 'concededhome':
-        if fix.division.type == "Mixed":
-            penalty_value = constants.PENALTY_MIXED_CONCEDED
-        else:
-            penalty_value = constants.PENALTY_LEVEL_CONCEDED
-        subject = str(fix) + ' - Match Conceded'
-        body = 'Hi,\n\nThe home team have conceded the match ' + str(fix) + ' scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + 'The home team will be penalised ' + str(penalty_value) + ". The away team's points will not be updated to reflect the concession until the end of the season " \
-        + 'but the fixture status has been updated to record the concession\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'both')
-    elif status == 'concededaway':
-        if fix.division.type == "Mixed":
-            penalty_value = constants.PENALTY_MIXED_CONCEDED
-        else:
-            penalty_value = constants.PENALTY_LEVEL_CONCEDED
-        subject = str(fix) + ' - Match Conceded'
-        body = 'Hi,\n\nThe away team have conceded the match ' + str(fix) + ' scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + 'The away team will be penalised ' + str(penalty_value) + ". The home team's points will not be updated to reflect the concession until the end of the season " \
-        + 'but the fixture status has been updated to record the concession\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'both')
-    elif status == 'result':
-        subject = str(fix) + ' - Result Submitted'
-        body = 'Hi,\n\nThe home team have submitted the results for the match ' + str(fix) + ' played on ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + '. You can view the score submitted on this page: https://gloubadleague.pythonanywhere.com/fixtures/' + str(fix.id) \
-        + '\n\nIf you believe the result has been entered incorrectly, please contact the league by replying to this email.\n\nRegards\n\nLeague Committee \
-        \n\n***This is an automated email from the league website***'
-        html = 'Hi,<br><br>The home team have submitted the results for the match ' + str(fix) + ' played on ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + '. You can view the score submitted <a href="https://gloubadleague.pythonanywhere.com/fixtures/' + str(fix.id) \
-        + '/div">here</a>.<br><br>If you believe the result has been entered incorrectly, please contact the league by replying to this email.<br><br>Regards<br><br>' \
-        + 'League Committee<br><br>***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'away')
-
-    body += '\n\nFor any issues surrounding fixtures, please contact GlosBadFixtures@outlook.com\nFor technical issues with the website, please reply to this email'
-    #recipients = ['schofieldmark@gmail.com']
-
-    if html:
-
-        html += '<br><br>For any issues surrounding fixtures, please contact <a href="mailto:GlosBadFixtures@outlook.com">GlosBadFixtures@outlook.com</a>' \
-        + '<br>For technical issues with the website, please reply to this email'
-        #html = html.replace('\n','<br>')
-
-        send_mail(subject, body, sender, recipients, html_message = html)
-
-    else:
-
-        send_mail(subject, body, sender, recipients)
-
-    return
-
-def email_admin(dup_player, cor_player, fix, code):
-
-    if code == 'done':
-        body = str(dup_player.club) + ' have submitted a player correction for ' + str(fix) + '. The erroneously created player was ' + dup_player.name \
-        + ' and the correct player is ' + cor_player.name + '. Update was successful.'
-        subject = 'Duplicate Player'
-    elif code == 'notfound':
-        body = str(dup_player.club) + ' have submitted a player correction for ' + str(fix) + '. The erroneously created player was ' + dup_player.name \
-        + ' and the correct player is ' + cor_player.name + '. Fixture containing player not found.'
-        subject = 'Duplicate Player Error'
-    elif code == 'fixerror':
-        body = str(dup_player.club) + ' have submitted a player correction for ' + str(fix) + '. The erroneously created player was ' + dup_player.name \
-        + ' and the correct player is ' + cor_player.name + '. Player has played too many fixtures.'
-        subject = 'Duplicate Player Error'
-
-    send_mail(subject, body, 'GlosBadWebsite@gmail.com', ['schofieldmark@gmail.com'])
-
-    return
-
-def build_dataframe(fixtures, admin=False):
-
-    def localiseDT(dtvalue):
-        if not pd.isnull(dtvalue):
-            return dtvalue.tz_localize(None)
-        else:
-            return dtvalue
-
-    fixDict = {'Division':[],'Date and Time':[],'Home Team':[], 'Home Points':[], 'Away Points':[],
-               'Away Team':[], 'Venue':[], 'Status':[], 'Original Date and Time':[]}
-    if admin:
-        fixDict.update({'Game Breakdown':[]})
-
-    for fix in fixtures:
-        fixDict['Division'].append(str(fix.division))
-        fixDict['Date and Time'].append(fix.date_time)
-        fixDict['Home Team'].append(str(fix.home_team))
-        fixDict['Home Points'].append(fix.home_points)
-        fixDict['Away Points'].append(fix.away_points)
-        fixDict['Away Team'].append(str(fix.away_team))
-        fixDict['Venue'].append(str(fix.venue))
-        fixDict['Status'].append(fix.status)
-        fixDict['Original Date and Time'].append(fix.old_date_time)
-        if admin:
-            fixDict['Game Breakdown'].append(fix.game_results)
-
-    df = pd.DataFrame(fixDict)
-    df['Date and Time'] = df['Date and Time'].dt.tz_localize(None)
-    df['Original Date and Time'] = df['Original Date and Time'].apply(localiseDT)
-
-    return df
-
-def get_all_club_contacts():
-
-    clubs = Club.objects.filter(active=True)
-    email_list = {}
-
-    for club in clubs:
-        if club.contact1_email:
-            email_list[f'{club.short_name} Contact 1'] = club.contact1_email
-        if club.contact2_email:
-            email_list[f'{club.short_name} Contact 2'] = club.contact2_email
-
-    return email_list
-
 def correct_duplicate_player(dup_player,cor_player,fix):
 
     home_players = ['home_player1','home_player2','home_player3','home_player4','home_player5','home_player6']
@@ -277,51 +63,6 @@ class GenericViewMixin:
             })
 
         return context
-
-    def download_fixtures(self, fixtures, is_admin=False):
-
-        df = self.build_dataframe(fixtures, is_admin)
-
-        with BytesIO() as b:
-            with pd.ExcelWriter(b) as writer:
-                df.to_excel(writer)
-            filename = "fixtures.xlsx"
-            res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            res['Content-Disposition'] = f'attachment; filename={filename}'
-
-            return res
-
-    def build_dataframe(self, fixtures, is_admin):
-
-        def localiseDT(dtvalue):
-            if not pd.isnull(dtvalue):
-                return dtvalue.tz_localize(None)
-            else:
-                return dtvalue
-
-        fixDict = {'Division':[],'Date and Time':[],'Home Team':[], 'Home Points':[], 'Away Points':[],
-                   'Away Team':[], 'Venue':[], 'Status':[], 'Original Date and Time':[]}
-        if is_admin:
-            fixDict.update({'Game Breakdown':[]})
-
-        for fix in fixtures:
-            fixDict['Division'].append(str(fix.division))
-            fixDict['Date and Time'].append(fix.date_time)
-            fixDict['Home Team'].append(str(fix.home_team))
-            fixDict['Home Points'].append(fix.home_points)
-            fixDict['Away Points'].append(fix.away_points)
-            fixDict['Away Team'].append(str(fix.away_team))
-            fixDict['Venue'].append(str(fix.venue))
-            fixDict['Status'].append(fix.status)
-            fixDict['Original Date and Time'].append(fix.old_date_time)
-            if is_admin:
-                fixDict['Game Breakdown'].append(fix.game_results)
-
-        df = pd.DataFrame(fixDict)
-        df['Date and Time'] = df['Date and Time'].dt.tz_localize(None)
-        df['Original Date and Time'] = df['Original Date and Time'].apply(localiseDT)
-
-        return df
 
 
 class DivisionsView(GenericViewMixin, TemplateView):
@@ -399,7 +140,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
         fixtures = Fixture.objects.filter(season=context['current_season']).filter(division=division.id).order_by("date_time")
 
         if fixtures:
-            return self.download_fixtures(fixtures)
+            return download_fixtures(fixtures)
 
 class FixturesView(GenericViewMixin, TemplateView):
     template_name = "league/fixtures.html"
@@ -465,7 +206,7 @@ class FixturesView(GenericViewMixin, TemplateView):
 
         fixtures = Fixture.objects.filter(season=context['current_season']).order_by('date_time')
 
-        return self.download_fixtures(fixtures)
+        return download_fixtures(fixtures)
 
 @method_decorator(login_required, name='dispatch')
 class FixUpdateView(GenericViewMixin, TemplateView):
@@ -483,43 +224,14 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
         if pagename == 'submit':
 
-            # Get relevant results form for fixture type
-            if fixture.division.type == "Mixed":
-                resform = MixedFixtureForm(instance=fixture)
-                resformset = MixedScoreFormSet()
-            else:
-                resform = LevelFixtureForm(instance=fixture)
-                resformset = LevelScoreFormSet()
-            
-            games_fields = []
-            games_names = constants.GAME_NAMES_MIXED if fixture.division.type == "Mixed" else constants.GAME_NAMES_LEVEL
-            for i, game_name in enumerate(games_names):
-                rubbers = [resformset.forms[2*i], resformset.forms[2*i+1]]
-                games_fields.append((game_name, rubbers))
-
-            if fixture.division.type == "Mixed":
-                home_ladies, home_men = fixture.get_eligible_players()
-                for i in range(1,4):
-                    resform.fields['home_player'+str(i)].choices = home_ladies
-                    resform.fields['home_player'+str(i+3)].choices = home_men
-            else:
-                home_players = fixture.get_eligible_players()
-                home_fields = ['home_player1','home_player2','home_player3','home_player4']
-                for field in home_fields:
-                    resform.fields[field].choices = home_players
-
-            context.update({'resform':resform, 
-                            'resformset':resformset,
-                            'games_fields': games_fields,})
+            # Instantiate result forms
+            context = self.setup_result_forms(context, fixture)
 
         elif pagename == 'reschedule':
 
             # Instantiate reschedule form
-            rform = RescheduleForm(None, instance=fixture)
+            context.update({'rform':RescheduleForm(None, instance=fixture)})
 
-            context.update({'rform':rform})
-
-        # If not a POST request, set up initial form view
         else:
 
             # Default status is 'update' - different pages required where a rearrangement has been proposed
@@ -542,30 +254,18 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         fixid = self.kwargs['fixid']
         fixture = Fixture.objects.get(id=fixid)
 
-        # Confirmation by the away team of a proposed rearrangement
-        if pagename == "confirmed":
-            fixture.status = 'Rearranged'
+        # Check for basic statuses
+        status_dict = {"confirmed":"Rearranged", "rejected":"Postponed", "postponed":"Postponed"}
+        if pagename in status_dict:
+            fixture.status = status_dict[pagename]
             fixture.save()
-            email_notification('confirmed',fixture)
-
-        # Proposed new date rejected by away team
-        elif pagename == "rejected":
-            fixture.status = 'Postponed'
-            fixture.save()
-            email_notification('rejected',fixture)
-
-        # Postponement by the home team without a new date
-        elif pagename == "postponed":
-            fixture.status = 'Postponed'
-            fixture.save()
-            email_notification('postponed',fixture)
+            email_notification(pagename, fixture)
 
         # Proposed reschedule date and location by home team
         elif pagename == "rescheduled":
 
             # Instantiate reschedule form
             rform = RescheduleForm(self.request.POST, instance=fixture)
-
             temp_date = fixture.date_time
 
             if rform.is_valid():
@@ -576,29 +276,26 @@ class FixUpdateView(GenericViewMixin, TemplateView):
                 fixture.save()
                 email_notification('reschedule',fixture)
 
-        # Match conceded by home team
-        elif pagename == "concededhome":
-            fixture.status = 'Conceded (H)'
-            fixture.save()
+        # Match conceded
+        elif pagename == "concededhome" or pagename == "concededaway":
             if fixture.division.type == "Mixed":
                 penalty_value = constants.PENALTY_MIXED_CONCEDED
             else:
                 penalty_value = constants.PENALTY_LEVEL_CONCEDED
-            p = Penalty(season=fixture.season, team=fixture.home_team, penalty_value=penalty_value, penalty_type='Match Conceded', fixture=fixture)
-            p.save()
-            email_notification('concededhome',fixture)
-
-        # Match conceded by away team
-        elif pagename == "concededaway":
-            fixture.status = 'Conceded (A)'
-            fixture.save()
-            if fixture.division.type == "Mixed":
-                penalty_value = constants.PENALTY_MIXED_CONCEDED
+            if pagename == "concededhome":
+                fixture.status = 'Conceded (H)'
+                team=fixture.home_team
             else:
-                penalty_value = constants.PENALTY_LEVEL_CONCEDED
-            p = Penalty(season=fixture.season, team=fixture.away_team, penalty_value=penalty_value, penalty_type='Match Conceded', fixture=fixture)
+                fixture.status = 'Conceded (A)'
+                team=fixture.away_team
+            fixture.save()
+            p = Penalty(season=fixture.season, 
+                        team=team, 
+                        penalty_value=penalty_value, 
+                        penalty_type='Match Conceded', 
+                        fixture=fixture)
             p.save()
-            email_notification('concededaway',fixture)
+            email_notification(pagename,fixture)
 
         # Result submitted by home team
         elif pagename == "submit":
@@ -615,7 +312,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
                 # Find matches for away players or create new ones
                 found_players = resformset.cleaned_data['found_players']
-                fixture = check_away_players(fixture, resform.cleaned_data)
+                check_away_players(fixture, found_players)
                 # Change fixture status
                 fixture.status = 'Played'
                 # Bundle up game results
@@ -623,11 +320,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
                     (f'{form.cleaned_data.get("forfeit")},{form.cleaned_data.get("forfeit")}' if form.cleaned_data.get("forfeit") else f"{form.cleaned_data.get('home_score')},{form.cleaned_data.get('away_score')}")
                     for form in resformset if form.cleaned_data
                     ]
-                scores_concatenated = ','.join(game_results)
-                #game_results = [resdata[x] for x in resdata.keys() if 'player' not in x and 'points' not in x and 'score' not in x]
-                #game_results = ['' if x==None else str(x) for x in game_results]
-                #game_results = ','.join(game_results)
-                fixture.game_results = scores_concatenated
+                fixture.game_results = ','.join(game_results)
                 # Save form and fixture data
                 resform.save()
                 fixture.save()
@@ -641,6 +334,39 @@ class FixUpdateView(GenericViewMixin, TemplateView):
                 context['pagename'] = 'errors'
 
         return self.render_to_response(context)
+
+    def setup_result_forms(context, fixture):
+
+        # Get relevant results form for fixture type
+        if fixture.division.type == "Mixed":
+            resform = MixedFixtureForm(instance=fixture)
+            resformset = MixedScoreFormSet()
+        else:
+            resform = LevelFixtureForm(instance=fixture)
+            resformset = LevelScoreFormSet()
+        
+        games_fields = []
+        games_names = constants.GAME_NAMES_MIXED if fixture.division.type == "Mixed" else constants.GAME_NAMES_LEVEL
+        for i, game_name in enumerate(games_names):
+            rubbers = [resformset.forms[2*i], resformset.forms[2*i+1]]
+            games_fields.append((game_name, rubbers))
+
+        if fixture.division.type == "Mixed":
+            home_ladies, home_men = fixture.get_eligible_players()
+            for i in range(1,4):
+                resform.fields['home_player'+str(i)].choices = home_ladies
+                resform.fields['home_player'+str(i+3)].choices = home_men
+        else:
+            home_players = fixture.get_eligible_players()
+            home_fields = ['home_player1','home_player2','home_player3','home_player4']
+            for field in home_fields:
+                resform.fields[field].choices = home_players
+
+        context.update({'resform':resform, 
+                        'resformset':resformset,
+                        'games_fields': games_fields,})
+        
+        return context
 
 class ClubsView(GenericViewMixin, TemplateView):
     template_name = "league/clubs.html"
@@ -703,7 +429,7 @@ class ClubsView(GenericViewMixin, TemplateView):
         club = Club.objects.get(name=urllib.parse.unquote(pagename))
         fixtures = Fixture.objects.filter(season=context['current_season']).filter(Q(home_team__club=club)|Q(away_team__club=club)).order_by("date_time")
 
-        return self.download_fixtures(fixtures)
+        return download_fixtures(fixtures)
 
 class TeamsView(GenericViewMixin, TemplateView):
     template_name = "league/teams.html"
@@ -904,148 +630,9 @@ class ArchivesView(GenericViewMixin, TemplateView):
         season = Season.objects.get(year=pagename)
         fixtures = Fixture.objects.filter(season=season).order_by('date_time')
 
-        return self.download_fixtures(fixtures, is_admin)
+        return download_fixtures(fixtures, is_admin)
 
 ################ Old function based views ################
-
-@login_required
-def fixupdate(request, pagename, status='', source=''):
-    '''
-        View for updating fixtures including postponing, rescheduling or submitting a result
-    '''
-
-    # Get relevant fixture
-    fixture = Fixture.objects.get(id=pagename)
-
-    # Get relevant results form for fixture type
-    if fixture.division.type == "Mixed":
-        detform = MixedFixtureForm(request.POST or None,instance=fixture)
-    else:
-        detform = LevelFixtureForm(request.POST or None,instance=fixture)
-
-    # Instantiate reschedule form
-    rform = RescheduleForm(request.POST or None, instance=fixture)
-
-    # Set up initial context values
-    context = {
-        'pageview': status,
-        'source': source,
-        'fixture': fixture,
-        'rform': rform,
-        'detform': detform,
-    }
-
-    # If there is posted form information, check which type...
-    if request.method == 'POST':
-
-        # Confirmation by the away team of a proposed rearrangement
-        if status == "confirmed":
-            fixture.status = 'Rearranged'
-            fixture.save()
-            email_notification('confirmed',fixture)
-
-        # Proposed new date rejected by away team
-        if status == "rejected":
-            fixture.status = 'Postponed'
-            fixture.save()
-            email_notification('rejected',fixture)
-
-        # Postponement by the home team without a new date
-        elif status == "postpone":
-            fixture.status = 'Postponed'
-            fixture.save()
-            email_notification('postponed',fixture)
-
-        # Proposed reschedule date and location by home team
-        elif status == "reschedule":
-            temp_date = fixture.date_time
-            if rform.is_valid():
-                if not fixture.old_date_time:
-                    fixture.old_date_time = temp_date
-                rform.save()
-                fixture.status = 'Proposed'
-                fixture.save()
-                email_notification('reschedule',fixture)
-
-        # Match conceded by home team
-        elif status == "concededhome":
-            fixture.status = 'Conceded (H)'
-            fixture.save()
-            if fixture.division.type == "Mixed":
-                penalty_value = constants.PENALTY_MIXED_CONCEDED
-            else:
-                penalty_value = constants.PENALTY_LEVEL_CONCEDED
-            p = Penalty(season=fixture.season, team=fixture.home_team, penalty_value=penalty_value, penalty_type='Match Conceded', fixture=fixture)
-            p.save()
-            email_notification('concededhome',fixture)
-
-        # Match conceded by away team
-        elif status == "concededaway":
-            fixture.status = 'Conceded (A)'
-            fixture.save()
-            if fixture.division.type == "Mixed":
-                penalty_value = constants.PENALTY_MIXED_CONCEDED
-            else:
-                penalty_value = constants.PENALTY_LEVEL_CONCEDED
-            p = Penalty(season=fixture.season, team=fixture.away_team, penalty_value=penalty_value, penalty_type='Match Conceded', fixture=fixture)
-            p.save()
-            email_notification('concededaway',fixture)
-
-        # Result submitted by home team
-        elif status == "result":
-            if detform.is_valid():
-
-                    # Get form data
-                    detdata = detform.cleaned_data
-                    # Find matches for away players or create new ones
-                    fixture = check_away_players(fixture,detdata)
-                    # Change fixture status
-                    fixture.status = 'Played'
-                    # Bundle up game results
-                    game_results = [detdata[x] for x in detdata.keys() if 'player' not in x and 'points' not in x and 'score' not in x]
-                    game_results = ['' if x==None else str(x) for x in game_results]
-                    game_results = ','.join(game_results)
-                    fixture.game_results = game_results
-                    # Save form and fixture data
-                    detform.save()
-                    fixture.save()
-                    # Check for illegal players and apply any penalties
-                    if fixture.season.current:
-                        fixture.check_player_eligibility()
-                        #fixture.check_nomination_status() # Nomination rules have changed
-                        email_notification('result',fixture)
-            else:
-                # If forms is not valid, change pageview returned
-                context['pageview'] = 'errors'
-
-    # If not a POST request, set up initial form view
-    else:
-
-        # Default status is 'update' - different pages required where a rearrangement has been proposed
-        # or the fixture is not updateable by the user
-        if fixture.status == "Proposed":
-            context['pageview'] = 'proposed'
-
-        elif not fixture.updateable(request.user):
-            context['pageview'] = 'unupdateable'
-
-    # Reduce the number of options for home players to club players of the relevant level doubles type
-    if context['pageview'] == 'update' or context['pageview'] == 'errors':
-
-        if fixture.division.type == "Mixed":
-            home_ladies, home_men = fixture.get_eligible_players()
-            for i in range(1,4):
-                detform.fields['home_player'+str(i)].choices = home_ladies
-                detform.fields['home_player'+str(i+3)].choices = home_men
-        else:
-            home_players = fixture.get_eligible_players()
-            home_fields = ['home_player1','home_player2','home_player3','home_player4']
-            for field in home_fields:
-                detform.fields[field].choices = home_players
-
-        context['detform'] = detform
-
-    return render(request, "league/fixtures.html", context)
 
 @login_required
 def clubadmin(request, update=''):

@@ -4,73 +4,8 @@ from django.core.mail import send_mail
 from django.contrib.auth.models import User
 import urllib
 import league.constants as constants
+from .utilities import email_notification, sort_table
 
-def sort_table(team_list):
-
-    revised_list = []
-    points_dict = {}
-
-    for team in team_list:
-        points = team[1]['PFor']
-        if points in points_dict.keys():
-            points_dict[points].append(team)
-        else:
-            points_dict[points] = [team]
-
-    points_list = list(points_dict.keys())
-    points_list.sort(reverse=True)
-    for point in points_list:
-        if len(points_dict[point]) == 1:
-            revised_list.append(points_dict[point][0])
-        else:
-            pass
-
-def email_notification(status, fix, team, sender='GlosBadWebsite@gmail.com', player_name=''):
-
-    def get_recipients(fix, team):
-
-        recipients = [team.club.contact1_email, team.club.contact2_email, team.captain_email]
-
-        for i in range(len(recipients),0,-1):
-            if not recipients[i-1]:
-                recipients.pop(i-1)
-
-        return recipients
-
-    if status == 'nomination_penalty':
-        subject = 'Nomination Penalty Applied'
-        recipients = get_recipients(fix, team)
-        body = 'Hi,\n\nFollowing the submission of the result for the match ' + str(fix) + ", your club's team has played their first three matches." \
-        + 'However, nominated player ' + player_name + ' has not played at least two of these matches and so the team has been penalised ' + str(constants.PENALTY_NOMINATION_VIOLATION) \
-        + ' points. Please contact the League Committee at GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.' \
-        + '\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        html =  'Hi,<br><br>Following the submission of the result for the match ' + str(fix) + ", your club's team has played their first three matches." \
-        + 'However, nominated player <b>' + player_name + '</b> has not played at least two of these matches and so the team has been penalised ' + str(constants.PENALTY_NOMINATION_VIOLATION) \
-        + ' points. Please contact the League Committee at GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.' \
-        + '<br><br>Regards<br><br>League Committee<br><br>***This is an automated email from the league website***'
-    elif status == 'eligibility_penalty':
-        subject = 'Eligibility Penalty Applied'
-        recipients = get_recipients(fix, team)
-        body = 'Hi,\n\nFollowing the submission of the result for the match ' + str(fix) + ', it has been identified that player ' + player_name + ' was ineligible' \
-        + " to play and so your club's team has been penalised " + str(constants.PENALTY_INELIGIBLE_PLAYER) + ' points. Please contact the League Committee at' \
-        + ' GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.\n\nRegards\n\nLeague Committee\n\n***This is an automated' \
-        + 'email from the league website***'
-        html = 'Hi,<br><br>Following the submission of the result for the match ' + str(fix) + ', it has been identified that player <b>' + player_name + '</b> was ineligible' \
-        + " to play and so your club's team has been penalised " + str(constants.PENALTY_INELIGIBLE_PLAYER) + ' points. Please contact the League Committee at' \
-        + ' GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.<br><br>Regards<br><br>League Committee<br><br>***This is an' \
-        + 'automated email from the league website***'
-
-    #recipients = ['schofieldmark@gmail.com']
-
-    send_mail(
-        subject,
-        body,
-        sender,
-        recipients,
-        html_message = html
-    )
-
-    return
 
 class Season(models.Model):
     year = models.CharField(max_length=10)
@@ -781,7 +716,7 @@ class Fixture(models.Model):
 
         if violations:
             for violation in violations:
-                email_notification('nomination_penalty', self, violation[0], player_name=violation[1].name)
+                email_notification('nomination_penalty', self, team=violation[0], player_name=violation[1].name)
                 p = Penalty(season=self.season, team=violation[0], penalty_value=constants.PENALTY_NOMINATION_VIOLATION, penalty_type='Nomination Violation', player=violation[1].name, fixture=self)
                 p.save()
 
@@ -793,12 +728,12 @@ class Fixture(models.Model):
 
         for player in self.get_players('home'):
             if not player.check_eligibility(self.home_team):
-                email_notification('eligibility_penalty', self, self.home_team, player_name=player.name)
+                email_notification('eligibility_penalty', self, team=self.home_team, player_name=player.name)
                 p = Penalty(season=self.season, team=self.home_team, penalty_value=constants.PENALTY_INELIGIBLE_PLAYER, penalty_type='Ineligible Player', player=player.name, fixture=self)
                 p.save()
         for player in self.get_players('away'):
             if not player.check_eligibility(self.away_team):
-                email_notification('eligibility_penalty', self, self.away_team, player_name=player.name)
+                email_notification('eligibility_penalty', self, team=self.away_team, player_name=player.name)
                 p = Penalty(season=self.season, team=self.away_team, penalty_value=constants.PENALTY_INELIGIBLE_PLAYER, penalty_type='Ineligible Player', player=player.name, fixture=self)
                 p.save()
 
