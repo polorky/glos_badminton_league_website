@@ -1,6 +1,5 @@
 from django.db import models
 from django.db.models import Q
-from django.core.mail import send_mail
 from django.contrib.auth.models import User
 import urllib
 import league.constants as constants

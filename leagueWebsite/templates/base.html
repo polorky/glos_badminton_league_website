@@ -20,14 +20,25 @@
         <img src="{% static 'Banner6.png' %}" width="100%"></img>
         <ul class="nav">
           {% block menubar %}
-          <li class="nav"><a class="nav" href="/">Home</a></li>
-          <li class="nav"><a class="nav" href="/divisions/home">Divisions</a></li>
-          <li class="nav"><a class="nav" href="/fixtures/home">Fixtures</a></li>
-          <li class="nav"><a class="nav" href="/clubs/home">Clubs</a></li>
-          <li class="nav"><a class="nav" href="/teams/home">Teams</a></li>
-          <li class="nav"><a class="nav" href="/venues/home">Venues</a></li>
-          <li class="nav"><a class="nav" href="/clubadmin">Club Admin</a></li>
-          <li class="nav"><a class="nav" href="/login">Login</a></li>
+          
+            <li class="nav"><a class="nav {% if active_tab == 'home' %}active{% endif %}" href="/">Home</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'divisions' %}active{% endif %}" href="/divisions/home">Divisions</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'fixtures' %}active{% endif %}" href="/fixtures/home">Fixtures</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'clubs' %}active{% endif %}" href="/clubs/home">Clubs</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'teams' %}active{% endif %}" href="/teams/home">Teams</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'venues' %}active{% endif %}" href="/venues/home">Venues</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'clubadmin' %}active{% endif %}" href="/clubadmin">Club Admin</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'archive' %}active{% endif %}" href="/archive/home">Archive</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'juniors' %}active{% endif %}" href="/juniors">Juniors</a></li>
+            <li class="nav"><a class="nav {% if active_tab == 'help' %}active{% endif %}" href="/help">Help!</a></li>
+            <li class="nav" style="float:right;">
+              {% if user.is_authenticated %}
+                  <a class="nav" href="{% url 'logout' %}?next=/">Log out</a>
+              {% else %}
+                  <a class="nav" href="{% url 'login' %}?next=/clubadmin">Log in</a>
+              {% endif %}
+            </li>
+
           {% endblock menubar %}
         </ul>
       </header>

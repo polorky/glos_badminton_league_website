@@ -5,6 +5,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
+from django.core.exceptions import ObjectDoesNotExist
 
 from .models import *
 from .forms import *
@@ -18,11 +19,9 @@ from datetime import datetime
 ##### Auxillary functions #####
 def correct_duplicate_player(dup_player,cor_player,fix):
 
-    home_players = ['home_player1','home_player2','home_player3','home_player4','home_player5','home_player6']
-    away_players = ['away_player1','away_player2','away_player3','away_player4','away_player5','away_player6']
-    players = home_players + away_players
+    player_fields = [f'home_player{i}' for i in range(1, 7)] + [f'away_player{i}' for i in range(1, 7)]
 
-    for player in players:
+    for player in player_fields:
         if getattr(fix, player) == dup_player:
             setattr(fix, player, cor_player)
             fix.save()
@@ -43,18 +42,23 @@ class GenericViewMixin:
 
         context = super().get_context_data(**kwargs)
 
+        path = self.request.path.strip('/').split('/')
+        context['active_tab'] = path[0] if path[0] else 'home'
+        
         if self.request.user.is_authenticated:
             user = self.request.user
         else:
             user = None
+            admin = None
 
-        try:
-            admin = Administrator.objects.get(user=user)
-        except:
+        if user:
             try:
-                admin = Member.objects.get(user=user)
-            except:
-                admin = None
+                admin = Administrator.objects.get(user=user)
+            except ObjectDoesNotExist:
+                try:
+                    admin = Member.objects.get(user=user)
+                except ObjectDoesNotExist:
+                    admin = None
 
         context.update({
             'current_season': Season.objects.get(current=True),
@@ -64,7 +68,20 @@ class GenericViewMixin:
 
         return context
 
+# Basic Views
+class HomeView(GenericViewMixin, TemplateView):
+    template_name = "league/home.html"
+    active_tab = 'home'
 
+class JuniorsView(GenericViewMixin, TemplateView):
+    template_name = "league/juniors.html"
+    active_tab = 'juniors'
+
+class HelpView(GenericViewMixin, TemplateView):
+    template_name = "league/help.html"
+    active_tab = 'help'
+
+# Other Views
 class DivisionsView(GenericViewMixin, TemplateView):
     template_name = "league/divisions.html"
 
@@ -88,9 +105,8 @@ class DivisionsView(GenericViewMixin, TemplateView):
         else:
 
             try:
-                # Check whether requested division exists - will error if doesn't exist
                 division = Division.objects.get(number=pagename[1:],type=self.type_dict[pagename[0]])
-            except:
+            except ObjectDoesNotExist:
                 return {'status':'doesnotexist'}
 
             # current season or no specific season requested get current table
@@ -126,7 +142,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
                 'next_season': next_season,
                 'prev_div': prev_div,
                 'next_div': next_div,
-                'exist': exist
+                'exist': exist,
             })
 
         return context
@@ -166,7 +182,7 @@ class FixturesView(GenericViewMixin, TemplateView):
             # Check fixture exists
             try:
                 fixture = Fixture.objects.get(id=pagename)
-            except:
+            except ObjectDoesNotExist:
                 return {'pageview':'doesnotexist'}
 
             # Get players in user is club admin
@@ -335,7 +351,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
         return self.render_to_response(context)
 
-    def setup_result_forms(context, fixture):
+    def setup_result_forms(self, context, fixture):
 
         # Get relevant results form for fixture type
         if fixture.division.type == "Mixed":
@@ -392,7 +408,7 @@ class ClubsView(GenericViewMixin, TemplateView):
             # Check requested club exists
             try:
                 club = Club.objects.get(name=urllib.parse.unquote(pagename))
-            except:
+            except ObjectDoesNotExist:
                 return {'status':'doesnotexist'}
 
             # Get teams and fixtures
@@ -455,7 +471,7 @@ class TeamsView(GenericViewMixin, TemplateView):
             # Check team exists
             try:
                 team = Team.objects.get(id=urllib.parse.unquote(pagename))
-            except:
+            except ObjectDoesNotExist:
                 return {'status':'doesnotexist'}
 
             # Create form for captain details
@@ -484,7 +500,7 @@ class TeamsView(GenericViewMixin, TemplateView):
 
     def post(self, request, **kwargs):
 
-        pagename = self.kwargs('pagename','')
+        pagename = self.kwargs.get('pagename','')
 
         team = Team.objects.get(id=urllib.parse.unquote(pagename))
 
@@ -505,10 +521,10 @@ class VenuesView(GenericViewMixin, TemplateView):
 
         # If home page requested, return all venues
         if pagename == 'home':
-            context = {
+            context.update({
                 'status': 'home',
                 'venues': Venue.objects.all().order_by("name"),
-            }
+            })
 
         # Otherwise return requested venue
         else:
@@ -516,7 +532,7 @@ class VenuesView(GenericViewMixin, TemplateView):
             # Check venue exists
             try:
                 venue = Venue.objects.get(name=urllib.parse.unquote(pagename))
-            except:
+            except ObjectDoesNotExist:
                 return {'status':'doesnotexist'}
 
             # Create venue form
@@ -545,7 +561,7 @@ class VenuesView(GenericViewMixin, TemplateView):
 
     def post(self, request, **kwargs):
 
-        pagename = self.kwargs('pagename','')
+        pagename = self.kwargs.get('pagename','')
 
         venue = Venue.objects.get(name=urllib.parse.unquote(pagename))
 
@@ -776,7 +792,7 @@ def clubadmin(request, update=''):
         admin = Administrator.objects.get(user=user)
         club = admin.club
         member = None
-    except:
+    except ObjectDoesNotExist:
         member = Member.objects.get(user=user)
         club = member.club
         admin = None
@@ -943,7 +959,7 @@ def nominations(request, pagename):
         # Check whether a team below exists if not, don't create a form for team
         try:
             Team.objects.get(club=club,type=team.type,active=True,number=team.number + 1)
-        except:
+        except ObjectDoesNotExist:
             continue
 
         # Otherwise create form for team
@@ -1020,29 +1036,11 @@ def player_stats(request, pagename):
 
 def clear_nominations():
 
-    teams = Team.objects.all()
-
-    for team in teams:
-        changed = False
-        if team.nom_player1:
-            team.nom_player1 = None
-            changed = True
-        if team.nom_player2:
-            team.nom_player2 = None
-            changed = True
-        if team.nom_player3:
-            team.nom_player3 = None
-            changed = True
-        if team.nom_player4:
-            team.nom_player4 = None
-            changed = True
-        if team.nom_player5:
-            team.nom_player5 = None
-            changed = True
-        if team.nom_player6:
-            team.nom_player6 = None
-            changed = True
-        if changed:
+    nom_fields = [f'nom_player{i}' for i in range(1, 7)]
+    for team in Team.objects.all():
+        if any(getattr(team, f) for f in nom_fields):
+            for f in nom_fields:
+                setattr(team, f, None)
             team.save()
 
 def get_performances():

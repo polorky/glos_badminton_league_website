@@ -129,7 +129,7 @@ class FixtureForm(ModelForm):
             raise ValidationError(['player','You have duplicated home player(s)'])
         
         # Check away players are not duplicated, are right gender and exist - CAN BE OVERRIDDEN
-        players_found, player_errors += find_away_players(cd, self.instance)
+        players_found, player_errors = find_away_players(cd, self.instance)
 
         # If errors and overrides not checked, raise error
         if player_errors and not cd['player_name_check']:

@@ -1,6 +1,5 @@
-from .models import Player, PendingPlayerVerification, Club
 import league.constants as constants
-from RapidFuzz import fuzz
+from rapidfuzz import fuzz
 from django.core.mail import send_mail
 from django.core import signing
 from django.http import HttpResponse
@@ -14,6 +13,7 @@ def find_away_players(data, fixture):
         Looks for existing players that match or closely match
         If none are found, return errors messages unless checkbox is ticked
     '''
+    from league.models import Player
 
     match_type = fixture.division.type
     club = fixture.away_team.club
@@ -86,6 +86,7 @@ def verify_away_players(fixture, players_found):
             1. If player found, add to fixture object
             2. Else send email to away club to get confirmation of correct player
     '''
+    from league.models import PendingPlayerVerification
 
     div_type = fixture.division.type
     mixed_player_type = ['Ladies','Ladies','Ladies','Men','Men','Men']
@@ -114,6 +115,7 @@ def verify_away_players(fixture, players_found):
         email_notification('playernotfound', verifications)
 
 def attempt_fuzzy_match(player_name, club):
+    from league.models import Player
 
     player = None
     fuzzy_max = ('',0)
@@ -333,6 +335,7 @@ def email_admin(dup_player, cor_player, fix, code):
     return
 
 def get_all_club_contacts():
+    from league.models import Club
 
     clubs = Club.objects.filter(active=True)
     email_list = {}
