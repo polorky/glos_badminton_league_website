@@ -3,8 +3,8 @@ from django.db.models import Q
 from django.contrib.auth.models import User
 import urllib
 import league.constants as constants
-from .utilities import email_notification, sort_table
-
+from .utilities import email_notification
+from django.core.exceptions import ObjectDoesNotExist
 
 class Season(models.Model):
     year = models.CharField(max_length=10)
@@ -186,17 +186,32 @@ class Club(models.Model):
 
         # Used in player model method get_team_dict
         # This counts the time a player has played for each team
-        if version == "count_version":
+        if version == 'count':
             team_dict = {
                          "Mixed":{team:0 for team in mixed},
                          "Ladies":{team:0 for team in ladies},
                          "Mens":{team:0 for team in mens},
                          }
+        # Used for player roster in club admin view
+        elif version == 'roster':
+            # Split out teams
+            team_dict = {"Mixed":teams.filter(type="Mixed"),
+                    "Ladies":teams.filter(type="Ladies"),
+                    "Mens":teams.filter(type="Mens"),
+                    "All":teams}
+            # Get length of team lists
+            team_dict.update({"Lengths":{"Mixed":len(team_dict["Mixed"]),
+                                    "Ladies":len(team_dict["Ladies"]),
+                                    "Mens": len(team_dict["Mens"]),
+                                    "All": len(team_dict["All"]),
+                                    }})            
         # Otherwise just return the lists of teams
         else:
             team_dict = {"Mixed":mixed, "Ladies":ladies, "Mens":mens}
 
         return team_dict
+    
+
 
     def get_clubs_player_stats(self):
 
@@ -327,7 +342,7 @@ class Player(models.Model):
 
         player_fixtures = self.get_own_fixtures()
         team_dict = {}
-        team_dict["teams"] = self.club.get_clubs_teams("count_version")
+        team_dict["teams"] = self.club.get_clubs_teams("count")
 
         # Count the times player has played for each team
         for fixture in player_fixtures:
@@ -374,7 +389,7 @@ class Player(models.Model):
 
         return team_dict
 
-    def get_nominated_team(self,match_type):
+    def get_nominated_team(self, match_type):
         '''
             Returns mixed/level team player has been nominated for (or empty list if none)
         '''
@@ -386,9 +401,10 @@ class Player(models.Model):
 
         if nom_team:
             try:
+                # Check if there is a lower team, if not then the nomination is irrelevant
                 Team.objects.get(active=True, type=match_type, club=self.club, number=nom_team[0].number + 1)
                 return nom_team
-            except:
+            except ObjectDoesNotExist:
                 return []
         return []
 
@@ -531,11 +547,8 @@ class Team(models.Model):
 
         try:
             team = Team.objects.get(club=self.club,type=self.type,number=self.number + 1)
-            if team.active:
-                return False
-            else:
-                return True
-        except:
+            return not team.active
+        except ObjectDoesNotExist:
             return True
 
     def get_penalties(self, season):
@@ -572,6 +585,52 @@ class Team(models.Model):
             final_str += f' - {round(cur_count/len(fixtures)*100,1)}% ({cur_count})'
 
         return final_str
+
+    def get_nomination_stats(self):
+        
+        season = Season.objects.get(current=True)
+
+        fixtures = Fixture.objects.filter(
+                season=season
+            ).filter(
+                Q(home_team=self) | Q(away_team=self)
+            ).filter(status='Played')
+        
+        total_matches = fixtures.count()
+        nominations = TeamNomination.objects.filter(team=self, season=season)
+        
+        positions = {}
+        for nomination in nominations:
+            if nomination.position not in positions:
+                positions[nomination.position] = []
+            positions[nomination.position].append(nomination.player)
+        
+        stats = {}
+        
+        for position, players in positions.items():
+            played = sum(
+                1 for fix in fixtures
+                if any(player in fix.get_players() for player in players)
+            )
+            stats[position] = {
+                'players': players,
+                'played': played,
+                'total': total_matches,
+                'percent': round(played / total_matches * 100, 1) if total_matches else 0,
+            }
+        
+        return stats
+
+class TeamNomination(models.Model):
+    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='nominations')
+    player = models.ForeignKey(Player, on_delete=models.CASCADE)
+    position = models.IntegerField()
+    date_from = models.DateField()
+    date_to = models.DateField(null=True, blank=True)
+    season = models.ForeignKey(Season, on_delete=models.CASCADE)
+    
+    class Meta:
+        unique_together = ['team', 'position', 'date_from']
 
 class Venue(models.Model):
     name = models.CharField(max_length=50)
@@ -639,7 +698,7 @@ class Fixture(models.Model):
 
         try:
             admin = Administrator.objects.get(user=user)
-        except:
+        except ObjectDoesNotExist:
             admin = Member.objects.get(user=user)
 
         # Away teams can update fixtures with new date proposed

@@ -1,7 +1,6 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect
 from django.db.models import Q
 from django.core.mail import send_mail
-from django.views import View
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
@@ -9,25 +8,12 @@ from django.core.exceptions import ObjectDoesNotExist
 
 from .models import *
 from .forms import *
-from .utilities import email_notification, email_admin, verify_away_players, download_fixtures, get_all_club_contacts
+from .utilities import verify_away_players, download_fixtures, correct_duplicate_player, get_performances, get_fixture_stats, get_player_stats, parse_fixtures
+from .email import email_notification, email_admin, get_all_club_contacts
 import league.constants as constants
 
 import urllib
 import pandas as pd
-from datetime import datetime
-
-##### Auxillary functions #####
-def correct_duplicate_player(dup_player,cor_player,fix):
-
-    player_fields = [f'home_player{i}' for i in range(1, 7)] + [f'away_player{i}' for i in range(1, 7)]
-
-    for player in player_fields:
-        if getattr(fix, player) == dup_player:
-            setattr(fix, player, cor_player)
-            fix.save()
-            return 'done'
-
-    return 'notfound'
 
 ##############################################################################################################################################
 ##### Main website page views #####
@@ -290,7 +276,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
                 rform.save()
                 fixture.status = 'Proposed'
                 fixture.save()
-                email_notification('reschedule',fixture)
+                email_notification('reschedule', fixture)
 
         # Match conceded
         elif pagename == "concededhome" or pagename == "concededaway":
@@ -311,7 +297,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
                         penalty_type='Match Conceded', 
                         fixture=fixture)
             p.save()
-            email_notification(pagename,fixture)
+            email_notification(pagename, fixture)
 
         # Result submitted by home team
         elif pagename == "submit":
@@ -344,7 +330,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
                 if fixture.season.current:
                     fixture.check_player_eligibility()
                     #fixture.check_nomination_status() # Nomination rules have changed
-                    email_notification('result',fixture)
+                    email_notification('result', fixture)
             else:
                 # If forms is not valid, change pageview returned
                 context['pagename'] = 'errors'
@@ -648,21 +634,157 @@ class ArchivesView(GenericViewMixin, TemplateView):
 
         return download_fixtures(fixtures, is_admin)
 
-################ Old function based views ################
-
 @login_required
 def clubadmin(request, update=''):
-    '''
-        View for Club Administrator page
-        Provides clubs contacts and players
-    '''
+    if request.user.username == 'leagueAdmin':
+        return redirect('league_admin')
+    elif request.user.username == 'websiteAdmin':
+        return redirect('website_admin')
+    
+    try:
+        Administrator.objects.get(user=request.user)
+        return redirect('club_admin')
+    except ObjectDoesNotExist:
+        pass
 
-    user = request.user
-    current_season = Season.objects.get(current=True)
+    try:
+        Member.objects.get(user=request.user)
+        return redirect('club_admin')
+    except ObjectDoesNotExist:
+        pass
 
-    # If user is league admin
-    if user.username == "leagueAdmin":
+    return redirect('home')
 
+@method_decorator(login_required, name='dispatch')
+class ClubAdminView(GenericViewMixin, TemplateView):
+    template_name = "league/clubadmin.html"
+    active_tab = 'clubadmin'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        club = context['admin'].club
+        penalties = Penalty.objects.filter(team__club=club).filter(season=Season.objects.get(current=True))
+
+        context.update({
+            'status': 'admin',
+            'clubform': ClubForm(instance=club),
+            'clubnights': ClubNight.objects.filter(club=club),
+            'clubnightform': ClubNightForm(),
+            'venueform': VenueForm(),
+            'players': Player.objects.filter(club=club).order_by("level","name"),
+            'playerform': PlayerForm(),
+            'playerstats': club.get_clubs_player_stats(),
+            'teams': club.get_clubs_teams('roster'),
+            'penalties': penalties})
+
+        return context
+    
+    def post(self, request, **kwargs):
+        context = self.get_context_data(kwargs)
+        update = self.kwargs.get('update', '')
+        club = context['admin'].club
+
+        # Contacts form submitted
+        if update == 'contacts':
+            clubform = ClubForm(request.POST,instance=club)
+            if clubform.is_valid():
+                clubform.save()
+                context.update({'status': 'contactupdated'})
+        
+        # Player form submitted
+        elif update == 'players':
+            playerform = PlayerForm(request.POST)
+            if playerform.is_valid():
+                name = playerform.cleaned_data['name']
+                level = playerform.cleaned_data['level']
+                if Player.objects.filter(club=club, name=name, level=level).exists():
+                    context.update({'status': 'playerduplicated'})
+                else:
+                    Player.objects.create(club=club,name=name,level=level)
+                    context.update({'status': 'playeradded'})
+        
+        # Venue form submitted
+        elif update == 'venue':
+            venueform = VenueForm(request.POST)
+            if venueform.is_valid():
+                if Venue.objects.filter(name=venueform.cleaned_data['name']).exists():
+                    context.update({'status': 'venueduplicated'})
+                else:
+                    venueform.save()
+                    send_mail(
+                        "New Venue Added",
+                        "Venue Created",
+                        "GlosBadWebsite@gmail.com",
+                        ["schofieldmark@gmail.com"],
+                        )
+                    context.update({'status': 'venueadded'})
+        
+        # Club Night form submitted
+        elif update == 'clubnight':
+            cnform = ClubNightForm(request.POST)
+            if cnform.is_valid():
+                ClubNight.objects.create(club=club,venue=cnform.cleaned_data['venue'],timings=cnform.cleaned_data['timings'])
+                context.update({'status': 'clubnightadded'})
+        
+        # Club Night deleted
+        elif 'deletecn' in update:
+            cn_id = update.replace('deletecn','')
+            ClubNight.objects.filter(id=cn_id).delete()
+            context.update({'status': 'clubnightdeleted'})
+        
+        # Player deleted
+        elif 'deleteplayer' in update:
+            player_id = update.replace('deleteplayer','')
+            Player.objects.filter(id=player_id).delete()
+            context.update({'status': 'playerdeleted'})
+        
+        # Player error reported
+        elif 'duplicateplayer' in update:
+            player_id = update.replace('duplicateplayer','')
+            player = Player.objects.get(id=player_id)
+            club_players = Player.objects.filter(club=club)
+            player_options = [(p.id, p.name) for p in club_players]
+            form = DuplicatePlayerForm(player=[(player.id,player.name)],players=player_options)
+            context.update({'status':'duplicateplayer', 'player':player, 'form':form})
+        
+        # Player error form submitted
+        elif 'duplicatesubmit' in update:
+            form = DuplicatePlayerForm(request.POST)
+            inc_player = Player.objects.get(id=request.POST['incorrect_player'])
+            cor_player = Player.objects.get(id=request.POST['correct_player'])
+            fix = inc_player.get_own_fixtures()
+            if len(fix) != 1:
+                email_admin(inc_player, cor_player, fix, 'fixerror')
+                context.update({'status':'duplicateerror'})
+            else:
+                status_code = correct_duplicate_player(inc_player, cor_player, fix[0])
+                if status_code == 'done':
+                    email_admin(inc_player, cor_player, fix[0], 'done')
+                    inc_player.delete()
+                    context.update({'status':'duplicatedeleted'})
+                else:
+                    email_admin(inc_player, cor_player, fix[0], 'notfound')
+                    context.update({'status':'duplicateerror'})
+        
+        return self.render_to_response(context)
+
+@method_decorator(login_required, name='dispatch')
+class LeagueAdminView(GenericViewMixin, TemplateView):
+    template_name = "league/leagueadmin.html"
+    active_tab = 'clubadmin'
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.username != 'leagueAdmin':
+            return redirect('home')
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)    
+        
+        update = context.get('update','')
+        current_season = Season.objects.get(current=True)
+        
         ##### Player View #####
         if 'player' in update:
             player_id = int(update.replace('player',''))
@@ -684,564 +806,195 @@ def clubadmin(request, update=''):
                                      "All": len(teams["All"]),
                                      }})
 
-            context = {
+            context.update({
                 'status': 'player',
                 'player': player,
                 'playerstats': playerstats,
                 'matches': playermatches,
                 'teams': teams,
                 'test': player_id
-                }
+                })
 
-            return render(request, "league/clubadmin.html", context)
-
-        penalties = Penalty.objects.filter(season=current_season)
-        active_teams = Team.objects.filter(active=True).order_by("club","type","number")
-        nom_teams = [team for team in active_teams if not team.last_team()]
-        nom_stats = [(team, team.check_nominations()) for team in nom_teams]
-        last_teams = [team for team in active_teams if team.last_team()]
-        #inactive_teams = Team.objects.filter(active=False).order_by("club","type","number")
-        clubs = Club.objects.filter(active=True).order_by("name")
-        #club_players = {club: Player.objects.filter(club=club).order_by("name") for club in clubs}
-        teamlengths = ((1,2,3),(1,2,3,4,5,6,7,8))
-        club_contacts = get_all_club_contacts()
-
-        ##### Send Email #####
-        if request.method == 'POST':
-            # if update == 'massemail':
-            #     form = EmailForm(request.POST)
-            #     recipients = get_all_club_contacts()
-            #     #recipients = ['schofieldmark@gmail.com']
-            #     if form.is_valid():
-            #         data = form.cleaned_data
-            #         msg = EmailMultiAlternatives(
-            #             data['subject'],
-            #             data['body'],
-            #             'glosbadwebsite@gmail.com', # from
-            #             [data['replyto']], # to
-            #             recipients, # bcc
-            #             reply_to=[data['replyto'],]
-            #             )
-            #         if data['html'] != '':
-            #             msg.attach_alternative(data['html'], "text/html")
-            #         msg.send()
-            #         status = 'emailsent'
-
-            if 'delpen' in update:
-                penID = update.replace('delpen','')
-                penalty = Penalty.objects.get(id=penID)
-                penalty.delete()
-                status = 'penaltydeleted'
         else:
-            status = 'leagueAdmin'
 
-        context = {
-            'status': status,
-            'email_form': EmailForm(),
-            'penalties': penalties,
-            'nom_teams': nom_stats,
-            'last_teams': last_teams,
-            #'inactive_teams': inactive_teams,
-            #'players': club_players,
-            'teamlengths': teamlengths,
-            'club_contacts': club_contacts,
-        }
+            # Get nomination stats
+            active_teams = Team.objects.filter(active=True).order_by("club","type","number")
+            last_teams = [team for team in active_teams if team.last_team()]
+            nom_teams = [team for team in active_teams if not team.last_team()]
+            nom_stats = [(team, team.check_nominations()) for team in nom_teams]
+            
+            # Update context
+            context.update({
+                'status': 'leagueAdmin',
+                'penalties': Penalty.objects.filter(season=current_season),
+                'nom_teams': nom_stats,
+                'last_teams': last_teams,
+                'club_contacts': get_all_club_contacts()
+            })
 
-        return render(request, "league/clubadmin.html", context)
+        return context
 
-    # If user is website admin
-    elif user.username == "websiteAdmin":
+    def post(self, request, **kwargs):
+        context = self.get_context_data(kwargs)
+        update = self.kwargs.get('update', '')
+    
+        if 'delpen' in update:
+            penID = update.replace('delpen','')
+            penalty = Penalty.objects.get(id=penID)
+            penalty.delete()
+            context.update({'status':'penaltydeleted'})
+        
+        return self.render_to_response(context)
 
-        if request.method == 'POST':
-            if update == 'upload':
-                myfile = request.FILES['myfile']
-                #df = pd.read_csv(myfile)
-                df = pd.read_excel(myfile)
-                contents = df.to_dict('index')
-                #parse_results(contents)
-                parse_fixtures(contents)
-                context = {
-                    'status': 'fileuploaded',
-                }
-            elif update == 'getperm':
-                log = get_performances()
-                context = {
-                    'status': 'gotperm',
-                    'log': log
-                    }
-            elif update == 'clearnoms':
-                clear_nominations()
-                context = {
-                    'status': 'nomscleared',
-                    }
-        else:
-            solo_rubs_to_30, solo_rubs_to_other, other_rubs_to_other, forfeits, errors = get_fixture_stats()
-            context = {
-                'status': 'websiteAdmin',
-                's30': solo_rubs_to_30,
-                'sother': solo_rubs_to_other,
-                'oother': other_rubs_to_other,
-                'forfeits': forfeits,
-                'errors': errors
-            }
+@method_decorator(login_required, name='dispatch')
+class WebsiteAdminView(GenericViewMixin, TemplateView):
+    template_name = "league/websiteadmin.html"
+    active_tab = 'clubadmin'
 
-        return render(request, "league/clubadmin.html", context)
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.username != 'websiteAdmin':
+            return redirect('home')
+        return super().dispatch(request, *args, **kwargs)
 
-    # Otherwise user will be club admin or member
-    try:
-        admin = Administrator.objects.get(user=user)
-        club = admin.club
-        member = None
-    except ObjectDoesNotExist:
-        member = Member.objects.get(user=user)
-        club = member.club
-        admin = None
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
 
-    # Get club and teams
-    club_teams = Team.objects.filter(active=True).filter(club=club)
+        solo_rubs_to_30, solo_rubs_to_other, other_rubs_to_other, forfeits, errors = get_fixture_stats()
 
-    # If form has been submitted
-    if request.method == 'POST':
+        context.update({
+            'status': 'websiteAdmin',
+            's30': solo_rubs_to_30,
+            'sother': solo_rubs_to_other,
+            'oother': other_rubs_to_other,
+            'forfeits': forfeits,
+            'errors': errors
+        })
 
-        # Contacts form submitted
-        if update == 'contacts':
-            clubform = ClubForm(request.POST,instance=club)
-            if clubform.is_valid():
-                clubform.save()
-                status = 'contactupdated'
-        # Player form submitted
-        elif update == 'players':
-            playerform = PlayerForm(request.POST)
-            if playerform.is_valid():
-                if len(Player.objects.filter(club=club).filter(name=playerform.cleaned_data['name']).filter(level=playerform.cleaned_data['level'])) > 0:
-                    status = 'playerduplicated'
-                else:
-                    player = Player(club=club,name=playerform.cleaned_data['name'],level=playerform.cleaned_data['level'])
-                    player.save()
-                    status = 'playeradded'
-        # Venue form submitted
-        elif update == 'venue':
-            venueform = VenueForm(request.POST)
-            if venueform.is_valid():
-                if len(Venue.objects.filter(name=venueform.cleaned_data['name'])) > 0:
-                    status = 'venueduplicated'
-                else:
-                    venueform.save()
-                    send_mail(
-                        "New Venue Added",
-                        "Venue Created",
-                        "GlosBadWebsite@gmail.com",
-                        ["schofieldmark@gmail.com"],
-                        )
-                    status = 'venueadded'
-        # Club Night form submitted
-        elif update == 'clubnight':
-            cnform = ClubNightForm(request.POST)
-            if cnform.is_valid():
-                cn = ClubNight(club=club,venue=cnform.cleaned_data['venue'],timings=cnform.cleaned_data['timings'])
-                cn.save()
-                status = 'clubnightadded'
-        # Club Night deleted
-        elif 'deletecn' in update:
-            cn_id = update.replace('deletecn','')
-            ClubNight.objects.filter(id=cn_id).delete()
-            status = 'clubnightdeleted'
-        # Player deleted
-        elif 'deleteplayer' in update:
-            player_id = update.replace('deleteplayer','')
-            Player.objects.filter(id=player_id).delete()
-            status = 'playerdeleted'
-        # Player error
-        elif 'duplicateplayer' in update:
-            player_id = update.replace('duplicateplayer','')
-            player = Player.objects.get(id=player_id)
-            club_players = Player.objects.filter(club=club)
-            player_options = [(p.id, p.name) for p in club_players]
-            #form = DuplicatePlayerForm(player=player,players=club_players)
-            form = DuplicatePlayerForm(player=[(player.id,player.name)],players=player_options)
-            return render(request, "league/clubadmin.html", {'status':'duplicateplayer','player':player,'form':form})
-        elif 'duplicatesubmit' in update:
-            #try:
-            form = DuplicatePlayerForm(request.POST)
-            inc_player = Player.objects.get(id=request.POST['incorrect_player'])
-            cor_player = Player.objects.get(id=request.POST['correct_player'])
-            fix = inc_player.get_own_fixtures()
-            if len(fix) != 1:
-                email_admin(inc_player, cor_player, fix, 'fixerror')
-                return render(request, "league/clubadmin.html", {'status':'duplicateerror'})
-            status_code = correct_duplicate_player(inc_player, cor_player, fix[0])
-            if status_code == 'done':
-                email_admin(inc_player, cor_player, fix[0], 'done')
-                inc_player.delete()
-                return render(request, "league/clubadmin.html", {'status':'duplicatedeleted'})
-            else:
-                email_admin(inc_player, cor_player, fix[0], 'notfound')
-                return render(request, "league/clubadmin.html", {'status':'duplicateerror'})
+        return context
+    
+    def post(self, request, **kwargs):
+        context = self.get_context_data(kwargs)
+        update = self.kwargs.get('update', '')
 
-    else:
-        status = 'admin'
+        if update == 'upload':
+            myfile = request.FILES['myfile']
+            #df = pd.read_csv(myfile)
+            df = pd.read_excel(myfile)
+            contents = df.to_dict('index')
+            #parse_results(contents)
+            parse_fixtures(contents)
+            context.update({'status': 'fileuploaded'})
 
-    # Get players and players stats
-    players = Player.objects.filter(club=club).order_by("level","name")
-    playerstats = club.get_clubs_player_stats()
-    #playerstats = {player:player.get_team_dict() for player in players}
-    # Split out teams
-    teams = {"Mixed":club_teams.filter(type="Mixed"),
-             "Ladies":club_teams.filter(type="Ladies"),
-             "Mens":club_teams.filter(type="Mens"),
-             "All":club_teams}
-    # Get length of team lists
-    teams.update({"Lengths":{"Mixed":len(teams["Mixed"]),
-                             "Ladies":len(teams["Ladies"]),
-                             "Mens": len(teams["Mens"]),
-                             "All": len(teams["All"]),
-                             }})
-    # Get club penalties
-    penalties = Penalty.objects.filter(team__club=club).filter(season=current_season)
+        elif update == 'getperm':
+            log = get_performances()
+            context.update({
+                'status': 'gotperm',
+                'log': log
+                })
+        
+        elif update == 'clearnoms':
+            
+            nom_fields = [f'nom_player{i}' for i in range(1, 7)]
+            for team in Team.objects.all():
+                if any(getattr(team, f) for f in nom_fields):
+                    for f in nom_fields:
+                        setattr(team, f, None)
+                    team.save()
 
-    # Set up context
-    context = {
-        'status': status,
-        'admin': admin,
-        'member': member,
-        'clubform': ClubForm(instance=club),
-        'clubnights': ClubNight.objects.filter(club=club),
-        'clubnightform': ClubNightForm(),
-        'venueform': VenueForm(),
-        'players': players,
-        'playerform': PlayerForm(),
-        'playerstats': playerstats,
-        'teams': teams,
-        'penalties': penalties,
-    }
+            context.update({'status': 'nomscleared'})
 
-    return render(request, "league/clubadmin.html", context)
+        return self.render_to_response(context)
 
-@login_required
-def nominations(request, pagename):
-    '''
-        View for team nominations
-    '''
+class NominationsView(GenericViewMixin, TemplateView):
+    template_name = "league/nominations.html"
+    active_tab = 'clubadmin'
 
-    # Get admin, club and teams
-    admin = Administrator.objects.get(user=request.user)
-    club = admin.club
-    club_teams = Team.objects.filter(active=True).filter(club=club)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        pagename = context.get('pagename','')
+        club = kwargs['admin'].club
+        club_teams = Team.objects.filter(active=True).filter(club=club)
 
-    # If form submitted
-    if request.method == 'POST':
-        # Check which team was submitted
+        # Get players
+        ladies = Player.objects.filter(club=club).filter(level="Ladies").order_by("name")
+        men = Player.objects.filter(club=club).filter(level="Mens").order_by("name")
+        ladies = [(player.id,player) for player in ladies]
+        men = [(player.id,player) for player in men]
+        ladies.insert(0,('',''))
+        men.insert(0,('',''))
+
+        # Set up forms for each team (except the lowest ones)
+        forms = []
         for team in club_teams:
-            if pagename == team.type + str(team.number):
+            name = team.type + " " + str(team.number)
+            code = team.type + str(team.number)
+
+            # Check whether a team below exists if not, don't create a form for team
+            try:
+                Team.objects.get(club=club, type=team.type, active=True, number=team.number + 1)
+            except ObjectDoesNotExist:
+                continue
+
+            # Otherwise create form for team
+            if team.type == 'Mixed':
+                if pagename == team.type + str(team.number):
+                    form = MixedNominateForm(None, instance=team)
+                else:
+                    form = MixedNominateForm(instance=team)
+            else:
+                if pagename == team.type + str(team.number):
+                    form = LevelNominateForm(None, instance=team)
+                else:
+                    form = LevelNominateForm(instance=team)
+
+            # Update players choices with the ladies and men at the club
+            if team.type == "Ladies":
+                for i in range(1,5):
+                    form.fields['nom_player'+str(i)].choices = ladies
+            elif team.type == "Mens":
+                for i in range(1,5):
+                    form.fields['nom_player'+str(i)].choices = men
+            else:
+                for i in range(1,4):
+                    form.fields['nom_player'+str(i)].choices = ladies
+                for i in range(4,7):
+                    form.fields['nom_player'+str(i)].choices = men
+
+            forms.append((name,code,form,team.type,team))
+
+        # Sort list of forms by team name
+        forms.sort(key=lambda x: x[0])
+
+        # Check whether there are any teams to nominate for
+        noteams = True if len(forms) == 0 else False
+
+        # Set up context
+        context.update({
+            'teams': club_teams,
+            'noteams': noteams,
+            'forms': forms,
+            'pagename': pagename,
+        })
+
+        return context
+    
+    def post(self, request, **kwargs):
+        context = self.get_context_data(kwargs)
+
+        # Check which team was submitted
+        for team in context['teams']:
+            if context['pagename'] == team.type + str(team.number):
                 current_team = team
         # Update team object
         if current_team.type == 'Mixed':
-            form = MixedNominateForm(request.POST,instance=current_team)
+            form = MixedNominateForm(request.POST, instance=current_team)
         else:
-            form = LevelNominateForm(request.POST,instance=current_team)
+            form = LevelNominateForm(request.POST, instance=current_team)
         if form.is_valid():
             form.save()
 
-    # Get players
-    ladies = Player.objects.filter(club=club).filter(level="Ladies").order_by("name")
-    men = Player.objects.filter(club=club).filter(level="Mens").order_by("name")
-    ladies = [(player.id,player) for player in ladies]
-    men = [(player.id,player) for player in men]
-    ladies.insert(0,('',''))
-    men.insert(0,('',''))
+        return self.render_to_response(context)
 
-    # Set up forms for each team (except the lowest ones)
-    forms = []
-    for team in club_teams:
-        name = team.type + " " + str(team.number)
-        code = team.type + str(team.number)
 
-        # Check whether a team below exists if not, don't create a form for team
-        try:
-            Team.objects.get(club=club,type=team.type,active=True,number=team.number + 1)
-        except ObjectDoesNotExist:
-            continue
 
-        # Otherwise create form for team
-        if team.type == 'Mixed':
-            if pagename == team.type + str(team.number):
-                form = MixedNominateForm(request.POST or None,instance=team)
-            else:
-                form = MixedNominateForm(instance=team)
-        else:
-            if pagename == team.type + str(team.number):
-                form = LevelNominateForm(request.POST or None,instance=team)
-            else:
-                form = LevelNominateForm(instance=team)
 
-        # Update players choices with the ladies and men at the club
-        if team.type == "Ladies":
-            for i in range(1,5):
-                form.fields['nom_player'+str(i)].choices = ladies
-        elif team.type == "Mens":
-            for i in range(1,5):
-                form.fields['nom_player'+str(i)].choices = men
-        else:
-            for i in range(1,4):
-                form.fields['nom_player'+str(i)].choices = ladies
-            for i in range(4,7):
-                form.fields['nom_player'+str(i)].choices = men
-
-        forms.append((name,code,form,team.type,team))
-
-    # Sort list of forms by team name
-    forms.sort(key=lambda x: x[0])
-
-    # Check whether there are any teams to nominate for
-    if len(forms) == 0:
-        noteams = True
-    else:
-        noteams = False
-
-    # Set up context
-    context = {
-        'teams': club_teams,
-        'noteams': noteams,
-        'forms': forms,
-        'pagename': pagename,
-    }
-
-    return render(request, "league/nominations.html", context)
-
-@login_required
-def player_stats(request, pagename):
-    '''
-    View to get breakdown for individual players' stats
-    '''
-
-    # Get admin, club and teams
-    admin = Administrator.objects.get(user=request.user)
-    club = admin.club
-    current_season = Season.objects.get(current=True)
-    club_fixtures = Fixture.objects.filter(season=current_season).filter(Q(home_team__club=club)|Q(away_team__club=club)).order_by("date_time")
-
-    player_stats = get_player_stats(club, club_fixtures)
-
-    # Set up context
-    context = {
-        'stats': player_stats,
-        'club': club,
-        'season': current_season,
-        'pagename': pagename,
-    }
-
-    return render(request, "league/playerstats.html", context)
-
-############################### Admin Functions ##################################
-
-def clear_nominations():
-
-    nom_fields = [f'nom_player{i}' for i in range(1, 7)]
-    for team in Team.objects.all():
-        if any(getattr(team, f) for f in nom_fields):
-            for f in nom_fields:
-                setattr(team, f, None)
-            team.save()
-
-def get_performances():
-
-    seasons_not_done = ['2024-2025']
-    log = ''
-    for season_text in seasons_not_done:
-        season = Season.objects.get(year=season_text)
-        log += 'Season: ' + str(season)
-        fixtures = Fixture.objects.filter(season=season)
-        log += ' -- Fixtures: ' + str(len(fixtures))
-        divisions = list(set([fix.division for fix in fixtures]))
-        log += ' -- Divisions: ' + str(len(divisions))
-        for division in divisions:
-            table = division.get_table(season)
-            position = 1
-            for row in table:
-                team = row[1]['Object']
-                if not Performance.objects.filter(team=team,season=season,division=division):
-                    cardinal = str(position) + {1:'st',2:'nd',3:'rd'}.get(position,'th') + ' out of ' + str(len(table))
-                    p = Performance(team=team,season=season,division=division,position=cardinal)
-                    p.save()
-                position += 1
-
-    return log
-
-def parse_fixtures(fixtures):
-    '''
-        Parses and creates fixtures from an uploaded file
-    '''
-
-    for row in fixtures.keys():
-        fix = fixtures[row]
-        home_club = Club.objects.get(short_name=fix['Home Club'])
-        away_club = Club.objects.get(short_name=fix['Away Club'])
-        fixture = Fixture(
-            home_team = Team.objects.get(club=home_club,number=fix['Home Team Num'],type=fix['Division Type']),
-            away_team = Team.objects.get(club=away_club,number=fix['Away Team Num'],type=fix['Division Type']),
-            date_time = datetime.combine(fix['Date'].date(), fix['Start Time']),
-            end_time = fix['End Time'],
-            season = Season.objects.get(year=fix['Season']),
-            venue = Venue.objects.get(name=fix['Venue']),
-            division = Division.objects.get(number=fix['Division No.'],type=fix['Division Type']),
-        )
-        fixture.save()
-
-    return
-
-def parse_results(fixtures):
-    '''
-        Parses and creates archive results from an uploaded file
-    '''
-
-    for row in fixtures.keys():
-        fix = fixtures[row]
-        home_club = Club.objects.get(short_name=fix['home club'])
-        away_club = Club.objects.get(short_name=fix['away club'])
-        fixture = Fixture(
-            home_team = Team.objects.get(club=home_club,number=fix['home num'],type=fix['type']),
-            away_team = Team.objects.get(club=away_club,number=fix['away num'],type=fix['type']),
-            home_points = fix['home score'],
-            away_points = fix['away score'],
-            date_time = fix['date_time'],
-            season = Season.objects.get(year=fix['season']),
-            division = Division.objects.get(number=fix['div num'],type=fix['type']),
-        )
-        fixture.save()
-
-    return
-
-def get_fixture_stats():
-
-    solo_rubs_to_30 = []
-    solo_rubs_to_other = []
-    other_rubs_to_other = []
-    forfeits = []
-    errors = []
-
-    current_season = Season.objects.get(current=True)
-    fixtures = Fixture.objects.filter(season=current_season)
-
-    for fix in fixtures:
-        if fix.status == 'Conceded (H)' or fix.status == 'Conceded (A)':
-            continue
-        try:
-            srt30 = False
-            srto = False
-            orto = False
-            scores = fix.game_results.split(',')
-            if 'FH' in scores or 'FA' in scores:
-                forfeits.append(fix)
-            scores = [scores[x:x+2] for x in range(0,len(scores),2)]
-            if fix.division.type == 'Mixed':
-                games = [scores[0:3],scores[3:6],scores[6:9],scores[9:12],scores[12:15],scores[15:18],scores[18:21],scores[21:24],scores[24:27]]
-            else:
-                games = [scores[0:2],scores[2:4],scores[4:6],scores[6:8],scores[8:10],scores[10:12]]
-            for game in games:
-                if game[1][0] == '':
-                    if game[0][0] == '30' or game[0][1] == '30':
-                        srt30 = True
-                    else:
-                        srto = True
-                else:
-                    for rubber in game:
-                        if rubber[0] != '' and rubber[0] != 'FH' and rubber[0] != 'FA' and rubber[0] != '21' and rubber[1] != '21':
-                            if abs(int(rubber[0]) - int(rubber[1])) != 2:
-                                if rubber[0] != '30' and rubber[1] != '30':
-                                    orto = True
-            if srt30:
-                solo_rubs_to_30.append(fix)
-            if srto:
-                solo_rubs_to_other.append(fix)
-            if orto:
-                other_rubs_to_other.append(fix)
-        except:
-            errors.append(fix)
-
-    return solo_rubs_to_30, solo_rubs_to_other, other_rubs_to_other, forfeits, errors
-
-def get_player_stats(club, fixtures):
-
-    player_dict = {}
-
-    for fixture in fixtures:
-
-        if fixture.status != 'Played':
-            continue
-
-        game_split = fixture.game_results.split(',')
-
-        home_players = fixture.get_players(side='home')
-        away_players = fixture.get_players(side='away')
-        club_home = False
-        club_away = False
-
-        if fixture.home_team.club == club:
-            for player in home_players:
-                if player.id not in player_dict:
-                    player_dict[player.id] = {'obj':player,'mixed':{'played':0,'won':0,'percent':0,'pf':0,'pa':0,'diff':0},'level':{'played':0,'won':0,'percent':0,'pf':0,'pa':0,'diff':0}}
-            club_home = True
-        if fixture.away_team.club == club:
-            for player in away_players:
-                if player.id not in player_dict:
-                    player_dict[player.id] = {'obj':player,'mixed':{'played':0,'won':0,'percent':0,'pf':0,'pa':0,'diff':0},'level':{'played':0,'won':0,'percent':0,'pf':0,'pa':0,'diff':0}}
-            club_away = True
-
-        if fixture.division.type == "Mixed":
-            #mixed_games = ["Mixed 3v2","Mixed 2v3","Mixed 1v1","Mixed 2v2","Mixed 3v3","Mens 1&2","Ladies 1&2","Mens 1&3","Ladies 1&3"]
-            mixed_games = [[[3,6],[2,5]],[[2,5],[3,6]],[[1,4],[1,4]],[[2,5],[2,5]],[[3,6],[3,6]],[[4,5],[4,5]],[[1,2],[1,2]],[[4,6],[4,6]],[[1,3],[1,3]]]
-            batched_games = [game_split[i:i + 6] for i in range(0, len(game_split), 6)]
-        else:
-            #level_games = ["2+3 v 2+3","1+4 v 1+4","2+4 v 2+4","1+3 v 1+3","3+4 v 3+4","1+2 v 1+2"]
-            level_games = [[2,3],[1,4],[2,4],[1,3],[3,4],[1,2]]
-            batched_games = [game_split[i:i + 4] for i in range(0, len(game_split), 4)]
-
-        for x, game in enumerate(batched_games):
-
-            rubbers = [game[i:i+2] for i in range(0, len(game), 2)]
-            for rubber in rubbers:
-                try:
-
-                    if rubber[0] in ['FH','FA',''] or rubber[1] in ['FH','FA','']:
-                        continue
-
-                    if club_home:
-
-                        if fixture.division.type == "Mixed":
-                            players_involved = [home_players[mixed_games[x][0][0] - 1], home_players[mixed_games[x][0][1] - 1]]
-                            match_type = "mixed"
-                        else:
-                            players_involved = [home_players[level_games[x][0] - 1], home_players[level_games[x][1] - 1]]
-                            match_type = "level"
-
-                        for player in players_involved:
-                            player_dict[player.id][match_type]['played'] += 1
-                            player_dict[player.id][match_type]['pf'] += int(rubber[0])
-                            player_dict[player.id][match_type]['pa'] += int(rubber[1])
-                            player_dict[player.id][match_type]['diff'] = player_dict[player.id][match_type]['pf'] - player_dict[player.id][match_type]['pa']
-                            if int(rubber[0]) > int(rubber[1]):
-                                player_dict[player.id][match_type]['won'] += 1
-                            player_dict[player.id][match_type]['percent'] = round(player_dict[player.id][match_type]['won'] / player_dict[player.id][match_type]['played'] * 100, 1)
-
-                    if club_away:
-
-                        if fixture.division.type == "Mixed":
-                            players_involved = [away_players[mixed_games[x][1][0] - 1], away_players[mixed_games[x][1][1] - 1]]
-                            match_type = "mixed"
-                        else:
-                            players_involved = [away_players[level_games[x][0] - 1], away_players[level_games[x][1] - 1]]
-                            match_type = "level"
-
-                        for player in players_involved:
-                            player_dict[player.id][match_type]['played'] += 1
-                            player_dict[player.id][match_type]['pf'] += int(rubber[1])
-                            player_dict[player.id][match_type]['pa'] += int(rubber[0])
-                            player_dict[player.id][match_type]['diff'] = player_dict[player.id][match_type]['pf'] - player_dict[player.id][match_type]['pa']
-                            if int(rubber[0]) < int(rubber[1]):
-                                player_dict[player.id][match_type]['won'] += 1
-                            player_dict[player.id][match_type]['percent'] = round(player_dict[player.id][match_type]['won'] / player_dict[player.id][match_type]['played'] * 100, 1)
-
-                except Exception as e:
-                    raise Exception(f'Error - {x}, {game}, {rubber}, {level_games}, {level_games[x]}, {level_games[x][1]}, {home_players}, {away_players}, {e}')
-
-    return player_dict

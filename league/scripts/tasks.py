@@ -1,22 +1,19 @@
+from django.core.exceptions import ObjectDoesNotExist
 import sys
-path = '/home/gloubadleague/leagueWebsite'
-if path not in sys.path:
-    sys.path.append(path)
-
 import django
 import os
-
-os.environ['DJANGO_SETTINGS_MODULE'] = 'leagueWebsite.settings'
-django.setup()
-
 from django.core.mail import send_mail
-from datetime import datetime, timedelta
+from datetime import timedelta
 from league.models import Fixture, Penalty, Season, Club
 from django.db.models import Q
 from django.utils import timezone
-import pytz
+from league import constants
 
-late_submission_penalty_value = 5
+path = '/home/gloubadleague/leagueWebsite'
+if path not in sys.path:
+    sys.path.append(path)
+os.environ['DJANGO_SETTINGS_MODULE'] = 'leagueWebsite.settings'
+django.setup()
 
 def run(test):
 
@@ -69,7 +66,7 @@ def run(test):
     for fix in overdue_fixtures:
         try:
             Penalty.objects.get(team=fix.home_team, penalty_type='Late Submission', fixture=fix)
-        except:
+        except ObjectDoesNotExist:
             subject = 'Late Results Submission - Penalty Applied'
             recipients = get_recipients(fix, fix.home_team)
             body = "Hi,\n\nThe result of the match " + str(fix) + " has still not been submitted and is now two weeks late so a penalty has been applied to your team." \
@@ -84,7 +81,7 @@ def run(test):
             if test:
                 break
 
-            p = Penalty(season=fix.season, team=fix.home_team, penalty_value=late_submission_penalty_value, penalty_type='Late Submission', player='', fixture=fix)
+            p = Penalty(season=fix.season, team=fix.home_team, penalty_value=constants.PENALTY_LATE_SUBMISSION, penalty_type='Late Submission', player='', fixture=fix)
             p.save()
 
     for fix in outstanding_fixtures:

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Admin{% endblock title %}
+
+{% block content %}
+
+{% if status == "nouser" %}
+
+    <p>Please login to view this page.</p>
+
+{% elif status == "websiteAdmin" %}
+
+    <h1>Website Admin Options</h1>
+    <p>Click <a href="/admin">here</a> to access the league database.</p>
+
+    <p>This section is used to upload the fixture list (note that a particular format is required)</p>
+    <form method="post"  action="/clubadmin/upload" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="myfile">
+        <button type="submit">Upload</button>
+    </form>
+    <br>
+    <form method="post"  action="/clubadmin/getperm">
+        {% csrf_token %}
+        <button type="submit">Get Performances</button>
+    </form>
+    <br>
+    <!--<form method="post"  action="/clubadmin/clearnoms">
+        {% csrf_token %}
+        <button type="submit">Clear Nominations</button>
+    </form>
+    <br>-->
+    <h3>Single Games to 30</h3>
+    <ul>
+        {% for fix in s30 %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>Single Games to Other</h3>
+    <ul>
+        {% for fix in sother %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>Other Games to Other</h3>
+    <ul>
+        {% for fix in oother %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>Forfeited Games</h3>
+    <ul>
+        {% for fix in forfeits %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+    <h3>Errors</h3>
+    <ul>
+        {% for fix in errors %}
+            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+        {% endfor %}
+    </ul>
+
+{% elif status == "fileuploaded" %}
+
+    <p>Fixtures uploaded successfully</p>
+
+{% elif status == "gotperm" %}
+
+    <p>{{ log }}</p>
+
+{% elif status == "nomscleared" %}
+
+    <p>Nominations cleared</p>
+
+{% endif %}
+
+{% endblock content %}

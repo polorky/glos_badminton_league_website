@@ -1,10 +1,11 @@
 import league.constants as constants
 from rapidfuzz import fuzz
-from django.core.mail import send_mail
 from django.core import signing
 from django.http import HttpResponse
 from io import BytesIO
 import pandas as pd
+from datetime import datetime
+from .email import email_notification
 
 # Player related functions
 def find_away_players(data, fixture):
@@ -27,7 +28,7 @@ def find_away_players(data, fixture):
     if match_type == "Mixed":
         players += ['away_player5','away_player6']
     
-    players_found = {player:{'player':None, 'suggest_only':False, 'name':data.get(player_title)} for player in players}
+    players_found = {player_title:{'player':None, 'suggest_only':False, 'name':data.get(player_title)} for player_title in players}
 
     for player_title in players:
 
@@ -157,198 +158,184 @@ def attempt_fuzzy_match(player_name, club):
 
     return player, suggest_only
 
-# Email related functions
-def email_notification(status, fix, sender='GlosBadWebsite@gmail.com', **kwargs):
+def correct_duplicate_player(dup_player,cor_player,fix):
 
-    def get_recipients(fix, team, penalty=False):
-        
-        if penalty:
-            recipients = [team.club.contact1_email, team.club.contact2_email, team.captain_email]
-        elif team == 'home':
-            recipients = [fix.home_team.club.contact1_email, fix.home_team.club.contact2_email, fix.home_team.captain_email]
-        elif team == 'away':
-            recipients = [fix.away_team.club.contact1_email, fix.away_team.club.contact2_email, fix.away_team.captain_email]
+    player_fields = [f'home_player{i}' for i in range(1, 7)] + [f'away_player{i}' for i in range(1, 7)]
+
+    for player in player_fields:
+        if getattr(fix, player) == dup_player:
+            setattr(fix, player, cor_player)
+            fix.save()
+            return 'done'
+
+    return 'notfound'
+
+def get_player_stats(club, fixtures):
+
+    player_dict = {}
+
+    for fixture in fixtures:
+
+        if fixture.status != 'Played':
+            continue
+
+        game_split = fixture.game_results.split(',')
+
+        home_players = fixture.get_players(side='home')
+        away_players = fixture.get_players(side='away')
+        club_home = False
+        club_away = False
+
+        if fixture.home_team.club == club:
+            for player in home_players:
+                if player.id not in player_dict:
+                    player_dict[player.id] = {'obj':player,'mixed':{'played':0,'won':0,'percent':0,'pf':0,'pa':0,'diff':0},'level':{'played':0,'won':0,'percent':0,'pf':0,'pa':0,'diff':0}}
+            club_home = True
+        if fixture.away_team.club == club:
+            for player in away_players:
+                if player.id not in player_dict:
+                    player_dict[player.id] = {'obj':player,'mixed':{'played':0,'won':0,'percent':0,'pf':0,'pa':0,'diff':0},'level':{'played':0,'won':0,'percent':0,'pf':0,'pa':0,'diff':0}}
+            club_away = True
+
+        if fixture.division.type == "Mixed":
+            #mixed_games = ["Mixed 3v2","Mixed 2v3","Mixed 1v1","Mixed 2v2","Mixed 3v3","Mens 1&2","Ladies 1&2","Mens 1&3","Ladies 1&3"]
+            mixed_games = [[[3,6],[2,5]],[[2,5],[3,6]],[[1,4],[1,4]],[[2,5],[2,5]],[[3,6],[3,6]],[[4,5],[4,5]],[[1,2],[1,2]],[[4,6],[4,6]],[[1,3],[1,3]]]
+            batched_games = [game_split[i:i + 6] for i in range(0, len(game_split), 6)]
         else:
-            recipients = [fix.home_team.club.contact1_email, fix.home_team.club.contact2_email, fix.home_team.captain_email]
-            recipients += [fix.away_team.club.contact1_email, fix.away_team.club.contact2_email, fix.away_team.captain_email]
-        
-        for i in range(len(recipients),0,-1):
-            if not recipients[i-1]:
-                recipients.pop(i-1)
+            #level_games = ["2+3 v 2+3","1+4 v 1+4","2+4 v 2+4","1+3 v 1+3","3+4 v 3+4","1+2 v 1+2"]
+            level_games = [[2,3],[1,4],[2,4],[1,3],[3,4],[1,2]]
+            batched_games = [game_split[i:i + 4] for i in range(0, len(game_split), 4)]
 
-        return recipients
+        for x, game in enumerate(batched_games):
 
-    html = ''
+            rubbers = [game[i:i+2] for i in range(0, len(game), 2)]
+            for rubber in rubbers:
+                try:
 
-    if status == 'playernotfound':
-        subject = 'Player Not Confirmed'
-        body = f'Hi,\n\nNot all away players for the match {fix} could be identified.'
-        verifications = kwargs['verifications']
-        if any([v.suggested_player for v in verifications]):
-            body += 'The following player(s) where a close match to the name entered, if the correct player has been identified, \
-                please click on "Correct Player" link, otherwise click on the "Incorrect Player"'
-            html = body
-            for v in verifications:
-                if v.suggested_player:
-                    body += f'\nEntered name: {v.submitted_name} --- Suggested Player: {v.suggested_player} --- \
-                        Click this link if this is the correct player: https://gloubadleague.pythonanywhere.com/verify-player/{v.token}/correct --- \
-                        Click this link if this is NOT the correct player: https://gloubadleague.pythonanywhere.com/verify-player/{v.token}/incorrect'
-                    html += f'\nEntered name: {v.submitted_name} --- Suggested Player: {v.suggested_player} --- \
-                        <a href="https://gloubadleague.pythonanywhere.com/verify-player/{v.token}/correct">This is the correct player</a> --- \
-                        <a href="https://gloubadleague.pythonanywhere.com/verify-player/{v.token}/incorrect">This is NOT the correct player</a>' 
+                    if rubber[0] in ['FH','FA',''] or rubber[1] in ['FH','FA','']:
+                        continue
+
+                    if club_home:
+
+                        if fixture.division.type == "Mixed":
+                            players_involved = [home_players[mixed_games[x][0][0] - 1], home_players[mixed_games[x][0][1] - 1]]
+                            match_type = "mixed"
+                        else:
+                            players_involved = [home_players[level_games[x][0] - 1], home_players[level_games[x][1] - 1]]
+                            match_type = "level"
+
+                        for player in players_involved:
+                            player_dict[player.id][match_type]['played'] += 1
+                            player_dict[player.id][match_type]['pf'] += int(rubber[0])
+                            player_dict[player.id][match_type]['pa'] += int(rubber[1])
+                            player_dict[player.id][match_type]['diff'] = player_dict[player.id][match_type]['pf'] - player_dict[player.id][match_type]['pa']
+                            if int(rubber[0]) > int(rubber[1]):
+                                player_dict[player.id][match_type]['won'] += 1
+                            player_dict[player.id][match_type]['percent'] = round(player_dict[player.id][match_type]['won'] / player_dict[player.id][match_type]['played'] * 100, 1)
+
+                    if club_away:
+
+                        if fixture.division.type == "Mixed":
+                            players_involved = [away_players[mixed_games[x][1][0] - 1], away_players[mixed_games[x][1][1] - 1]]
+                            match_type = "mixed"
+                        else:
+                            players_involved = [away_players[level_games[x][0] - 1], away_players[level_games[x][1] - 1]]
+                            match_type = "level"
+
+                        for player in players_involved:
+                            player_dict[player.id][match_type]['played'] += 1
+                            player_dict[player.id][match_type]['pf'] += int(rubber[1])
+                            player_dict[player.id][match_type]['pa'] += int(rubber[0])
+                            player_dict[player.id][match_type]['diff'] = player_dict[player.id][match_type]['pf'] - player_dict[player.id][match_type]['pa']
+                            if int(rubber[0]) < int(rubber[1]):
+                                player_dict[player.id][match_type]['won'] += 1
+                            player_dict[player.id][match_type]['percent'] = round(player_dict[player.id][match_type]['won'] / player_dict[player.id][match_type]['played'] * 100, 1)
+
+                except Exception as e:
+                    raise Exception(f'Error - {x}, {game}, {rubber}, {level_games}, {level_games[x]}, {level_games[x][1]}, {home_players}, {away_players}, {e}')
+
+    return player_dict
+
+# Team related functions
+def get_performances():
+    '''
+    Creates performance records for all teams 
+    '''
+    from league.models import Season, Fixture, Performance
+
+    season = Season.objects.get(current=True)
+    log = f'Season: {season}'
+    fixtures = Fixture.objects.filter(season=season)
+    log += f' -- Fixtures: {len(fixtures)}'
+    divisions = list(set([fix.division for fix in fixtures]))
+    log += f' -- Divisions: {len(divisions)}'
+    for division in divisions:
+        table = division.get_table(season)
+        position = 1
+        for row in table:
+            team = row[1]['Object']
+            if not Performance.objects.filter(team=team,season=season,division=division):
+                suffix = {1:'st',2:'nd',3:'rd'}.get(position,'th')
+                cardinal = f"{position}{suffix} out of {len(table)}"
+                p = Performance(team=team, season=season, division=division, position=cardinal)
+                p.save()
+            position += 1
+
+    return log
+
+# Fixture related functions
+def get_fixture_stats():
+
+    from league.models import Season, Fixture
+
+    solo_rubs_to_30 = []
+    solo_rubs_to_other = []
+    other_rubs_to_other = []
+    forfeits = []
+    errors = []
+
+    current_season = Season.objects.get(current=True)
+    fixtures = Fixture.objects.filter(season=current_season)
+
+    for fix in fixtures:
+        if fix.status == 'Conceded (H)' or fix.status == 'Conceded (A)':
+            continue
+        try:
+            srt30 = False
+            srto = False
+            orto = False
+            scores = fix.game_results.split(',')
+            if 'FH' in scores or 'FA' in scores:
+                forfeits.append(fix)
+            scores = [scores[x:x+2] for x in range(0,len(scores),2)]
+            if fix.division.type == 'Mixed':
+                games = [scores[0:3],scores[3:6],scores[6:9],scores[9:12],scores[12:15],scores[15:18],scores[18:21],scores[21:24],scores[24:27]]
+            else:
+                games = [scores[0:2],scores[2:4],scores[4:6],scores[6:8],scores[8:10],scores[10:12]]
+            for game in games:
+                if game[1][0] == '':
+                    if game[0][0] == '30' or game[0][1] == '30':
+                        srt30 = True
+                    else:
+                        srto = True
                 else:
-                    body += f'\nEntered name: {v.submitted_name} --- Click this link to find/create player: \
-                        https://gloubadleague.pythonanywhere.com/verify-player/{v.token}/nosuggest'
-                    html += f'\nEntered name: {v.submitted_name} --- \
-                        <a href="https://gloubadleague.pythonanywhere.com/verify-player/{v.token}/nosuggest"> \
-                        Click this link to find/create player</a>'    
-        recipients = get_recipients(fix, 'away')
+                    for rubber in game:
+                        if rubber[0] != '' and rubber[0] != 'FH' and rubber[0] != 'FA' and rubber[0] != '21' and rubber[1] != '21':
+                            if abs(int(rubber[0]) - int(rubber[1])) != 2:
+                                if rubber[0] != '30' and rubber[1] != '30':
+                                    orto = True
+            if srt30:
+                solo_rubs_to_30.append(fix)
+            if srto:
+                solo_rubs_to_other.append(fix)
+            if orto:
+                other_rubs_to_other.append(fix)
+        except Exception:
+            errors.append(fix)
 
-    elif status == 'confirmed':
-        subject = str(fix) + ' - Rearrangement Confirmed'
-        body = 'Hi,\n\nThe away team have confirmed the rearrangement of the match ' + str(fix) + ' originally scheduled for ' \
-        + fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' and now scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + ' at ' + str(fix.venue) + '.\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'home')
-    
-    elif status == 'rejected':
-        subject = str(fix) + ' - Rearrangement Rejected'
-        body = 'Hi,\n\nThe away team have REJECTED the proposed rearrangement of the match ' + str(fix) + ' originally scheduled for ' \
-        + fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' and proposed to be rearranged for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' at ' \
-        + str(fix.venue) + '.\n\nPlease contact the away team to discuss why the rearrangement was rejected and agree a new date/venue. Fixture status has ' \
-        + 'been returned to "Postponed".\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'home')
-    
-    elif status == 'postponed':
-        subject = str(fix) + ' - Match Postponed'
-        body = 'Hi,\n\nThe home team have postponed the match ' + str(fix) + ' originally scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + '. Hopefully, they have been in touch to explain why and to initiate the process of finding a new date/venue.\n\nRegards\n\nLeague Committee\n\n' \
-        + '***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'away')
-    
-    elif status == 'reschedule':
-        subject = str(fix) + ' - New Date Proposed'
-        body = 'Hi,\n\nThe home team have proposed a new date/venue for the match ' + str(fix) + ' originally scheduled for ' \
-        + fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S") + '. The proposed new date is ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' at ' + str(fix.venue) \
-        + '.\n\nPlease confirm or reject this rearrangement via this page: https://gloubadleague.pythonanywhere.com/fixtures/' \
-        + str(fix.id) + '/update/div\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        html = 'Hi,<br><br>The home team have proposed a new date/venue for the match ' + str(fix) + ' originally scheduled for ' \
-        + fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S") + '. The proposed new date is ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") + ' at ' + str(fix.venue) \
-        + '.<br><br>Please confirm or reject this rearrangement by clicking ' + '<a href="https://gloubadleague.pythonanywhere.com/fixtures/' \
-        + str(fix.id) + '/update/div">here</a>.<br><br>Regards<br><br>League Committee<br><br>***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'away')
-    
-    elif status == 'concededhome':
-        if fix.division.type == "Mixed":
-            penalty_value = constants.PENALTY_MIXED_CONCEDED
-        else:
-            penalty_value = constants.PENALTY_LEVEL_CONCEDED
-        subject = str(fix) + ' - Match Conceded'
-        body = 'Hi,\n\nThe home team have conceded the match ' + str(fix) + ' scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + 'The home team will be penalised ' + str(penalty_value) + ". The away team's points will not be updated to reflect the concession until the end of the season " \
-        + 'but the fixture status has been updated to record the concession\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'both')
-    
-    elif status == 'concededaway':
-        if fix.division.type == "Mixed":
-            penalty_value = constants.PENALTY_MIXED_CONCEDED
-        else:
-            penalty_value = constants.PENALTY_LEVEL_CONCEDED
-        subject = str(fix) + ' - Match Conceded'
-        body = 'Hi,\n\nThe away team have conceded the match ' + str(fix) + ' scheduled for ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + 'The away team will be penalised ' + str(penalty_value) + ". The home team's points will not be updated to reflect the concession until the end of the season " \
-        + 'but the fixture status has been updated to record the concession\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'both')
-    
-    elif status == 'result':
-        subject = str(fix) + ' - Result Submitted'
-        body = 'Hi,\n\nThe home team have submitted the results for the match ' + str(fix) + ' played on ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + '. You can view the score submitted on this page: https://gloubadleague.pythonanywhere.com/fixtures/' + str(fix.id) \
-        + '\n\nIf you believe the result has been entered incorrectly, please contact the league by replying to this email.\n\nRegards\n\nLeague Committee \
-        \n\n***This is an automated email from the league website***'
-        html = 'Hi,<br><br>The home team have submitted the results for the match ' + str(fix) + ' played on ' + fix.date_time.strftime("%d/%m/%Y, %H:%M:%S") \
-        + '. You can view the score submitted <a href="https://gloubadleague.pythonanywhere.com/fixtures/' + str(fix.id) \
-        + '/div">here</a>.<br><br>If you believe the result has been entered incorrectly, please contact the league by replying to this email.<br><br>Regards<br><br>' \
-        + 'League Committee<br><br>***This is an automated email from the league website***'
-        recipients = get_recipients(fix, 'away')
+    return solo_rubs_to_30, solo_rubs_to_other, other_rubs_to_other, forfeits, errors
 
-    elif status == 'nomination_penalty':
-        team = kwargs['team']
-        player_name = kwargs['player_name']
-        subject = 'Nomination Penalty Applied'
-        recipients = get_recipients(fix, team, penalty=True)
-        body = 'Hi,\n\nFollowing the submission of the result for the match ' + str(fix) + ", your club's team has played their first three matches." \
-        + 'However, nominated player ' + player_name + ' has not played at least two of these matches and so the team has been penalised ' + str(constants.PENALTY_NOMINATION_VIOLATION) \
-        + ' points. Please contact the League Committee at GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.' \
-        + '\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***'
-        html =  'Hi,<br><br>Following the submission of the result for the match ' + str(fix) + ", your club's team has played their first three matches." \
-        + 'However, nominated player <b>' + player_name + '</b> has not played at least two of these matches and so the team has been penalised ' + str(constants.PENALTY_NOMINATION_VIOLATION) \
-        + ' points. Please contact the League Committee at GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.' \
-        + '<br><br>Regards<br><br>League Committee<br><br>***This is an automated email from the league website***'
-    
-    elif status == 'eligibility_penalty':
-        subject = 'Eligibility Penalty Applied'
-        recipients = get_recipients(fix, team, penalty=True)
-        body = 'Hi,\n\nFollowing the submission of the result for the match ' + str(fix) + ', it has been identified that player ' + player_name + ' was ineligible' \
-        + " to play and so your club's team has been penalised " + str(constants.PENALTY_INELIGIBLE_PLAYER) + ' points. Please contact the League Committee at' \
-        + ' GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.\n\nRegards\n\nLeague Committee\n\n***This is an automated' \
-        + 'email from the league website***'
-        html = 'Hi,<br><br>Following the submission of the result for the match ' + str(fix) + ', it has been identified that player <b>' + player_name + '</b> was ineligible' \
-        + " to play and so your club's team has been penalised " + str(constants.PENALTY_INELIGIBLE_PLAYER) + ' points. Please contact the League Committee at' \
-        + ' GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise.<br><br>Regards<br><br>League Committee<br><br>***This is an' \
-        + 'automated email from the league website***'
-
-    body += '\n\nFor any issues surrounding fixtures, please contact GlosBadFixtures@outlook.com\nFor technical issues with the website, please reply to this email'
-    #recipients = ['schofieldmark@gmail.com']
-
-    if html:
-
-        html += '<br><br>For any issues surrounding fixtures, please contact <a href="mailto:GlosBadFixtures@outlook.com">GlosBadFixtures@outlook.com</a>' \
-        + '<br>For technical issues with the website, please reply to this email'
-        #html = html.replace('\n','<br>')
-
-        send_mail(subject, body, sender, recipients, html_message = html)
-
-    else:
-
-        send_mail(subject, body, sender, recipients)
-
-    return
-
-def email_admin(dup_player, cor_player, fix, code):
-
-    if code == 'done':
-        body = str(dup_player.club) + ' have submitted a player correction for ' + str(fix) + '. The erroneously created player was ' + dup_player.name \
-        + ' and the correct player is ' + cor_player.name + '. Update was successful.'
-        subject = 'Duplicate Player'
-    elif code == 'notfound':
-        body = str(dup_player.club) + ' have submitted a player correction for ' + str(fix) + '. The erroneously created player was ' + dup_player.name \
-        + ' and the correct player is ' + cor_player.name + '. Fixture containing player not found.'
-        subject = 'Duplicate Player Error'
-    elif code == 'fixerror':
-        body = str(dup_player.club) + ' have submitted a player correction for ' + str(fix) + '. The erroneously created player was ' + dup_player.name \
-        + ' and the correct player is ' + cor_player.name + '. Player has played too many fixtures.'
-        subject = 'Duplicate Player Error'
-
-    send_mail(subject, body, 'GlosBadWebsite@gmail.com', ['schofieldmark@gmail.com'])
-
-    return
-
-def get_all_club_contacts():
-    from league.models import Club
-
-    clubs = Club.objects.filter(active=True)
-    email_list = {}
-
-    for club in clubs:
-        if club.contact1_email:
-            email_list[f'{club.short_name} Contact 1'] = club.contact1_email
-        if club.contact2_email:
-            email_list[f'{club.short_name} Contact 2'] = club.contact2_email
-
-    return email_list
-
-# Download fixtures to Excel
+# Fixture Download/Upload
 def download_fixtures(fixtures, is_admin=False):
 
     df = build_dataframe(fixtures, is_admin)
@@ -394,7 +381,51 @@ def build_dataframe(fixtures, is_admin):
 
     return df
 
+def parse_fixtures(fixtures):
+    '''
+        Parses and creates fixtures from an uploaded file
+    '''
+    from league.models import Club, Team, Division, Fixture, Season, Venue
+
+    for row in fixtures.keys():
+        fix = fixtures[row]
+        home_club = Club.objects.get(short_name=fix['Home Club'])
+        away_club = Club.objects.get(short_name=fix['Away Club'])
+        fixture = Fixture(
+            home_team = Team.objects.get(club=home_club,number=fix['Home Team Num'],type=fix['Division Type']),
+            away_team = Team.objects.get(club=away_club,number=fix['Away Team Num'],type=fix['Division Type']),
+            date_time = datetime.combine(fix['Date'].date(), fix['Start Time']),
+            end_time = fix['End Time'],
+            season = Season.objects.get(year=fix['Season']),
+            venue = Venue.objects.get(name=fix['Venue']),
+            division = Division.objects.get(number=fix['Division No.'],type=fix['Division Type']),
+        )
+        fixture.save()
+
 # NOT CURRENTLY IMPLEMENTED
+def parse_results(fixtures):
+    '''
+        Parses and creates archive results from an uploaded file
+    '''
+    from league.models import Club, Fixture, Team, Season, Division
+
+    for row in fixtures.keys():
+        fix = fixtures[row]
+        home_club = Club.objects.get(short_name=fix['home club'])
+        away_club = Club.objects.get(short_name=fix['away club'])
+        fixture = Fixture(
+            home_team = Team.objects.get(club=home_club,number=fix['home num'],type=fix['type']),
+            away_team = Team.objects.get(club=away_club,number=fix['away num'],type=fix['type']),
+            home_points = fix['home score'],
+            away_points = fix['away score'],
+            date_time = fix['date_time'],
+            season = Season.objects.get(year=fix['season']),
+            division = Division.objects.get(number=fix['div num'],type=fix['type']),
+        )
+        fixture.save()
+
+    return
+
 def sort_table(team_list):
     # team_list is list of team dictionaries:
     # team_name:{'Played':0,'Won':0,'Drawn':0,'Lost':0,'PFor':0,'PAgainst':0,'Object':''}

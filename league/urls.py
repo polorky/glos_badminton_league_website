@@ -1,13 +1,11 @@
 from django.urls import path
 from . import views
-from django.views.generic import TemplateView
 
 urlpatterns = [
     #path('nominations/<str:pagename>', views.nominations, name='nominations'),
 
     
     path('clubadmin/<str:update>', views.clubadmin, name='clubadmin'),
-    path('clubadmin', views.clubadmin, name='clubadmin'),
 
     path("divisions/<str:pagename>/<str:season>", views.DivisionsView.as_view(), name='divisions'),
     path("divisions/<str:pagename>", views.DivisionsView.as_view(), name='divisions'),
@@ -20,6 +18,11 @@ urlpatterns = [
     path('venues/<str:pagename>', views.VenuesView.as_view(), name='venues'),
     path('playerstats/<str:pagename>', views.PlayerStatsView.as_view(), name='playerstats'),
     path('archive/<str:pagename>', views.ArchivesView.as_view(), name='archive'),
+    
+    path('clubadmin/', views.clubadmin, name='clubadmin'),
+    path('admin/league/', views.LeagueAdminView.as_view(), name='league_admin'),
+    path('admin/website/', views.WebsiteAdminView.as_view(), name='website_admin'),
+    path('admin/club/', views.ClubAdminView.as_view(), name='club_admin'),
 
     path('juniors', views.JuniorsView.as_view(), name='juniors'),
     path('help', views.HelpView.as_view(), name='help'),
