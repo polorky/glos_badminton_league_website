@@ -17,14 +17,14 @@ class ClubAdmin(admin.ModelAdmin):
     list_display = ('name','short_name','active','website','club_notifications','captain_notifications')
 
 class PlayerAdmin(admin.ModelAdmin):
-    list_display = ('name','club','level')
+    list_display = ('id','name','club','level')
     list_filter = ['club']
 
 class SeasonAdmin(admin.ModelAdmin):
-    list_display = ('year','current','historic_divs')
+    list_display = ('year','current','historic_divs','archive_info')
 
 class FixtureAdmin(admin.ModelAdmin):
-    list_display = ('id','season','division','home_points','away_points','home_team','away_team','date_time','venue','status')
+    list_display = ('id','season','division','home_points','away_points','home_team','away_team','date_time','old_date_time','venue','status')
     list_filter = ['season','status','division','home_team','away_team']
     list_editable = ['status']
 
@@ -40,6 +40,7 @@ class VenueAdmin(admin.ModelAdmin):
 
 class PenaltyAdmin(admin.ModelAdmin):
     list_display = ('season','team','penalty_type','player','fixture')
+    raw_id_fields = ('fixture',)
 
 class ClubNightAdmin(admin.ModelAdmin):
     list_display = ('club','venue','timings')

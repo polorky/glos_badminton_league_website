@@ -16,14 +16,14 @@ import pandas as pd
 from fuzzywuzzy import fuzz
 from io import BytesIO
 from datetime import datetime
-
+from collections import defaultdict
 
 ##### Constants #####
 fuzzy_match_ratio = 85
 alt_names_list = (('David','Dave'),('Stuart','Stu'),('Richard','Rich'),('Alexander','Alex'),('Christopher','Chris'),('Andrew','Andy'),('Daniel','Dan'),('Matthew','Matt'),
 ('Michael','Mike'),('Oliver','Oli'),('Oliver','Ollie'),('Phillip','Phil'),('Philip','Phil'),('Robert','Rob'),('Simon','Si'),('Thomas','Tom'),('William','Will'),
 ('Rebecca','Becky'))
-conceded_penalty_mixed = 5
+conceded_penalty_mixed = 10
 conceded_penalty_level = 7
 cardinal_dict = {1:'st',2:'nd',3:'rd'}
 
@@ -529,7 +529,9 @@ class FixturesView(GenericViewMixin, TemplateView):
 
         fixtures = Fixture.objects.filter(season=context['current_season']).order_by('date_time')
 
-        return self.download_fixtures(fixtures)
+        is_admin = context['user'] is not None and context['user'].username == "websiteAdmin"
+
+        return self.download_fixtures(fixtures, is_admin=is_admin)
 
 @method_decorator(login_required, name='dispatch')
 class FixUpdateView(GenericViewMixin, TemplateView):
@@ -954,199 +956,18 @@ class ArchivesView(GenericViewMixin, TemplateView):
 
         return self.download_fixtures(fixtures, is_admin)
 
+class StatsView(GenericViewMixin, TemplateView):
+    template_name = "league/stats.html"
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        context.update({'stats': get_league_stats()})
+
+        return context
+
 ################ Old function based views ################
-
-def divisions(request, pagename, season=''):
-    '''
-        View for Divisions page
-        If 'Home' view accessed then lists of divisions are returned
-        Otherwise, specific division information is returned
-    '''
-
-    # For home page return list of divisions
-    if pagename == 'home':
-        mixed_divs = Division.objects.filter(type="Mixed",active=True).order_by("number")
-        ladies_divs = Division.objects.filter(type="Ladies",active=True).order_by("number")
-        mens_divs = Division.objects.filter(type="Mens",active=True).order_by("number")
-        old_mixed_divs = Division.objects.filter(type="Mixed",active=False).order_by("number")
-        old_ladies_divs = Division.objects.filter(type="Ladies",active=False).order_by("number")
-        old_mens_divs = Division.objects.filter(type="Mens",active=False).order_by("number")
-
-        context = {
-            'status': 'home',
-            'mixed_divs': mixed_divs,
-            'ladies_divs': ladies_divs,
-            'mens_divs': mens_divs,
-            'old_mixed_divs': old_mixed_divs,
-            'old_ladies_divs': old_ladies_divs,
-            'old_mens_divs': old_mens_divs,
-        }
-
-    # Otherwise return specific division
-    else:
-
-        # Check user
-        if request.user.is_authenticated:
-            user = request.user
-        else:
-            user = None
-
-        # Check whether requested division exists
-        try:
-            type_dict = {'X':'Mixed','L':'Ladies','M':'Mens'}
-            division = Division.objects.get(number=pagename[1:],type=type_dict[pagename[0]])
-        except:
-            return render(request, "league/divisions.html", {'status':'doesnotexist'})
-
-        # Get current season
-        current_season = Season.objects.get(current=True)
-
-        # If current season or no specific season requested get current table
-        if season == '' or season == current_season.year:
-            table = division.get_table()
-        # Else work out table for requested season
-        else:
-            current_season = Season.objects.get(year=season)
-            table = division.get_table(season=current_season)
-
-        # Work out previous/next season/division for links
-        prev_season, next_season = current_season.get_adj_seasons()
-        prev_div = Division.objects.filter(number=division.number - 1, type=division.type)
-        next_div = Division.objects.filter(number=division.number + 1, type=division.type)
-        fixtures = Fixture.objects.filter(season=current_season).filter(division=division.id).order_by("date_time")
-        fix_list = [(fix,fix.updateable(user)) for fix in fixtures]
-        concessions = False
-
-        # If no fixtures found and not current season, division did not exist in requested season
-        if len(fixtures) == 0 and not division.active:
-            exist = False
-        else:
-            exist = True
-
-        # If concessions exist a note will be added next to table
-        for fix in fixtures:
-            if fix.status == "Conceded (H)" or fix.status == "Conceded (A)":
-                concessions = True
-                break
-
-        # Download fixtures to Excel
-        if request.method == 'POST':
-            if len(fixtures) != 0:
-                df = build_dataframe(fixtures)
-                with BytesIO() as b:
-                    with pd.ExcelWriter(b) as writer:
-                        df.to_excel(writer)
-                    filename = "fixtures.xlsx"
-                    res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                    res['Content-Disposition'] = f'attachment; filename={filename}'
-                    return res
-
-        context = {
-            'status': 'view',
-            'division': division,
-            'fixtures': fix_list,
-            'table': table,
-            'concessions': concessions,
-            'cur_season': current_season,
-            'prev_season': prev_season,
-            'next_season': next_season,
-            'prev_div': prev_div,
-            'next_div': next_div,
-            'exist': exist
-        }
-
-    return render(request, "league/divisions.html", context)
-
-def fixtures(request, pagename, source=''):
-    '''
-        View for the Fixtures page
-        If 'Home' view requested, full fixture list is returned
-        Otherwise details of a specific fixture are returned
-        Note that updating fixtures is done by the 'fixupdate' view
-    '''
-
-    # Check user
-    if request.user.is_authenticated:
-        user = request.user
-    else:
-        user = None
-
-    # Check for admin
-    try:
-        admin = Administrator.objects.get(user=user)
-    except:
-        try:
-            admin = Member.objects.get(user=user)
-        except:
-            admin = None
-
-    # Get current season
-    current_season = Season.objects.get(current=True)
-
-    # If home page requested, return all fixtures
-    if pagename == 'home':
-
-        # Download fixtures
-        if request.method == 'POST':
-            fixtures = Fixture.objects.filter(season=current_season).order_by('date_time')
-            df = build_dataframe(fixtures)
-            with BytesIO() as b:
-                with pd.ExcelWriter(b) as writer:
-                    df.to_excel(writer)
-                filename = "fixtures.xlsx"
-                res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                res['Content-Disposition'] = f'attachment; filename={filename}'
-                return res
-
-        # Get all fixtures ordered by date
-        fixtures = Fixture.objects.filter(season=current_season).order_by('date_time')
-        fix_list = [(fix,fix.updateable(user)) for fix in fixtures]
-
-        context = {
-            'pageview': 'home',
-            'fixtures': fix_list,
-            'season': current_season,
-        }
-
-    # Otherwise return requested fixture for viewing
-    else:
-
-        # Check fixture exists
-        try:
-            fixture = Fixture.objects.get(id=pagename)
-        except:
-            return render(request, "league/fixtures.html", {'pageview':'doesnotexist'})
-
-        # Get players in user is club admin
-        players = []
-
-        if admin and admin.club == fixture.home_team.club:
-            players += fixture.get_players(side='home')
-        if admin and admin.club == fixture.away_team.club:
-            players += fixture.get_players(side='away')
-
-        # Get games for played matches
-        if fixture.status == "Played" and fixture.game_results:
-            batched_games = fixture.get_scores()
-        else:
-            batched_games = None
-
-        # Work out number of rubbers expected per game
-        if fixture.division.type == "Mixed" and fixture.season.mixed_scoring == "point per game":
-            rubber_number = 3
-        else:
-            rubber_number = 2
-
-        context = {
-            'pageview': 'view',
-            'fixture': fixture,
-            'game_results': batched_games,
-            'players': players,
-            'source': source,
-            'rubber_number': rubber_number,
-        }
-
-    return render(request, "league/fixtures.html", context)
 
 @login_required
 def fixupdate(request, pagename, status='', source=''):
@@ -1286,231 +1107,6 @@ def fixupdate(request, pagename, status='', source=''):
         context['detform'] = detform
 
     return render(request, "league/fixtures.html", context)
-
-def clubs(request, pagename):
-    '''
-        View for Clubs page
-        If 'Home' view accessed then lists of clubs are returned
-        Otherwise, specific club information is returned
-    '''
-
-    if request.user.is_authenticated:
-        user = request.user
-    else:
-        user = None
-
-    # If home page requested, return all clubs
-    if pagename == 'home':
-        context = {
-            'status': 'home',
-            'clubs': Club.objects.filter(active=True).order_by("name"),
-            'old_clubs': Club.objects.filter(active=False).order_by("name"),
-        }
-
-    # Otherwise return requested club details
-    else:
-        name = urllib.parse.unquote(pagename)
-
-        # Check requested club exists
-        try:
-            club = Club.objects.get(name=name)
-        except:
-            return render(request, "league/clubs.html", {'status':'doesnotexist'})
-
-        # Get teams and fixtures
-        teams = Team.objects.filter(active=True).filter(club=club).order_by("type", "number")
-        ex_teams = Team.objects.filter(active=False).filter(club=club).order_by("type", "number")
-        current_season = Season.objects.get(current=True)
-        club_fixtures = Fixture.objects.filter(season=current_season).filter(Q(home_team__club=club)|Q(away_team__club=club)).order_by("date_time")
-        fix_list = [(fix,fix.updateable(user)) for fix in club_fixtures]
-
-        # Get list of venues used
-        venues = set()
-        for team in teams:
-            fixtures = Fixture.objects.filter(season=current_season).filter(home_team=team)
-            for fix in fixtures:
-                venues.add(fix.venue)
-
-        # Get contacts
-        if club.public_contact_name or club.public_email or club.public_num:
-            public_info = True
-        else:
-            public_info = False
-
-        # Download fixtures
-        if request.method == 'POST':
-            df = build_dataframe(club_fixtures)
-            with BytesIO() as b:
-                with pd.ExcelWriter(b) as writer:
-                    df.to_excel(writer)
-                filename = "fixtures.xlsx"
-                res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                res['Content-Disposition'] = f'attachment; filename={filename}'
-                return res
-
-        context = {
-            'status': 'view',
-            'club': club,
-            'teams': teams,
-            'ex_teams': ex_teams,
-            'venues': venues,
-            'fixtures': fix_list,
-            'clubnights': ClubNight.objects.filter(club=club),
-            'public_info': public_info,
-        }
-
-    return render(request, "league/clubs.html", context)
-
-def teams(request, pagename):
-    '''
-        View for Teams page
-        If 'Home' view accessed then lists of teams are returned
-        Otherwise, specific team information is returned
-    '''
-
-    # If home page requested, return all teams
-    if pagename == 'home':
-        context = {
-            'status': 'home',
-            'teams': Team.objects.filter(active=True).order_by("club__name", "type", "number"),
-            'old_teams': Team.objects.filter(active=False).order_by("club__name", "type", "number"),
-        }
-
-    # Otherwise return team requested
-    else:
-
-        # Check user
-        if request.user.is_authenticated:
-            user = request.user
-        else:
-            user = None
-
-        # Check for admin
-        try:
-            admin = Administrator.objects.get(user=user)
-        except:
-            try:
-                admin = Member.objects.get(user=user)
-            except:
-                admin = None
-
-        # Check team exists
-        id = urllib.parse.unquote(pagename)
-        try:
-            team = Team.objects.get(id=id)
-        except:
-            return render(request, "league/teams.html", {'status':'doesnotexist'})
-
-        # Create form for captain details
-        form = TeamForm(request.POST or None,instance=team)
-
-        # Get fixtures
-        current_season = Season.objects.get(current=True)
-        fixtures = Fixture.objects.filter(season=current_season).filter(Q(home_team=team)|Q(away_team=team)).order_by('date_time')
-        fix_list = [(fix,fix.updateable(user)) for fix in fixtures]
-
-        # Get performances
-        performances = Performance.objects.filter(team=team).order_by('season__year').reverse()
-
-        # Check whether captain details have been updated
-        updated = False
-
-        # Process updated form
-        if request.method == 'POST':
-            if form.is_valid():
-                form.save()
-                updated = True
-
-        # If admin, captain's details are updateable
-        if admin and admin.club == team.club:
-            updateable = True
-        else:
-            updateable = False
-
-        context = {
-            'status': 'view',
-            'team': team,
-            'updateable': updateable,
-            'updated': updated,
-            'form': form,
-            'fixtures': fix_list,
-            'performances': performances,
-        }
-
-    return render(request, "league/teams.html", context)
-
-def venues(request, pagename):
-    '''
-        View for Venue page
-        If 'Home' view accessed then lists of venues are returned
-        Otherwise, specific venue information is returned
-    '''
-    # If home page requested, return all venues
-    if pagename == 'home':
-        context = {
-            'status': 'home',
-            'venues': Venue.objects.all().order_by("name"),
-        }
-
-    # Otherwise return requested venue
-    else:
-
-        # Check user
-        if request.user.is_authenticated:
-            user = request.user
-        else:
-            user = None
-
-        # Check for admin
-        try:
-            admin = Administrator.objects.get(user=user)
-        except:
-            admin = None
-
-        # Check venue exists
-        name = urllib.parse.unquote(pagename)
-        try:
-            venue = Venue.objects.get(name=name)
-        except:
-            return render(request, "league/venues.html", {'status':'doesnotexist'})
-
-        # Create venue form
-        form = VenueForm(request.POST or None,instance=venue)
-
-        # Get fixtures at venue
-        current_season = Season.objects.get(current=True)
-        fixtures = Fixture.objects.filter(season=current_season).filter(venue=venue)
-
-        # Find clubs with fixtures at venue
-        clubs = [fix.home_team.club for fix in fixtures]
-        clubs += [cn.club for cn in ClubNight.objects.filter(venue=venue)]
-        clubs = list(set(clubs))
-
-        # Check whether venue details have been updated
-        updated = False
-
-        # Process updated form
-        if request.method == 'POST':
-            if form.is_valid():
-                form.save()
-                updated = True
-
-        # If admin, captain's details are updateable
-        if admin and admin.club in clubs:
-            updateable = True
-        else:
-            updateable = False
-
-        context = {
-            'status': 'view',
-            'venue': venue,
-            'form': form,
-            'clubs': clubs,
-            'updateable': updateable,
-            'updated': updated,
-        }
-
-    return render(request, "league/venues.html", context)
 
 @login_required
 def clubadmin(request, update=''):
@@ -1894,60 +1490,6 @@ def player_stats(request, pagename):
 
     return render(request, "league/playerstats.html", context)
 
-def archive(request, pagename):
-
-    if pagename == 'home':
-
-        seasons = list(Season.objects.filter(current=False))
-        seasons = sorted(seasons, key=lambda x: int(x.year[:4]), reverse=True)
-
-        context = {'view': 'home',
-                   'seasons': seasons}
-
-    else:
-
-        season = Season.objects.get(year=pagename)
-        fixtures = Fixture.objects.filter(season=season).order_by('date_time')
-
-        if request.method == 'POST':
-
-            if request.user.is_authenticated:
-                user = request.user
-            else:
-                user = None
-            if user and user.username == "websiteAdmin":
-                df = build_dataframe(fixtures, admin=True)
-            else:
-                df = build_dataframe(fixtures)
-            with BytesIO() as b:
-                with pd.ExcelWriter(b) as writer:
-                    df.to_excel(writer)
-                filename = f"fixtures_{str(season)}.xlsx"
-                res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                res['Content-Disposition'] = f'attachment; filename={filename}'
-                return res
-
-
-        divisions = []
-        for fix in fixtures:
-            if fix.division not in divisions:
-                divisions.append(fix.division)
-
-        divisions.sort(key=lambda div: (div.type, div.number))
-
-        full_divs = []
-        for div in divisions:
-            table = div.get_table(season)
-            divfixs = fixtures.filter(division=div)
-            full_divs.append({'division':div, 'table':table, 'fixtures':divfixs})
-
-
-        context = {'view': 'season',
-                   'season': season,
-                   'divisions': full_divs}
-
-    return render(request, "league/archive.html", context)
-
 
 ############################### Admin Functions ##################################
 
@@ -2180,3 +1722,178 @@ def get_player_stats(club, fixtures):
                     raise Exception(f'Error - {x}, {game}, {rubber}, {level_games}, {level_games[x]}, {level_games[x][1]}, {home_players}, {away_players}, {e}')
 
     return player_dict
+
+def get_league_stats(season='current'):
+
+    if season == 'current':
+        season_obj = Season.objects.get(current=True)
+    else:
+        season_obj = Season.objects.get(year=season)
+    fixtures = Fixture.objects.filter(season=season_obj)
+
+    team_dict = {}
+    score_dict = defaultdict(int)
+    total_dict = {'m':0,'hw':0,'d':0,'c':0,'r':0,'pt':0,'pw':0,'pl':0,'ph':0,'pa':0}
+
+    for fixture in fixtures:
+
+        total_dict['m'] += 1
+        ht = fixture.home_team
+        at = fixture.away_team
+        if ht not in team_dict:
+            team_dict[ht] = {'mp':0,'w':0,'d':0,'c':0,'hr':0,'ar':0,'hp':0,'hpa':0,'ap':0,'apa':0,'ww':0,'st':0,'sw':0}
+        if at not in team_dict:
+            team_dict[at] = {'mp':0,'w':0,'d':0,'c':0,'hr':0,'ar':0,'hp':0,'hpa':0,'ap':0,'apa':0,'ww':0,'st':0,'sw':0}
+
+        team_dict[ht]['mp'] += 1
+        team_dict[at]['mp'] += 1
+
+        if not fixture.game_results:
+            total_dict['c'] += 1
+            if fixture.status == 'Conceded (H)':
+                team_dict[ht]['c'] += 1
+                team_dict[at]['w'] += 1
+            else:
+                team_dict[at]['c'] += 1
+                team_dict[ht]['w'] += 1
+            continue
+
+        tp = 18 if fixture.division.type == 'Mixed' else 12
+        if fixture.home_points == tp:
+            team_dict[ht]['ww'] += 1
+        if fixture.away_points == tp:
+            team_dict[at]['ww'] += 1
+
+        if fixture.home_points == fixture.away_points:
+            team_dict[ht]['d'] += 1
+            team_dict[at]['d'] += 1
+            total_dict['d'] += 1
+        elif fixture.home_points > fixture.away_points:
+            team_dict[ht]['w'] += 1
+            total_dict['hw'] += 1
+        else:
+            team_dict[at]['w'] += 1
+
+        scores = fixture.game_results.split(',')
+        scores = [tuple(scores[i:i+2]) for i in range(0, len(scores), 2)]
+        scores = [(int(x[0]), int(x[1])) if x[0].isdigit() else x for x in scores]
+
+        for score in scores:
+
+            if isinstance(score[0], str):
+                continue
+
+            score_dict[score] += 1
+            total_dict['r'] += 1
+            total_dict['pt'] += score[0] + score[1]
+            total_dict['ph'] += score[0]
+            total_dict['pa'] += score[1]
+
+            team_dict[ht]['hp'] += score[0]
+            team_dict[at]['ap'] += score[1]
+            team_dict[ht]['hpa'] += score[1]
+            team_dict[at]['apa'] += score[0]
+            if score[0] > score[1]:
+                team_dict[ht]['hr'] += 1
+                total_dict['pw'] += score[0]
+                total_dict['pl'] += score[1]
+                if score[0] > 21:
+                    team_dict[ht]['st'] += 1
+                    team_dict[at]['st'] += 1
+                    team_dict[ht]['sw'] += 1
+            else:
+                team_dict[at]['ar'] += 1
+                total_dict['pw'] += score[1]
+                total_dict['pl'] += score[0]
+                if score[0] > 21:
+                    team_dict[at]['st'] += 1
+                    team_dict[ht]['st'] += 1
+                    team_dict[at]['sw'] += 1
+
+    set_team = max(team_dict, key=lambda team: team_dict[team]['sw'])
+    set_string = f"{set_team} ({team_dict[set_team]['sw']})"
+    ww_team = max(team_dict, key=lambda team: team_dict[team]['ww'])
+    ww_string = f"{ww_team} ({team_dict[ww_team]['ww']})"
+
+    stats = {
+        'Total Matches': total_dict['m'],
+        'Total Home Wins': total_dict['hw'],
+        'Total Away Wins': total_dict['m'] - total_dict['hw'] - total_dict['d'] - total_dict['c'],
+        'Total Draws': total_dict['d'],
+        'Total Conceded': total_dict['c'],
+        'Total Rubbers': total_dict['r'],
+        'Total Points': total_dict['pt'],
+        'Total Home Points': total_dict['ph'],
+        'Total Away Points': total_dict['pa'],
+        'Total Points of Winner': total_dict['pw'],
+        'Total Points of Loser': total_dict['pl'],
+        'Average Winning Score': round(total_dict['pw'] / total_dict['r'], 2),
+        'Average Losing Score': round(total_dict['pl'] / total_dict['r'], 2),
+        'Most Common Scoreline': max(score_dict, key=score_dict.get),
+        'Teams with perfect records': [],
+        'Mixed Team with most points per match': None,
+        "Women's Team with most points per match": None,
+        "Men's Team with most points per match": None,
+        'Most games won on setting': set_string,
+        'Most matches whitewashed': ww_string,
+        'Biggest Average Game Winning Margin (Mixed)': None,
+        "Biggest Average Game Winning Margin (Women's)": None,
+        "Biggest Average Game Winning Margin (Men's)": None,
+    }
+
+    for team, team_stats in team_dict.items():
+        team_type = team.type
+        if team_stats['mp'] == team_stats['w']:
+            stats['Teams with perfect records'].append(str(team))
+        ppm = round((team_stats['hr'] + team_stats['ar']) / (team_stats['mp'] - team_stats['c']), 2)
+        rpm = 18 if team_type == 'Mixed' else 12
+        avemgn = round((team_stats['hp'] + team_stats['ap'] - team_stats['hpa'] - team_stats['apa']) / ((team_stats['mp'] - team_stats['c']) * rpm), 2)
+        if team_type == 'Mixed':
+            if not stats['Mixed Team with most points per match']:
+                stats['Mixed Team with most points per match'] = f'{team} ({ppm})'
+            else:
+                current = float(stats['Mixed Team with most points per match'].split('(')[1].replace(')',''))
+                if ppm > current:
+                    stats['Mixed Team with most points per match'] = f'{team} ({ppm})'
+            if not stats['Biggest Average Game Winning Margin (Mixed)']:
+                stats['Biggest Average Game Winning Margin (Mixed)'] = f'{team} ({avemgn})'
+            else:
+                current = float(stats['Biggest Average Game Winning Margin (Mixed)'].split('(')[1].replace(')',''))
+                if avemgn > current:
+                    stats['Biggest Average Game Winning Margin (Mixed)'] = f'{team} ({avemgn})'
+        elif team_type == 'Ladies':
+            if not stats["Women's Team with most points per match"]:
+                stats["Women's Team with most points per match"] = f'{team} ({ppm})'
+            else:
+                current = float(stats["Women's Team with most points per match"].split('(')[1].replace(')',''))
+                if ppm > current:
+                    stats["Women's Team with most points per match"] = f'{team} ({ppm})'
+            if not stats["Biggest Average Game Winning Margin (Women's)"]:
+                stats["Biggest Average Game Winning Margin (Women's)"] = f'{team} ({avemgn})'
+            else:
+                current = float(stats["Biggest Average Game Winning Margin (Women's)"].split('(')[1].replace(')',''))
+                if avemgn > current:
+                    stats["Biggest Average Game Winning Margin (Women's)"] = f'{team} ({avemgn})'
+        elif team_type == 'Mens':
+            if not stats["Men's Team with most points per match"]:
+                stats["Men's Team with most points per match"] = f'{team} ({ppm})'
+            else:
+                current = float(stats["Men's Team with most points per match"].split('(')[1].replace(')',''))
+                if ppm > current:
+                    stats["Men's Team with most points per match"] = f'{team} ({ppm})'
+            if not stats["Biggest Average Game Winning Margin (Men's)"]:
+                stats["Biggest Average Game Winning Margin (Men's)"] = f'{team} ({avemgn})'
+            else:
+                current = float(stats["Biggest Average Game Winning Margin (Men's)"].split('(')[1].replace(')',''))
+                if avemgn > current:
+                    stats["Biggest Average Game Winning Margin (Men's)"] = f'{team} ({avemgn})'
+
+    return stats
+
+
+
+
+
+
+
+

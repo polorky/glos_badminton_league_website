@@ -27,6 +27,7 @@ urlpatterns = [
     path('venues/<str:pagename>', views.VenuesView.as_view(), name='venues'),
     path('playerstats/<str:pagename>', views.PlayerStatsView.as_view(), name='playerstats'),
     path('archive/<str:pagename>', views.ArchivesView.as_view(), name='archive'),
+    path('stats', views.StatsView.as_view(), name='stats'),
 
     path('juniors', TemplateView.as_view(template_name="league/juniors.html"), name='juniors'),
     path('help', TemplateView.as_view(template_name="league/help.html"), name='help'),

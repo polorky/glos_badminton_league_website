@@ -351,7 +351,7 @@ class Club(models.Model):
                 if team_dict[team] > 0:
                     played = player_dict[player]["teams"][team.type][team.number]
                     if isinstance(played, str) and played != "X":
-                        played = int(played.split("(")[1].replace(")"))
+                        played = int(played.split("(")[1].replace(")",""))
                         percent = int(played/team_dict[team]*100)
                         player_dict[player]["teams"][team.type][team.number] = f"X ({played} ({percent}%))"
                     elif played != "X" and played != 0:
