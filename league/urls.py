@@ -29,6 +29,4 @@ urlpatterns = [
     path('verify-player/<str:token>/<str:action>/', verify_player, name='verify_player'), # note this view is in the player.py file
 
     path('', views.HomeView.as_view(), name='home'),
-
-    path('stats', views.StatsView.as_view(), name='stats'),
 ]
