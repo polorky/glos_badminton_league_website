@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Player{% endblock title %}
+
+{% block content %}
+
+    <h2>{{ player.name }} - {{ player.club }}</h2>
+    <table id="table" class="table">
+    <tr><th rowspan="3">Name</th><th rowspan="3">Level</th>
+        <th colspan="2">Nominations</th><th colspan="{{ teams.Lengths.All }}">Teams Player For</th></tr>
+    <tr>
+        <th rowspan="2">Mixed</th><th rowspan="2">Level</th>
+        {% if teams.Lengths.Mixed > 0 %}
+        <th colspan="{{ teams.Lengths.Mixed }}">Mixed</th>
+        {% endif %}
+        {% if teams.Lengths.Womens > 0 %}
+        <th colspan="{{ teams.Lengths.Womens }}">Women's</th>
+        {% endif %}
+        {% if teams.Lengths.Mens > 0 %}
+        <th colspan="{{ teams.Lengths.Mens }}">Men's</th>
+        {% endif %}
+    </tr>
+    <tr>
+        {% if teams.Lengths.Mixed > 0 %}
+        {% for team in teams.Mixed %}
+            <th>{{ team.number }}</th>
+        {% endfor %}
+        {% endif %}
+        {% if teams.Lengths.Womens > 0 %}
+        {% for team in teams.Womens %}
+            <th>{{ team.number }}</th>
+        {% endfor %}
+        {% endif %}
+        {% if teams.Lengths.Mens > 0 %}
+        {% for team in teams.Mens %}
+            <th>{{ team.number }}</th>
+        {% endfor %}
+        {% endif %}
+    </tr>
+    {% for player, stats in playerstats.items %}
+        <tr><td>{{ player.name }}</td><td>{{ player.level }}</td>
+        <td>{{ stats.noms.mixed }}</td><td>{{ stats.noms.level }}</td>
+        {% for stat in stats.teams.Mixed.values %}
+        {% if 'X' in stat %}
+            <td id="redcell">{{ stat }}</td>
+        {% elif stat > 0 %}
+            <td id="greencell">{{ stat }}</td>
+        {% else %}
+            <td>{{ stat }}</td>
+        {% endif %}
+        {% endfor %}
+        {% for stat in stats.teams.Womens.values %}
+        {% if 'X' in stat %}
+            <td id="redcell">{{ stat }}</td>
+        {% elif stat > 0 %}
+            <td id="greencell">{{ stat }}</td>
+        {% else %}
+            <td>{{ stat }}</td>
+        {% endif %}
+        {% endfor %}
+        {% for stat in stats.teams.Mens.values %}
+        {% if 'X' in stat %}
+            <td id="redcell">{{ stat }}</td>
+        {% elif stat > 0 %}
+            <td id="greencell">{{ stat }}</td>
+        {% else %}
+            <td>{{ stat }}</td>
+        {% endif %}
+        {% endfor %}
+        </tr>
+    {% endfor %}
+    </table>
+
+    <ul>
+        {% for match in matches %}
+            {% comment %} <a href="https://gloubadleague.pythonanywhere.com/admin/league/fixture/{{ match.id }}/change/">{{ match }}</p> {% endcomment %}
+            <a href="/fixtures/{{ match.id }}">{{ match }}</a>
+        {% endfor %}
+    </ul>
+
+<br>
+<a href="/clubadmin">Return to Club Admin Page</a>
+
+{% endblock content %}

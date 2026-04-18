@@ -1,11 +1,8 @@
 import league.constants as constants
 from rapidfuzz import fuzz
 from django.core import signing
-from django.http import HttpResponse
-from io import BytesIO
-import pandas as pd
-from datetime import datetime
 from .email import email_notification
+from league.models import Team, PendingPlayerVerification, Penalty
 
 # Player related functions
 def find_away_players(data, fixture):
@@ -87,13 +84,12 @@ def verify_away_players(fixture, players_found):
             1. If player found, add to fixture object
             2. Else send email to away club to get confirmation of correct player
     '''
-    from league.models import PendingPlayerVerification
-
+    
     div_type = fixture.division.type
     mixed_player_type = ['Ladies','Ladies','Ladies','Men','Men','Men']
     verifications = []
 
-    for player_title, player_dict in players_found:
+    for player_title, player_dict in players_found.items():
         if player_dict['player'] and not player_dict['suggest_only']:
             setattr(fixture, player_title, player_dict['player'])
             fixture.save()
@@ -113,7 +109,44 @@ def verify_away_players(fixture, players_found):
             verifications.append(verification)
     
     if verifications:
-        email_notification('playernotfound', verifications)
+        email_notification('playernotfound', fixture, verifications=verifications)
+
+def verify_player(request, token):
+    try:
+        data = signing.loads(token, max_age=86400 * 7)  # 7 day expiry
+        verification = PendingPlayerVerification.objects.get(
+            id=data['verification_id'],
+            resolved=False
+        )
+
+    except (signing.BadSignature, signing.SignatureExpired, PendingPlayerVerification.DoesNotExist):
+        pass
+
+def check_player_eligibility(fixture):
+    '''
+        Checks whether players are uneligible for these teams due to playing for higher teams
+        Applies penalty points for any uneligible players played
+    '''
+
+    for player in fixture.get_players('home'):
+        if not player.check_eligibility(fixture.home_team):
+            email_notification('eligibility_penalty', fixture, team=fixture.home_team, player_name=player.name)
+            Penalty.objects.create(season=fixture.season, 
+                                   team=fixture.home_team, 
+                                   penalty_value=constants.PENALTY_INELIGIBLE_PLAYER, 
+                                   penalty_type='Ineligible Player', 
+                                   player=player.name, 
+                                   fixture=fixture)
+
+    for player in fixture.get_players('away'):
+        if not player.check_eligibility(fixture.away_team):
+            email_notification('eligibility_penalty', fixture, team=fixture.away_team, player_name=player.name)
+            Penalty.objects.create(season=fixture.season, 
+                                   team=fixture.away_team,
+                                   penalty_value=constants.PENALTY_INELIGIBLE_PLAYER, 
+                                   penalty_type='Ineligible Player', 
+                                   player=player.name, 
+                                   fixture=fixture)
 
 def attempt_fuzzy_match(player_name, club):
     from league.models import Player
@@ -171,7 +204,7 @@ def correct_duplicate_player(dup_player,cor_player,fix):
     return 'notfound'
 
 def get_player_stats(club, fixtures):
-
+    '''Stats for the player stats page'''
     player_dict = {}
 
     for fixture in fixtures:
@@ -256,194 +289,44 @@ def get_player_stats(club, fixtures):
 
     return player_dict
 
-# Team related functions
-def get_performances():
-    '''
-    Creates performance records for all teams 
-    '''
-    from league.models import Season, Fixture, Performance
+def get_player_appearances(player):
+    '''Pulls stats for player - times played for each team and teams nominated for
+        Used in the league admin view to provide a summary for player'''
 
-    season = Season.objects.get(current=True)
-    log = f'Season: {season}'
-    fixtures = Fixture.objects.filter(season=season)
-    log += f' -- Fixtures: {len(fixtures)}'
-    divisions = list(set([fix.division for fix in fixtures]))
-    log += f' -- Divisions: {len(divisions)}'
-    for division in divisions:
-        table = division.get_table(season)
-        position = 1
-        for row in table:
-            team = row[1]['Object']
-            if not Performance.objects.filter(team=team,season=season,division=division):
-                suffix = {1:'st',2:'nd',3:'rd'}.get(position,'th')
-                cardinal = f"{position}{suffix} out of {len(table)}"
-                p = Performance(team=team, season=season, division=division, position=cardinal)
-                p.save()
-            position += 1
+    player_fixtures = player.get_own_fixtures()
+    team_dict = {}
+    team_dict["teams"] = player.club.get_clubs_teams("count")
 
-    return log
+    team_dict = _count_appearances(player_fixtures, team_dict, player)
+    team_dict = _add_eligibility(team_dict, player)
+    
+    noms = player.get_noms_strings()
+    team_dict["noms"] = {"mixed":noms[0],"level":noms[1]}
 
-# Fixture related functions
-def get_fixture_stats():
+def _count_appearances(fixtures, team_dict, player):
+    '''Count the times player has played for each team'''
+    for fixture in fixtures:
+        if player in fixture.get_players(side='home'):
+            num = fixture.home_team.number
+            type = fixture.home_team.type
+        else:
+            num = fixture.away_team.number
+            type = fixture.away_team.type
 
-    from league.models import Season, Fixture
+        team_dict["teams"][type][num] += 1
+    
+    return team_dict
 
-    solo_rubs_to_30 = []
-    solo_rubs_to_other = []
-    other_rubs_to_other = []
-    forfeits = []
-    errors = []
-
-    current_season = Season.objects.get(current=True)
-    fixtures = Fixture.objects.filter(season=current_season)
-
-    for fix in fixtures:
-        if fix.status == 'Conceded (H)' or fix.status == 'Conceded (A)':
-            continue
-        try:
-            srt30 = False
-            srto = False
-            orto = False
-            scores = fix.game_results.split(',')
-            if 'FH' in scores or 'FA' in scores:
-                forfeits.append(fix)
-            scores = [scores[x:x+2] for x in range(0,len(scores),2)]
-            if fix.division.type == 'Mixed':
-                games = [scores[0:3],scores[3:6],scores[6:9],scores[9:12],scores[12:15],scores[15:18],scores[18:21],scores[21:24],scores[24:27]]
-            else:
-                games = [scores[0:2],scores[2:4],scores[4:6],scores[6:8],scores[8:10],scores[10:12]]
-            for game in games:
-                if game[1][0] == '':
-                    if game[0][0] == '30' or game[0][1] == '30':
-                        srt30 = True
-                    else:
-                        srto = True
+def _add_eligibility(team_dict, player):
+    '''Add player's eligibility status to each team'''
+    for team_type in team_dict["teams"].keys():
+        for team_num in team_dict["teams"][team_type].keys():
+            team = Team.objects.get(club=player.club,number=team_num,type=team_type)
+            if not player.check_eligibility(team):
+                count = team_dict["teams"][team_type][team_num]
+                if count == 0:
+                    team_dict["teams"][team_type][team_num] = "X"
                 else:
-                    for rubber in game:
-                        if rubber[0] != '' and rubber[0] != 'FH' and rubber[0] != 'FA' and rubber[0] != '21' and rubber[1] != '21':
-                            if abs(int(rubber[0]) - int(rubber[1])) != 2:
-                                if rubber[0] != '30' and rubber[1] != '30':
-                                    orto = True
-            if srt30:
-                solo_rubs_to_30.append(fix)
-            if srto:
-                solo_rubs_to_other.append(fix)
-            if orto:
-                other_rubs_to_other.append(fix)
-        except Exception:
-            errors.append(fix)
+                    team_dict["teams"][team_type][team_num] = "X (" + str(count) + ")"
 
-    return solo_rubs_to_30, solo_rubs_to_other, other_rubs_to_other, forfeits, errors
-
-# Fixture Download/Upload
-def download_fixtures(fixtures, is_admin=False):
-
-    df = build_dataframe(fixtures, is_admin)
-
-    with BytesIO() as b:
-        with pd.ExcelWriter(b) as writer:
-            df.to_excel(writer)
-        filename = "fixtures.xlsx"
-        res = HttpResponse(b.getvalue(),content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        res['Content-Disposition'] = f'attachment; filename={filename}'
-
-        return res
-
-def build_dataframe(fixtures, is_admin):
-
-    def localiseDT(dtvalue):
-        if not pd.isnull(dtvalue):
-            return dtvalue.tz_localize(None)
-        else:
-            return dtvalue
-
-    fixDict = {'Division':[],'Date and Time':[],'Home Team':[], 'Home Points':[], 'Away Points':[],
-                'Away Team':[], 'Venue':[], 'Status':[], 'Original Date and Time':[]}
-    if is_admin:
-        fixDict.update({'Game Breakdown':[]})
-
-    for fix in fixtures:
-        fixDict['Division'].append(str(fix.division))
-        fixDict['Date and Time'].append(fix.date_time)
-        fixDict['Home Team'].append(str(fix.home_team))
-        fixDict['Home Points'].append(fix.home_points)
-        fixDict['Away Points'].append(fix.away_points)
-        fixDict['Away Team'].append(str(fix.away_team))
-        fixDict['Venue'].append(str(fix.venue))
-        fixDict['Status'].append(fix.status)
-        fixDict['Original Date and Time'].append(fix.old_date_time)
-        if is_admin:
-            fixDict['Game Breakdown'].append(fix.game_results)
-
-    df = pd.DataFrame(fixDict)
-    df['Date and Time'] = df['Date and Time'].dt.tz_localize(None)
-    df['Original Date and Time'] = df['Original Date and Time'].apply(localiseDT)
-
-    return df
-
-def parse_fixtures(fixtures):
-    '''
-        Parses and creates fixtures from an uploaded file
-    '''
-    from league.models import Club, Team, Division, Fixture, Season, Venue
-
-    for row in fixtures.keys():
-        fix = fixtures[row]
-        home_club = Club.objects.get(short_name=fix['Home Club'])
-        away_club = Club.objects.get(short_name=fix['Away Club'])
-        fixture = Fixture(
-            home_team = Team.objects.get(club=home_club,number=fix['Home Team Num'],type=fix['Division Type']),
-            away_team = Team.objects.get(club=away_club,number=fix['Away Team Num'],type=fix['Division Type']),
-            date_time = datetime.combine(fix['Date'].date(), fix['Start Time']),
-            end_time = fix['End Time'],
-            season = Season.objects.get(year=fix['Season']),
-            venue = Venue.objects.get(name=fix['Venue']),
-            division = Division.objects.get(number=fix['Division No.'],type=fix['Division Type']),
-        )
-        fixture.save()
-
-# NOT CURRENTLY IMPLEMENTED
-def parse_results(fixtures):
-    '''
-        Parses and creates archive results from an uploaded file
-    '''
-    from league.models import Club, Fixture, Team, Season, Division
-
-    for row in fixtures.keys():
-        fix = fixtures[row]
-        home_club = Club.objects.get(short_name=fix['home club'])
-        away_club = Club.objects.get(short_name=fix['away club'])
-        fixture = Fixture(
-            home_team = Team.objects.get(club=home_club,number=fix['home num'],type=fix['type']),
-            away_team = Team.objects.get(club=away_club,number=fix['away num'],type=fix['type']),
-            home_points = fix['home score'],
-            away_points = fix['away score'],
-            date_time = fix['date_time'],
-            season = Season.objects.get(year=fix['season']),
-            division = Division.objects.get(number=fix['div num'],type=fix['type']),
-        )
-        fixture.save()
-
-    return
-
-def sort_table(team_list):
-    # team_list is list of team dictionaries:
-    # team_name:{'Played':0,'Won':0,'Drawn':0,'Lost':0,'PFor':0,'PAgainst':0,'Object':''}
-
-    revised_list = []
-    points_dict = {}
-
-    for team in team_list:
-        points = team[1]['PFor']
-        if points in points_dict.keys():
-            points_dict[points].append(team)
-        else:
-            points_dict[points] = [team]
-
-    points_list = list(points_dict.keys())
-    points_list.sort(reverse=True)
-    for point in points_list:
-        if len(points_dict[point]) == 1:
-            revised_list.append(points_dict[point][0])
-        else:
-            pass
+    return team_dict

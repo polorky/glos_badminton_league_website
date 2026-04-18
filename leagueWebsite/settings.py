@@ -54,6 +54,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'leagueWebsite.wsgi.application'
 
+LOGOUT_REDIRECT_URL = "/"
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/login"
 

@@ -18,7 +18,7 @@
         </table>
         <table id="table" class="table floating">
           <tr><th>Women's League</th></tr>
-          {% for division in ladies_divs %}
+          {% for division in womens_divs %}
             <tr><td><a href="{{ division.get_division_url }}">{{ division }}</a></td></tr>
           {% endfor %}
         </table>
@@ -43,7 +43,7 @@
         </table>
         <table id="table" class="table floating">
           <tr><th>Women's League</th></tr>
-          {% for division in old_ladies_divs %}
+          {% for division in old_womens_divs %}
             <tr><td><a href="{{ division.get_division_url }}">{{ division }}</a></td></tr>
           {% endfor %}
         </table>
@@ -149,15 +149,15 @@
               <td>{{ fix.0.date_time|date:'D' }}</td>
               <td>{{ fix.0.date_time|date:'H:i' }}</td>
               <td>{{ fix.0.end_time|date:'H:i' }}</td>
-              <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team }}</a></td>
+              <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team.get_short_name }}</a></td>
               <td>{{ fix.0.home_points }}</td>
               <td>{{ fix.0.away_points }}</td>
-              <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team }}</a></td>
+              <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team.get_short_name }}</a></td>
               <td><a href="/venues/{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td>
               <td>{{ fix.0.get_status_display }}</td>
               <td><a href="/fixtures/{{ fix.0.id }}/div">View</a></td>
               {% if fix.1 %}
-                <td><a href="/fixtures/{{ fix.0.id }}/update/div">Update</a></td>
+                <td><a href="/fixtures/update/{{ fix.0.id }}/options/div">Update</a></td>
               {% else %}
                 <td></td>
               {% endif %}

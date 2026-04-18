@@ -1,9 +1,9 @@
-from django.forms import ModelForm, BaseFormSet, Form, IntegerField, ChoiceField, CharField, formset_factory
+from django.forms import ModelForm, BaseFormSet, Form, IntegerField, ChoiceField, CharField, formset_factory, modelformset_factory
 from django import forms
-from .models import Fixture, Club, ClubNight, Player, Venue, Team
+from .models import Fixture, Club, ClubNight, Player, Venue, Team, TeamNomination
 from django.core.exceptions import ValidationError
 import league.constants as constants
-from .utilities import find_away_players
+from .utilities.player import find_away_players
 
 
 class ClubForm(ModelForm):
@@ -48,45 +48,23 @@ class PlayerForm(ModelForm):
         model = Player
         fields = ['name','level']
 
-class MixedNominateForm(ModelForm):
-
+class NominationForm(forms.ModelForm):
     class Meta:
-        model = Team
-        fields = ['nom_player1','nom_player2','nom_player3','nom_player4','nom_player5','nom_player6']
+        model = TeamNomination
+        fields = ['player','notes']
 
-    def clean(self):
-        cleaned_data = super().clean()
-        for i, field in enumerate(cleaned_data.keys()):
-            player = cleaned_data[field]
-            if not player:
-                raise ValidationError('Player ' + str(i+1) + ' has not been nominated')
-            club = player.club
-            teams = Team.objects.filter(club=club).filter(type='Mixed')
-            for team in teams:
-                if self.instance.id == team.id:
-                    continue
-                if team.player_in_team(player):
-                    raise ValidationError('Player ' + str(i+1) + ' has already been nominated for a team')
+    def __init__(self, *args, players=None, variant='Team', **kwargs):
+        super().__init__(*args, **kwargs)
+        if players:
+            self.fields['player'].queryset = players
+        if variant == 'Team':
+            del self.fields['notes']
 
-class LevelNominateForm(ModelForm):
-
-    class Meta:
-        model = Team
-        fields = ['nom_player1','nom_player2','nom_player3','nom_player4']
-
-    def clean(self):
-        cleaned_data = super().clean()
-        for i, field in enumerate(cleaned_data.keys()):
-            player = cleaned_data[field]
-            if not player:
-                raise ValidationError('Player ' + str(i+1) + ' has not been nominated')
-            club = player.club
-            teams = Team.objects.filter(club=club).filter(type=player.level)
-            for team in teams:
-                if self.instance.id == team.id:
-                    continue
-                if team.player_in_team(player):
-                    raise ValidationError('Player ' + str(i+1) + ' has already been nominated for a team')
+NominationFormSet = modelformset_factory(
+    TeamNomination,
+    form=NominationForm,
+    extra=0,
+)            
 
 class RescheduleForm(ModelForm):
 
@@ -155,6 +133,7 @@ class LevelFixtureForm(FixtureForm):
         fields = ['home_points','away_points','home_player1','home_player2','home_player3','home_player4']
 
 class BaseScoreFormSet(BaseFormSet):
+    
     def clean(self):
         super().clean()
 

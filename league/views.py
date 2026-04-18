@@ -5,12 +5,20 @@ from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.core.exceptions import ObjectDoesNotExist
+from django.contrib import messages
 
 from .models import *
 from .forms import *
-from .utilities import verify_away_players, download_fixtures, correct_duplicate_player, get_performances, get_fixture_stats, get_player_stats, parse_fixtures
-from .email import email_notification, email_admin, get_all_club_contacts
+from .utilities.player import verify_away_players, correct_duplicate_player, get_player_stats, get_player_appearances
+from .utilities.download import download_fixtures, parse_fixtures
+from .utilities.team import get_performances
+from .utilities.fixture import get_fixture_stats, get_scores
+from .utilities.email import email_notification, email_admin, get_all_club_contacts
+from .utilities.table import build_table
+from .utilities.season import get_adj_seasons
+from .utilities.roster import build_roster
 import league.constants as constants
+from datetime import date
 
 import urllib
 import pandas as pd
@@ -22,7 +30,7 @@ import pandas as pd
 class GenericViewMixin:
     user = None
     admin = None
-    type_dict = {'X':'Mixed','L':'Ladies','M':'Mens'}
+    type_dict = {'X':'Mixed','W':'Womens','M':'Mens'}
 
     def get_context_data(self, **kwargs):
 
@@ -30,19 +38,21 @@ class GenericViewMixin:
 
         path = self.request.path.strip('/').split('/')
         context['active_tab'] = path[0] if path[0] else 'home'
-        
+        member = None
+
         if self.request.user.is_authenticated:
             user = self.request.user
         else:
             user = None
             admin = None
-
+            
         if user:
             try:
                 admin = Administrator.objects.get(user=user)
             except ObjectDoesNotExist:
                 try:
                     admin = Member.objects.get(user=user)
+                    member = True
                 except ObjectDoesNotExist:
                     admin = None
 
@@ -50,6 +60,8 @@ class GenericViewMixin:
             'current_season': Season.objects.get(current=True),
             'user': user,
             'admin': admin,
+            'member': member,
+            'settings': LeagueSettings.get(),
             })
 
         return context
@@ -80,34 +92,33 @@ class DivisionsView(GenericViewMixin, TemplateView):
         all_divs = Division.objects.all().order_by("number")
 
         if pagename == 'home':
-
+            
+            # Extract all divisions, split into the three leagues and active/not active
             context.update({
                 'status': 'home',
                 **{f"{'old_' if not a else ''}{t.lower()}_divs":
                    [d for d in all_divs if d.type == t and d.active == a]
-                   for t in ["Mixed", "Ladies", "Mens"] for a in [True, False]}
+                   for t in ["Mixed", "Womens", "Mens"] for a in [True, False]}
             })
 
         else:
 
+            # Get specified division
             try:
                 division = Division.objects.get(number=pagename[1:],type=self.type_dict[pagename[0]])
             except ObjectDoesNotExist:
                 return {'status':'doesnotexist'}
 
-            # current season or no specific season requested get current table
-            if season == '' or season == context['current_season'].year:
-                table = division.get_table()
-            # Else work out table for requested season and override current_season
-            else:
+            # If season other than current one requested, override current_season
+            if season != '' and season != context['current_season'].year:
                 context['current_season'] = Season.objects.get(year=season)
-                table = division.get_table(season=context['current_season'])
+            table = build_table(division, context['current_season'])
 
             # Get fixtures and if method is post just return these
             fixtures = Fixture.objects.filter(season=context['current_season']).filter(division=division.id).order_by("date_time")
 
             # Work out previous/next season/division for links
-            prev_season, next_season = context['current_season'].get_adj_seasons()
+            prev_season, next_season = get_adj_seasons(context['current_season'])
             prev_div = Division.objects.filter(number=division.number - 1, type=division.type)
             next_div = Division.objects.filter(number=division.number + 1, type=division.type)
             fix_list = [(fix,fix.updateable(context['user'])) for fix in fixtures]
@@ -180,10 +191,7 @@ class FixturesView(GenericViewMixin, TemplateView):
                 players += fixture.get_players(side='away')
 
             # Get games for played matches
-            if fixture.status == "Played" and fixture.game_results:
-                batched_games = fixture.get_scores()
-            else:
-                batched_games = None
+            batched_games = get_scores(fixture)
 
             # Work out number of rubbers expected per game
             if fixture.division.type == "Mixed" and fixture.season.mixed_scoring == "point per game":
@@ -208,7 +216,9 @@ class FixturesView(GenericViewMixin, TemplateView):
 
         fixtures = Fixture.objects.filter(season=context['current_season']).order_by('date_time')
 
-        return download_fixtures(fixtures)
+        is_admin = context['user'] is not None and context['user'].username == "websiteAdmin"
+
+        return download_fixtures(fixtures, is_admin)
 
 @method_decorator(login_required, name='dispatch')
 class FixUpdateView(GenericViewMixin, TemplateView):
@@ -227,7 +237,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         if pagename == 'submit':
 
             # Instantiate result forms
-            context = self.setup_result_forms(context, fixture)
+            context = self._setup_result_forms(context, fixture)
 
         elif pagename == 'reschedule':
 
@@ -249,7 +259,8 @@ class FixUpdateView(GenericViewMixin, TemplateView):
     def post(self, request, **kwargs):
 
         context = self.get_context_data(**kwargs)
-
+        context['errors'] = False
+        
         pagename = self.kwargs.get('pagename','')
 
         # Get relevant fixture
@@ -266,86 +277,116 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         # Proposed reschedule date and location by home team
         elif pagename == "rescheduled":
 
-            # Instantiate reschedule form
-            rform = RescheduleForm(self.request.POST, instance=fixture)
-            temp_date = fixture.date_time
-
-            if rform.is_valid():
-                if not fixture.old_date_time:
-                    fixture.old_date_time = temp_date
-                rform.save()
-                fixture.status = 'Proposed'
-                fixture.save()
-                email_notification('reschedule', fixture)
+            self._reschedule_match(fixture)
 
         # Match conceded
         elif pagename == "concededhome" or pagename == "concededaway":
-            if fixture.division.type == "Mixed":
-                penalty_value = constants.PENALTY_MIXED_CONCEDED
-            else:
-                penalty_value = constants.PENALTY_LEVEL_CONCEDED
-            if pagename == "concededhome":
-                fixture.status = 'Conceded (H)'
-                team=fixture.home_team
-            else:
-                fixture.status = 'Conceded (A)'
-                team=fixture.away_team
-            fixture.save()
-            p = Penalty(season=fixture.season, 
-                        team=team, 
-                        penalty_value=penalty_value, 
-                        penalty_type='Match Conceded', 
-                        fixture=fixture)
-            p.save()
-            email_notification(pagename, fixture)
+
+            self._conceded_match(pagename, fixture)
 
         # Result submitted by home team
         elif pagename == "submit":
 
-            # Get relevant results form for fixture type
-            if fixture.division.type == "Mixed":
-                resform = MixedFixtureForm(self.request.POST, instance=fixture)
-                resformset = MixedScoreFormSet(self.request.POST)
-            else:
-                resform = LevelFixtureForm(self.request.POST, instance=fixture)
-                resformset = LevelScoreFormSet(self.request.POST)
-
-            if resform.is_valid() and resformset.is_valid():
-
-                # Find matches for away players or create new ones
-                found_players = resformset.cleaned_data['found_players']
-                verify_away_players(fixture, found_players)
-                # Change fixture status
-                fixture.status = 'Played'
-                # Bundle up game results
-                game_results = [
-                    (f'{form.cleaned_data.get("forfeit")},{form.cleaned_data.get("forfeit")}' if form.cleaned_data.get("forfeit") else f"{form.cleaned_data.get('home_score')},{form.cleaned_data.get('away_score')}")
-                    for form in resformset if form.cleaned_data
-                    ]
-                fixture.game_results = ','.join(game_results)
-                # Save form and fixture data
-                resform.save()
-                fixture.save()
-                # Check for illegal players and apply any penalties
-                if fixture.season.current:
-                    fixture.check_player_eligibility()
-                    #fixture.check_nomination_status() # Nomination rules have changed
-                    email_notification('result', fixture)
-            else:
-                # If forms is not valid, change pageview returned
-                context['pagename'] = 'errors'
+            context = self._process_result(fixture)
 
         return self.render_to_response(context)
 
-    def setup_result_forms(self, context, fixture):
+    def _reschedule_match(self, fixture):
+        
+        # Instantiate reschedule form
+        rform = RescheduleForm(self.request.POST, instance=fixture)
+        temp_date = fixture.date_time
+
+        if rform.is_valid():
+            if not fixture.old_date_time:
+                fixture.old_date_time = temp_date
+            rform.save()
+            fixture.status = 'Proposed'
+            fixture.save()
+            email_notification('reschedule', fixture)
+
+    def _conceded_match(self, pagename, fixture):
+
+        if fixture.division.type == "Mixed":
+            penalty_value = constants.PENALTY_MIXED_CONCEDED
+        else:
+            penalty_value = constants.PENALTY_LEVEL_CONCEDED
+        
+        if pagename == "concededhome":
+            fixture.status = 'Conceded (H)'
+            team=fixture.home_team
+        else:
+            fixture.status = 'Conceded (A)'
+            team=fixture.away_team
+       
+        fixture.save()
+        
+        Penalty.objects.create(season=fixture.season, 
+                               team=team, 
+                               penalty_value=penalty_value, 
+                               penalty_type='Match Conceded', 
+                               fixture=fixture)
+        
+        email_notification(pagename, fixture)
+
+    def _process_result(self, fixture):
 
         # Get relevant results form for fixture type
         if fixture.division.type == "Mixed":
-            resform = MixedFixtureForm(instance=fixture)
-            resformset = MixedScoreFormSet()
+            resform = MixedFixtureForm(self.request.POST, instance=fixture)
+            resformset = MixedScoreFormSet(self.request.POST)
         else:
-            resform = LevelFixtureForm(instance=fixture)
-            resformset = LevelScoreFormSet()
+            resform = LevelFixtureForm(self.request.POST, instance=fixture)
+            resformset = LevelScoreFormSet(self.request.POST)
+        
+        if resform.is_valid() and resformset.is_valid():
+
+            # Find matches for away players or create new ones
+            a = resform.cleaned_data
+            found_players = resform.cleaned_data['players_found']
+            verify_away_players(fixture, found_players)
+            
+            # Change fixture status
+            fixture.status = 'Played'
+            
+            # Bundle up game results
+            game_results = [self._get_game_result(form.cleaned_data) for form in resformset if form.cleaned_data]
+            fixture.game_results = ','.join(game_results)
+            
+            # Save form and fixture data
+            resform.save()
+            fixture.save()
+            
+            # Check for illegal players and apply any penalties
+            fixture.check_player_eligibility()
+            email_notification('result', fixture)
+            
+            context['pagename'] = 'submitted'
+        
+        else:
+            # If forms is not valid, change pageview returned
+            context['errors'] = True
+            context = self._setup_result_forms(context, fixture, resform, resformset)
+        
+        return context
+
+    def _get_game_result(self, cleaned_data: dict) -> str:
+        if forfeit := cleaned_data.get("forfeit"):
+            return f"{forfeit},{forfeit}"
+        home = cleaned_data.get("home_score")
+        away = cleaned_data.get("away_score")
+        return f"{home},{away}"
+
+    def _setup_result_forms(self, context, fixture, resform=None, resformset=None):
+
+        # Get relevant results form for fixture type
+        if resform is None:
+            if fixture.division.type == "Mixed":
+                resform = MixedFixtureForm(instance=fixture)
+                resformset = MixedScoreFormSet()
+            else:
+                resform = LevelFixtureForm(instance=fixture)
+                resformset = LevelScoreFormSet()
         
         games_fields = []
         games_names = constants.GAME_NAMES_MIXED if fixture.division.type == "Mixed" else constants.GAME_NAMES_LEVEL
@@ -354,14 +395,13 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             games_fields.append((game_name, rubbers))
 
         if fixture.division.type == "Mixed":
-            home_ladies, home_men = fixture.get_eligible_players()
+            home_women, home_men = fixture.get_eligible_players()
             for i in range(1,4):
-                resform.fields['home_player'+str(i)].choices = home_ladies
+                resform.fields['home_player'+str(i)].choices = home_women
                 resform.fields['home_player'+str(i+3)].choices = home_men
         else:
             home_players = fixture.get_eligible_players()
-            home_fields = ['home_player1','home_player2','home_player3','home_player4']
-            for field in home_fields:
+            for field in ['home_player1','home_player2','home_player3','home_player4']:
                 resform.fields[field].choices = home_players
 
         context.update({'resform':resform, 
@@ -404,7 +444,8 @@ class ClubsView(GenericViewMixin, TemplateView):
             fix_list = [(fix,fix.updateable(context['user'])) for fix in club_fixtures]
 
             # Get list of venues used
-            venues = club.get_club_venues(context['current_season'])
+            home_fix = Fixture.objects.filter(season=context['current_season']).filter(home_team__club=club)
+            venues = {fix.venue for fix in home_fix}
 
             # Check whether club has public contacts
             public_info = bool(club.public_contact_name or club.public_email or club.public_num)
@@ -580,6 +621,43 @@ class PlayerStatsView(GenericViewMixin, TemplateView):
 
         return context
 
+class PlayerView(GenericViewMixin, TemplateView):
+    template_name = "league/player.html"
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        player_id = int(kwargs['playerid'])
+        player = Player.objects.get(id=player_id)
+        playerstats = {player: get_player_appearances(player)}
+        playermatches = player.get_own_fixtures()
+
+        club_teams = Team.objects.filter(active=True).filter(club=player.club)
+
+        # Split out teams
+        teams = {"Mixed":club_teams.filter(type="Mixed"),
+                    "Womens":club_teams.filter(type="Womens"),
+                    "Mens":club_teams.filter(type="Mens"),
+                    "All":club_teams}
+        # Get length of team lists
+        teams.update({"Lengths":{"Mixed":len(teams["Mixed"]),
+                                    "Womens":len(teams["Womens"]),
+                                    "Mens": len(teams["Mens"]),
+                                    "All": len(teams["All"]),
+                                    }})
+
+        context.update({
+            'status': 'player',
+            'player': player,
+            'playerstats': playerstats,
+            'matches': playermatches,
+            'teams': teams,
+            'test': player_id,
+            })
+        
+        return context
+
 class ArchivesView(GenericViewMixin, TemplateView):
     template_name = "league/archive.html"
 
@@ -610,7 +688,7 @@ class ArchivesView(GenericViewMixin, TemplateView):
 
             full_divs = []
             for div in divisions:
-                table = div.get_table(season)
+                table = build_table(div, season)
                 divfixs = fixtures.filter(division=div)
                 full_divs.append({'division':div, 'table':table, 'fixtures':divfixs})
 
@@ -660,6 +738,13 @@ class ClubAdminView(GenericViewMixin, TemplateView):
     template_name = "league/clubadmin.html"
     active_tab = 'clubadmin'
     
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.username == 'leagueAdmin':
+            return redirect('league_admin')
+        elif request.user.username == 'websiteAdmin':
+            return redirect('website_admin')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
@@ -674,14 +759,14 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             'venueform': VenueForm(),
             'players': Player.objects.filter(club=club).order_by("level","name"),
             'playerform': PlayerForm(),
-            'playerstats': club.get_clubs_player_stats(),
+            'playerstats': build_roster(club),
             'teams': club.get_clubs_teams('roster'),
             'penalties': penalties})
-
+        
         return context
     
     def post(self, request, **kwargs):
-        context = self.get_context_data(kwargs)
+        context = self.get_context_data(**kwargs)
         update = self.kwargs.get('update', '')
         club = context['admin'].club
 
@@ -709,7 +794,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             venueform = VenueForm(request.POST)
             if venueform.is_valid():
                 if Venue.objects.filter(name=venueform.cleaned_data['name']).exists():
-                    context.update({'status': 'venueduplicated'})
+                    return redirect("/clubadmin/club/?updated=venueduplicated#newvenue")
                 else:
                     venueform.save()
                     send_mail(
@@ -718,20 +803,20 @@ class ClubAdminView(GenericViewMixin, TemplateView):
                         "GlosBadWebsite@gmail.com",
                         ["schofieldmark@gmail.com"],
                         )
-                    context.update({'status': 'venueadded'})
+                    return redirect("/clubadmin/club/?updated=newvenue#newvenue")
         
         # Club Night form submitted
         elif update == 'clubnight':
             cnform = ClubNightForm(request.POST)
             if cnform.is_valid():
                 ClubNight.objects.create(club=club,venue=cnform.cleaned_data['venue'],timings=cnform.cleaned_data['timings'])
-                context.update({'status': 'clubnightadded'})
+                return redirect("/clubadmin/club/?updated=clubnightadded#clubnights")
         
         # Club Night deleted
         elif 'deletecn' in update:
             cn_id = update.replace('deletecn','')
             ClubNight.objects.filter(id=cn_id).delete()
-            context.update({'status': 'clubnightdeleted'})
+            return redirect("/clubadmin/club/?updated=clubnightdeleted#clubnights")
         
         # Player deleted
         elif 'deleteplayer' in update:
@@ -782,60 +867,27 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)    
         
-        update = context.get('update','')
         current_season = Season.objects.get(current=True)
+
+        # Get nomination stats
+        active_teams = Team.objects.filter(active=True).order_by("club","type","number")
+        last_teams = [team for team in active_teams if team.last_team()]
+        nom_teams = [team for team in active_teams if not team.last_team()]
+        nom_stats = [(team, team.check_nominations()) for team in nom_teams]
         
-        ##### Player View #####
-        if 'player' in update:
-            player_id = int(update.replace('player',''))
-            player = Player.objects.get(id=player_id)
-            playerstats = {player: player.get_team_dict()}
-            playermatches = player.get_own_fixtures()
-
-            club_teams = Team.objects.filter(active=True).filter(club=player.club)
-
-            # Split out teams
-            teams = {"Mixed":club_teams.filter(type="Mixed"),
-                     "Ladies":club_teams.filter(type="Ladies"),
-                     "Mens":club_teams.filter(type="Mens"),
-                     "All":club_teams}
-            # Get length of team lists
-            teams.update({"Lengths":{"Mixed":len(teams["Mixed"]),
-                                     "Ladies":len(teams["Ladies"]),
-                                     "Mens": len(teams["Mens"]),
-                                     "All": len(teams["All"]),
-                                     }})
-
-            context.update({
-                'status': 'player',
-                'player': player,
-                'playerstats': playerstats,
-                'matches': playermatches,
-                'teams': teams,
-                'test': player_id
-                })
-
-        else:
-
-            # Get nomination stats
-            active_teams = Team.objects.filter(active=True).order_by("club","type","number")
-            last_teams = [team for team in active_teams if team.last_team()]
-            nom_teams = [team for team in active_teams if not team.last_team()]
-            nom_stats = [(team, team.check_nominations()) for team in nom_teams]
-            
-            # Update context
-            context.update({
-                'status': 'leagueAdmin',
-                'penalties': Penalty.objects.filter(season=current_season),
-                'nom_teams': nom_stats,
-                'last_teams': last_teams,
-                'club_contacts': get_all_club_contacts()
-            })
+        # Update context
+        context.update({
+            'status': 'leagueAdmin',
+            'penalties': Penalty.objects.filter(season=current_season),
+            'nom_teams': nom_stats,
+            'last_teams': last_teams,
+            'club_contacts': get_all_club_contacts()
+        })
 
         return context
 
     def post(self, request, **kwargs):
-        context = self.get_context_data(kwargs)
+        context = self.get_context_data(**kwargs)
         update = self.kwargs.get('update', '')
     
         if 'delpen' in update:
@@ -843,6 +895,12 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             penalty = Penalty.objects.get(id=penID)
             penalty.delete()
             context.update({'status':'penaltydeleted'})
+
+        if 'noms' in update:
+            settings = LeagueSettings.get()
+            settings.nomination_window_open = 'nomination_window_open' in request.POST
+            settings.save()
+            return redirect(f"{self.request.path}?noms_updated=true")
         
         return self.render_to_response(context)
 
@@ -894,12 +952,7 @@ class WebsiteAdminView(GenericViewMixin, TemplateView):
         
         elif update == 'clearnoms':
             
-            nom_fields = [f'nom_player{i}' for i in range(1, 7)]
-            for team in Team.objects.all():
-                if any(getattr(team, f) for f in nom_fields):
-                    for f in nom_fields:
-                        setattr(team, f, None)
-                    team.save()
+            TeamNomination.objects.all().delete()
 
             context.update({'status': 'nomscleared'})
 
@@ -910,91 +963,348 @@ class NominationsView(GenericViewMixin, TemplateView):
     active_tab = 'clubadmin'
 
     def get_context_data(self, **kwargs):
+
+        def get_form_list(data, club, club_teams):
+
+            women = Player.objects.filter(club=club).filter(level="Womens").order_by("name")
+            men = Player.objects.filter(club=club).filter(level="Mens").order_by("name")
+            
+            form_list = []
+
+            for team in club_teams:
+
+                if team.last_team():
+                    continue
+                
+                existing_noms = TeamNomination.objects.filter(
+                    team=team,
+                    date_to=None  # currently active nominations
+                ).order_by('position')
+
+                if team.type == 'Mixed':
+                    women_existing = existing_noms.filter(player__level='Womens')
+                    men_existing = existing_noms.filter(player__level='Mens')
+                    women_extra = 3 - women_existing.count()
+                    men_extra = 3 - men_existing.count()
+
+                    WomensFormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=women_extra)
+                    MensFormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=men_extra)
+                    
+                    womens_formset = WomensFormSet(
+                        data,
+                        queryset=women_existing,
+                        form_kwargs={'players': women},
+                        prefix=f'women_{team.id}'
+                    )
+                    mens_formset = MensFormSet(
+                        data,
+                        queryset=men_existing,
+                        form_kwargs={'players': men},
+                        prefix=f'men_{team.id}'
+                    )
+
+                    form_list.append((team,womens_formset,mens_formset))
+
+                else:
+                    players = women if team.type == 'Womens' else men
+                    extra = 4 - existing_noms.count()
+                    
+                    FormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=extra)
+
+                    formset = FormSet(
+                        data,
+                        queryset=existing_noms,
+                        form_kwargs={'players': players},
+                        prefix=f'team_{team.id}'
+                    )
+
+                    form_list.append((team,formset))
+
+            return form_list
+
         context = super().get_context_data(**kwargs)
         pagename = context.get('pagename','')
-        club = kwargs['admin'].club
-        club_teams = Team.objects.filter(active=True).filter(club=club)
 
-        # Get players
-        ladies = Player.objects.filter(club=club).filter(level="Ladies").order_by("name")
-        men = Player.objects.filter(club=club).filter(level="Mens").order_by("name")
-        ladies = [(player.id,player) for player in ladies]
-        men = [(player.id,player) for player in men]
-        ladies.insert(0,('',''))
-        men.insert(0,('',''))
+        # If 'update' page requested and nomination window open, return team forms
+        if pagename == 'update' and context['settings'].nomination_window_open:
 
-        # Set up forms for each team (except the lowest ones)
-        forms = []
-        for team in club_teams:
-            name = team.type + " " + str(team.number)
-            code = team.type + str(team.number)
+            data = self.request.POST or None
+            club = context['admin'].club
+            club_teams = Team.objects.filter(active=True).filter(club=club).order_by("type", "number")
 
-            # Check whether a team below exists if not, don't create a form for team
-            try:
-                Team.objects.get(club=club, type=team.type, active=True, number=team.number + 1)
-            except ObjectDoesNotExist:
-                continue
+            form_list = get_form_list(data, club, club_teams)
 
-            # Otherwise create form for team
-            if team.type == 'Mixed':
-                if pagename == team.type + str(team.number):
-                    form = MixedNominateForm(None, instance=team)
-                else:
-                    form = MixedNominateForm(instance=team)
-            else:
-                if pagename == team.type + str(team.number):
-                    form = LevelNominateForm(None, instance=team)
-                else:
-                    form = LevelNominateForm(instance=team)
+            # Set up context
+            context.update({
+                'teams': club_teams,
+                'forms': form_list,
+                'view': 'teamupdate',
+            })
 
-            # Update players choices with the ladies and men at the club
-            if team.type == "Ladies":
-                for i in range(1,5):
-                    form.fields['nom_player'+str(i)].choices = ladies
-            elif team.type == "Mens":
-                for i in range(1,5):
-                    form.fields['nom_player'+str(i)].choices = men
-            else:
-                for i in range(1,4):
-                    form.fields['nom_player'+str(i)].choices = ladies
-                for i in range(4,7):
-                    form.fields['nom_player'+str(i)].choices = men
+        # If 'update' page requested but nomination window closed, return 'unavailable'
+        elif pagename == 'update':
+            
+            context.update({'view':'unavailable'})
 
-            forms.append((name,code,form,team.type,team))
+        # If admin view requested return current and requested nominations and player stats
+        elif pagename == 'admin':
+            nom = TeamNomination.objects.get(id=kwargs['type'])
+            current_nom = TeamNomination.objects.get(team=nom.team, position=nom.position, date_to=None, approved=True)
 
-        # Sort list of forms by team name
-        forms.sort(key=lambda x: x[0])
+            context.update({'view': 'admin', 
+                            'nom': nom, 
+                            'current_nom': current_nom, 
+                            'new_player_stats': get_player_appearances(nom.player),
+                            'cur_player_stats': get_player_appearances(nom.player)})
+        
+        # Otherwise return specific individual nomination form
+        else:
 
-        # Check whether there are any teams to nominate for
-        noteams = True if len(forms) == 0 else False
+            nom_player = Player.objects.get(id=pagename)
+            team_type = 'Mixed' if context['type'] == 'mixed' else nom_player.level
+            nom = TeamNomination.objects.get(player=nom_player, date_to=None, approved=True, team__type=team_type)
+            replacement_options = nom.get_possible_replacements()
+            form = NominationForm(None, players=replacement_options, variant='change')
 
-        # Set up context
-        context.update({
-            'teams': club_teams,
-            'noteams': noteams,
-            'forms': forms,
-            'pagename': pagename,
-        })
+            context.update({'view':'indiupdate', 'playerselectform':form, 'current_nom':nom})
 
         return context
-    
+
     def post(self, request, **kwargs):
-        context = self.get_context_data(kwargs)
+        context = self.get_context_data(**kwargs)
 
-        # Check which team was submitted
-        for team in context['teams']:
-            if context['pagename'] == team.type + str(team.number):
-                current_team = team
-        # Update team object
-        if current_team.type == 'Mixed':
-            form = MixedNominateForm(request.POST, instance=current_team)
+        if context['view'] == 'teamupdate':
+            
+            # Check which team was submitted
+            team = Team.objects.get(id=self.kwargs['pagename'])
+            current = next(form_list for form_list in context['forms'] if form_list[0] == team)
+
+            # Rebind the relevant formsets with POST data
+            if team.type == 'Mixed':
+                womens_formset = current[1]
+                mens_formset = current[2]
+                
+                if womens_formset.is_valid() and mens_formset.is_valid():
+                    self.save_nominations(womens_formset, team, range(1, 4))
+                    self.save_nominations(mens_formset, team, range(4, 7))
+                    return redirect(request.path)
+            else:
+                formset = current[1]
+                
+                if formset.is_valid():
+                    self.save_nominations(formset, team, range(1, 5))
+                    return redirect(request.path)
+
+            return redirect('nominations_success')
+
+        elif context['view'] == 'admin_approved':
+
+            context['cur_nom'].approved = True
+            context['cur_nom'].save()
+            email_notification('nomination_approved', None, {'nom':context['cur_num']})
+
+        elif context['view'] == 'admin_rejected':
+
+            context['cur_nom'].delete()
+
         else:
-            form = LevelNominateForm(request.POST, instance=current_team)
-        if form.is_valid():
-            form.save()
 
-        return self.render_to_response(context)
+            player_in = Player.objects.get(id=request.POST.get('player'))
 
+            TeamNomination.objects.create(
+                team=context['current_nom'].team,
+                player=player_in,
+                position=context['current_nom'].position,
+                date_from=date.today(),
+                notes=request.POST.get('notes')
+            )
 
+            return redirect('nomination_change_success')
 
+    def save_nominations(self, formset, team, positions):
+        for position, form in zip(positions, formset):
+            if form.cleaned_data.get('player'):
+                nomination = form.save(commit=False)
+                nomination.team = team
+                nomination.position = position
+                nomination.date_from = date.today()
+                nomination.approved = True
+                nomination.save()
 
+class StatsView(GenericViewMixin, TemplateView):
+    template_name = "league/stats.html"
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        context.update({'stats': get_league_stats()})
+
+        return context
+
+def get_league_stats(season='current'):
+
+    if season == 'current':
+        season_obj = Season.objects.get(current=True)
+    else:
+        season_obj = Season.objects.get(year=season)
+    fixtures = Fixture.objects.filter(season=season_obj)
+
+    team_dict = {}
+    score_dict = defaultdict(int)
+    total_dict = {'m':0,'hw':0,'d':0,'c':0,'r':0,'pt':0,'pw':0,'pl':0,'ph':0,'pa':0}
+
+    for fixture in fixtures:
+
+        total_dict['m'] += 1
+        ht = fixture.home_team
+        at = fixture.away_team
+        if ht not in team_dict:
+            team_dict[ht] = {'mp':0,'w':0,'d':0,'c':0,'hr':0,'ar':0,'hp':0,'hpa':0,'ap':0,'apa':0,'ww':0,'st':0,'sw':0}
+        if at not in team_dict:
+            team_dict[at] = {'mp':0,'w':0,'d':0,'c':0,'hr':0,'ar':0,'hp':0,'hpa':0,'ap':0,'apa':0,'ww':0,'st':0,'sw':0}
+
+        team_dict[ht]['mp'] += 1
+        team_dict[at]['mp'] += 1
+
+        if not fixture.game_results:
+            total_dict['c'] += 1
+            if fixture.status == 'Conceded (H)':
+                team_dict[ht]['c'] += 1
+                team_dict[at]['w'] += 1
+            else:
+                team_dict[at]['c'] += 1
+                team_dict[ht]['w'] += 1
+            continue
+
+        tp = 18 if fixture.division.type == 'Mixed' else 12
+        if fixture.home_points == tp:
+            team_dict[ht]['ww'] += 1
+        if fixture.away_points == tp:
+            team_dict[at]['ww'] += 1
+
+        if fixture.home_points == fixture.away_points:
+            team_dict[ht]['d'] += 1
+            team_dict[at]['d'] += 1
+            total_dict['d'] += 1
+        elif fixture.home_points > fixture.away_points:
+            team_dict[ht]['w'] += 1
+            total_dict['hw'] += 1
+        else:
+            team_dict[at]['w'] += 1
+
+        scores = fixture.game_results.split(',')
+        scores = [tuple(scores[i:i+2]) for i in range(0, len(scores), 2)]
+        scores = [(int(x[0]), int(x[1])) if x[0].isdigit() else x for x in scores]
+
+        for score in scores:
+
+            if isinstance(score[0], str):
+                continue
+
+            score_dict[score] += 1
+            total_dict['r'] += 1
+            total_dict['pt'] += score[0] + score[1]
+            total_dict['ph'] += score[0]
+            total_dict['pa'] += score[1]
+
+            team_dict[ht]['hp'] += score[0]
+            team_dict[at]['ap'] += score[1]
+            team_dict[ht]['hpa'] += score[1]
+            team_dict[at]['apa'] += score[0]
+            if score[0] > score[1]:
+                team_dict[ht]['hr'] += 1
+                total_dict['pw'] += score[0]
+                total_dict['pl'] += score[1]
+                if score[0] > 21:
+                    team_dict[ht]['st'] += 1
+                    team_dict[at]['st'] += 1
+                    team_dict[ht]['sw'] += 1
+            else:
+                team_dict[at]['ar'] += 1
+                total_dict['pw'] += score[1]
+                total_dict['pl'] += score[0]
+                if score[0] > 21:
+                    team_dict[at]['st'] += 1
+                    team_dict[ht]['st'] += 1
+                    team_dict[at]['sw'] += 1
+
+    set_team = max(team_dict, key=lambda team: team_dict[team]['sw'])
+    set_string = f"{set_team} ({team_dict[set_team]['sw']})"
+    ww_team = max(team_dict, key=lambda team: team_dict[team]['ww'])
+    ww_string = f"{ww_team} ({team_dict[ww_team]['ww']})"
+
+    stats = {
+        'Total Matches': total_dict['m'],
+        'Total Home Wins': total_dict['hw'],
+        'Total Away Wins': total_dict['m'] - total_dict['hw'] - total_dict['d'] - total_dict['c'],
+        'Total Draws': total_dict['d'],
+        'Total Conceded': total_dict['c'],
+        'Total Rubbers': total_dict['r'],
+        'Total Points': total_dict['pt'],
+        'Total Home Points': total_dict['ph'],
+        'Total Away Points': total_dict['pa'],
+        'Total Points of Winner': total_dict['pw'],
+        'Total Points of Loser': total_dict['pl'],
+        'Average Winning Score': round(total_dict['pw'] / total_dict['r'], 2),
+        'Average Losing Score': round(total_dict['pl'] / total_dict['r'], 2),
+        'Most Common Scoreline': max(score_dict, key=score_dict.get),
+        'Teams with perfect records': [],
+        'Mixed Team with most points per match': None,
+        "Women's Team with most points per match": None,
+        "Men's Team with most points per match": None,
+        'Most games won on setting': set_string,
+        'Most matches whitewashed': ww_string,
+        'Biggest Average Game Winning Margin (Mixed)': None,
+        "Biggest Average Game Winning Margin (Women's)": None,
+        "Biggest Average Game Winning Margin (Men's)": None,
+    }
+
+    for team, team_stats in team_dict.items():
+        team_type = team.type
+        if team_stats['mp'] == team_stats['w']:
+            stats['Teams with perfect records'].append(str(team))
+        ppm = round((team_stats['hr'] + team_stats['ar']) / (team_stats['mp'] - team_stats['c']), 2)
+        rpm = 18 if team_type == 'Mixed' else 12
+        avemgn = round((team_stats['hp'] + team_stats['ap'] - team_stats['hpa'] - team_stats['apa']) / ((team_stats['mp'] - team_stats['c']) * rpm), 2)
+        if team_type == 'Mixed':
+            if not stats['Mixed Team with most points per match']:
+                stats['Mixed Team with most points per match'] = f'{team} ({ppm})'
+            else:
+                current = float(stats['Mixed Team with most points per match'].split('(')[1].replace(')',''))
+                if ppm > current:
+                    stats['Mixed Team with most points per match'] = f'{team} ({ppm})'
+            if not stats['Biggest Average Game Winning Margin (Mixed)']:
+                stats['Biggest Average Game Winning Margin (Mixed)'] = f'{team} ({avemgn})'
+            else:
+                current = float(stats['Biggest Average Game Winning Margin (Mixed)'].split('(')[1].replace(')',''))
+                if avemgn > current:
+                    stats['Biggest Average Game Winning Margin (Mixed)'] = f'{team} ({avemgn})'
+        elif team_type == 'Ladies':
+            if not stats["Women's Team with most points per match"]:
+                stats["Women's Team with most points per match"] = f'{team} ({ppm})'
+            else:
+                current = float(stats["Women's Team with most points per match"].split('(')[1].replace(')',''))
+                if ppm > current:
+                    stats["Women's Team with most points per match"] = f'{team} ({ppm})'
+            if not stats["Biggest Average Game Winning Margin (Women's)"]:
+                stats["Biggest Average Game Winning Margin (Women's)"] = f'{team} ({avemgn})'
+            else:
+                current = float(stats["Biggest Average Game Winning Margin (Women's)"].split('(')[1].replace(')',''))
+                if avemgn > current:
+                    stats["Biggest Average Game Winning Margin (Women's)"] = f'{team} ({avemgn})'
+        elif team_type == 'Mens':
+            if not stats["Men's Team with most points per match"]:
+                stats["Men's Team with most points per match"] = f'{team} ({ppm})'
+            else:
+                current = float(stats["Men's Team with most points per match"].split('(')[1].replace(')',''))
+                if ppm > current:
+                    stats["Men's Team with most points per match"] = f'{team} ({ppm})'
+            if not stats["Biggest Average Game Winning Margin (Men's)"]:
+                stats["Biggest Average Game Winning Margin (Men's)"] = f'{team} ({avemgn})'
+            else:
+                current = float(stats["Biggest Average Game Winning Margin (Men's)"].split('(')[1].replace(')',''))
+                if avemgn > current:
+                    stats["Biggest Average Game Winning Margin (Men's)"] = f'{team} ({avemgn})'
+
+    return stats

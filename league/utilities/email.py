@@ -5,7 +5,7 @@ BASE_URL = 'https://gloubadleague.pythonanywhere.com'
 SENDER = 'GlosBadWebsite@gmail.com'
 ADMIN_EMAIL = 'schofieldmark@gmail.com'
 FIXTURES_EMAIL = 'GlosBadFixtures@outlook.com'
-
+TESTING_ENV = True
 
 class LeagueEmail:
     def __init__(self, fix, **kwargs):
@@ -16,9 +16,11 @@ class LeagueEmail:
         self.html = ''
         self.recipients = []
 
-    def get_recipients(self, team, penalty=False):
+    def get_recipients(self, team, non_fix=False):
+        if TESTING_ENV:
+            return ['schofieldmark@gmail.com',]
         fix = self.fix
-        if penalty:
+        if non_fix:
             team_obj = self.kwargs.get('team')
             return self._filter_emails([
                 team_obj.club.contact1_email,
@@ -154,7 +156,7 @@ class PlayerNotFoundEmail(LeagueEmail):
         self.recipients = self.get_recipients('away')
         verifications = kwargs['verifications']
         self.body = f'Hi,\n\nNot all away players for the match {fix} could be identified.'
-        self.html = self.body
+        self.html = f'Hi,<br><br>Not all away players for the match {fix} could be identified.'
 
         for v in verifications:
             verify_url = f'{BASE_URL}/verify-player/{v.token}'
@@ -163,13 +165,13 @@ class PlayerNotFoundEmail(LeagueEmail):
                               f'Suggested Player: {v.suggested_player} --- '
                               f'Correct: {verify_url}/correct --- '
                               f'Not correct: {verify_url}/incorrect')
-                self.html += (f'\nEntered name: {v.submitted_name} --- '
+                self.html += (f'<br>Entered name: {v.submitted_name} --- '
                               f'Suggested Player: {v.suggested_player} --- '
                               f'<a href="{verify_url}/correct">Correct player</a> --- '
                               f'<a href="{verify_url}/incorrect">Not correct</a>')
             else:
                 self.body += f'\nEntered name: {v.submitted_name} --- Find/create player: {verify_url}/nosuggest'
-                self.html += (f'\nEntered name: {v.submitted_name} --- '
+                self.html += (f'<br>Entered name: {v.submitted_name} --- '
                               f'<a href="{verify_url}/nosuggest">Find/create player</a>')
 
 
@@ -188,7 +190,7 @@ class NominationPenEmail(LeagueEmail):
     def __init__(self, fix, **kwargs):
         super().__init__(fix, **kwargs)
         self.subject = 'Nomination Penalty Applied'
-        self.recipients = self.get_recipients(fix, kwargs['team'], penalty=True)
+        self.recipients = self.get_recipients(kwargs['team'], non_fix=True)
         self.body = (f'Hi,\n\nFollowing the submission of the result for the match {fix}, your '
                      f"club's team has played their first three matches. However, nominated player "
                      f"{kwargs['player_name']} has not played at least 50% of the team's matches "
@@ -207,7 +209,7 @@ class EligibilityPenEmail(LeagueEmail):
     def __init__(self, fix, **kwargs):
         super().__init__(fix, **kwargs)
         self.subject = 'Eligibility Penalty Applied'
-        self.recipients = self.get_recipients(fix, kwargs['team'], penalty=True)
+        self.recipients = self.get_recipients(kwargs['team'], non_fix=True)
         self.body = (f'Hi,\n\nFollowing the submission of the result for the match {fix}, it has been '
                      f'identified that player {kwargs["player_name"]} was ineligible to play and so your '
                      f"club's team has been penalised {constants.PENALTY_INELIGIBLE_PLAYER} points. Please "
@@ -220,6 +222,21 @@ class EligibilityPenEmail(LeagueEmail):
                      f'extenuating circumstances you would like to raise.')
 
 
+class NominationApprovedEmail(LeagueEmail):
+    def __init__(self, fix, **kwargs):
+        super().__init__(fix, **kwargs)
+        self.subject = 'Nomination Change Approved'
+        team = kwargs['nom'].team
+        kwargs['team'] = team
+        cur_player = kwargs['cur_nom'].player
+        new_player = kwargs['nom'].player
+        self.recipients = self.get_recipients('', kwargs, non_fix=True)
+        self.body = (f"Hi,\n\nThe nomination change request to replace {cur_player} with "
+                     f"{new_player} for {team} has been approved.")
+        self.html = (f"Hi,<br><br>The nomination change request to replace {cur_player} with "
+                     f"{new_player} for {team} has been approved.")
+
+
 EMAIL_CLASSES = {
     'result': ResultEmail,
     'postponed': PostponedEmail,
@@ -229,6 +246,7 @@ EMAIL_CLASSES = {
     'playernotfound': PlayerNotFoundEmail,
     'nomination_penalty': NominationPenEmail,
     'eligibility_penalty': EligibilityPenEmail,
+    'nomination_approved': NominationApprovedEmail,
 }
 
 
@@ -241,6 +259,49 @@ def email_notification(status, fix, **kwargs):
         email = email_class(fix, **kwargs)
     email.send()
 
+
+class AdminEmail:
+    def __init__(self, all_admin=False, **kwargs):
+        self.kwargs = kwargs
+        self.subject = ''
+        self.body = ''
+        self.html = ''
+        self.recipients = self.get_recipients(all_admin)
+
+    def get_recipients(self, all_admin):
+        if all_admin and not TESTING_ENV:
+            return ['martin.godwin@btinternet.com','johnsexton1955@yahoo.co.uk','peter.sexton@bt.com','schofieldmark@gmail.com']
+        else:
+            return ['schofieldmark@gmail.com',]
+
+    def _footer(self, html=False):
+        if html:
+            return '<br><br>***This is an automated email from the league website***'
+        return '\n\n***This is an automated email from the league website***'
+
+    def send(self):
+        body = self.body + self._footer()
+        if self.html:
+            html = self.html + self._footer(html=True)
+            send_mail(self.subject, body, SENDER, self.recipients, html_message=html)
+        else:
+            send_mail(self.subject, body, SENDER, self.recipients)
+
+
+class NominationChangeEmail(AdminEmail):
+    def __init__(self, all_admin, **kwargs):
+        super().__init__(all_admin, **kwargs)
+        nom = self.kwargs['nom_object']
+        nom_url = f'{BASE_URL}/nominations/admin/{nom.id}'
+        self.subject = 'Nomination Change Request'
+        self.body = (f'Hi,\n\n{nom.team.club} has submitted a request to change a nomination for the team {nom.team}. '
+                     f'Please go to the following page to view the players involved and their current playing stats:'
+                     f'\n\n{nom_url}\n\nPlease approve/reject the request via that page, if rejecting it please contact '
+                     f'the club directly to explain why.')
+        self.html = (f'Hi,<br><br>{nom.team.club} has submitted a request to change a nomination for the team {nom.team}. '
+                     f'Please <a href={nom_url}>click here</a> to view the players involved and their current '
+                     f'playing stats. Please approve/reject the request via that page, if rejecting it please contact '
+                     f'the club directly to explain why.')
 
 
 def email_admin(dup_player, cor_player, fix, code):

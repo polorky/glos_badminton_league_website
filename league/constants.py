@@ -1,4 +1,6 @@
 # League defined parameters
+MIXED_PLAYERS = 6
+LEVEL_PLAYERS = 4
 
 # Scoring formats
 SCORING_MIXED = 'point per game' # Current scoring format for mixed league (used as default for new seasons)
@@ -9,7 +11,7 @@ TOTAL_POINTS_MIXED = 18
 TOTAL_POINTS_LEVEL = 12
 
 # Game names for display
-GAME_NAMES_MIXED = ['Mixed 3v2','Mixed 2v3','Mixed 1v1','Mixed 2v2','Mens 1&2','Ladies 1&2','Mens 1&3','Ladies 1&3']
+GAME_NAMES_MIXED = ['Mixed 3v2','Mixed 2v3','Mixed 1v1','Mixed 2v2','Men 1&2','Women 1&2','Men 1&3','Women 1&3']
 GAME_NAMES_LEVEL = ['2+3 v 2+3', '1+4 v 1+4', '2+4 v 2+4', '1+3 v 1+3', '3+4 v 3+4', '1+2 v 1+2']
 
 # Penalties

@@ -1,34 +1,27 @@
 from django.shortcuts import render
-from django.http import HttpResponse, HttpResponseRedirect
-from django.urls import reverse
-from django.contrib.auth import authenticate, login, logout
+from django.http import HttpResponseRedirect
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm
 
 def user_login(request):
-
     if request.method == 'POST':
-
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-
-        user = authenticate(username=username, password=password)
-
-        if user:
-            if user.is_active:
-                login(request,user)
-                return HttpResponseRedirect(reverse('home'))
-            else:
-                return HttpResponse("Account not active")
-        else:
-            return HttpResponse("Invalid login details supplied")
-
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            next_url = request.POST.get('next') or request.GET.get('next') or '/'
+            return HttpResponseRedirect(next_url)
     else:
-
-        return render(request,'registration/login.html',{})
+        form = AuthenticationForm()
+    
+    next_url = request.POST.get('next') or request.GET.get('next') or '/'
+    return render(request, 'login.html', {'form': form, 'next': next_url})
 
 @login_required
 def user_logout(request):
 
     logout(request)
+    next_url = request.META.get('HTTP_REFERER', '/')
 
-    return HttpResponseRedirect(reverse('home'))
+    return HttpResponseRedirect(next_url)

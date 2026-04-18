@@ -4,13 +4,9 @@
 
 {% block content %}
 
-  <h1>Team Nominations</h1>
+    <h1>Team Nominations</h1>
 
-  {% if noteams %}
-
-    <p>Your club has no teams that require nominations (because you don't have multiple teams in any league) so there is nothing for you to do!</p>
-
-  {% else %}
+    {% if view == 'teamupdate' %}
 
       <p>Below is the list of teams your club has confirmed for the upcoming season.</p>
       <p>Please select the players you want to nominate for each team and click "Save Nominations" to update the nominations.</p>
@@ -20,41 +16,49 @@
 
       {% for team_list in forms %}
         <h3>{{ team_list.0 }}</h3>
-        <p>Currently nominated:</p>
-        <table id="table" class="table">
-            <tr><th>Player</th></tr>
-            <tr><td>{{ team_list.4.nom_player1 }}</td></tr>
-            <tr><td>{{ team_list.4.nom_player2 }}</td></tr>
-            <tr><td>{{ team_list.4.nom_player3 }}</td></tr>
-            <tr><td>{{ team_list.4.nom_player4 }}</td></tr>
-            {% if team_list.3 == "Mixed" %}
-                <tr><td>{{ team_list.4.nom_player5 }}</td></tr>
-                <tr><td>{{ team_list.4.nom_player6 }}</td></tr>
+        <form action="{% url 'nominations' team_list.0.id %}" method="post">
+            {% csrf_token %}
+            
+            {% if team_list.0.type == 'Mixed' %}
+                <h3>Women</h3>
+                {{ team_list.1.management_form }}
+                {% for form in team_list.1 %}
+                    {{ form.as_p }}
+                {% endfor %}
+                
+                <h3>Men</h3>
+                {{ team_list.2.management_form }}
+                {% for form in team_list.2 %}
+                    {{ form.as_p }}
+                {% endfor %}
+            {% else %}
+                {{ team_list.1.management_form }}
+                {% for form in team_list.1 %}
+                    {{ form.as_p }}
+                {% endfor %}
             {% endif %}
-        </table>
-        <br>
-        <p>Add or change nominations:</p>
-        <form action="/nominations/{{ team_list.1 }}" method="post">
-          {% csrf_token %}
-          <table class="table" id="table">
-            <tr><td>Player 1</td><td>{{ team_list.2.nom_player1 }}</td></tr>
-            <tr><td>Player 2</td><td>{{ team_list.2.nom_player2 }}</td></tr>
-            <tr><td>Player 3</td><td>{{ team_list.2.nom_player3 }}</td></tr>
-            <tr><td>Player 4</td><td>{{ team_list.2.nom_player4 }}</td></tr>
-            {% if team_list.3 == "Mixed" %}
-              <tr><td>Player 5</td><td>{{ team_list.2.nom_player5 }}</td></tr>
-              <tr><td>Player 6</td><td>{{ team_list.2.nom_player6 }}</td></tr>
-            {% endif %}
-          </table>
-          {% if team_list.2.non_field_errors %}
-            {% for error in team_list.2.non_field_errors %}
-              <p style="color:red;">{{ error }}</p>
-            {% endfor %}
-          {% endif %}
-          <br>
-          <input class="button" type="submit" value="Save {{ team_list.0 }} Nominations">
+            <button class="buttongreen" type="submit">Save {{ team_list.0 }} Nominations</button>
         </form>
       {% endfor %}
+    
+    {% elif view == 'indiupdate' %}
+
+      <p>You have requested a change in the nomination of <b>{{ current_nom.player }}</b> for <b>{{ current_nom.team }}</b>.</p>
+      <p>Please select the player you would like to replace them with and the reason for the change:</p>
+      <br>
+      <form method="post">
+        {% csrf_token %}
+        <table>
+        {% for field in playerselectform %}
+          <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
+        {% endfor %}
+        </table>
+        <button class="button" type="submit">Submit</button>
+      </form>
+
+    {% else %}
+
+        <p>Nominations are not currently available.</p>  
 
     {% endif %}
 

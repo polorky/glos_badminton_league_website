@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Administrator, Member, Club, Team, Venue, Fixture, Division, Season, Player, Penalty, ClubNight, Performance
+from . import models
 
 def admin_username(obj):
     return obj.user.username
@@ -47,15 +47,24 @@ class ClubNightAdmin(admin.ModelAdmin):
 class PerformanceAdmin(admin.ModelAdmin):
     list_display = ('team','season','division','position')
 
-admin.site.register(Administrator, AdministratorAdmin)
-admin.site.register(Member, MemberAdmin)
-admin.site.register(Club, ClubAdmin)
-admin.site.register(Team, TeamAdmin)
-admin.site.register(Venue, VenueAdmin)
-admin.site.register(Fixture, FixtureAdmin)
-admin.site.register(Division, DivisionAdmin)
-admin.site.register(Season, SeasonAdmin)
-admin.site.register(Player, PlayerAdmin)
-admin.site.register(Penalty, PenaltyAdmin)
-admin.site.register(ClubNight, ClubNightAdmin)
-admin.site.register(Performance, PerformanceAdmin)
+class NominationAdmin(admin.ModelAdmin):
+    list_display = ('team', 'player', 'position', 'date_to', 'approved')
+    list_filter = ['team__club']
+
+class SettingsAdmin(admin.ModelAdmin):
+    list_display = ('nomination_window_open',)
+
+admin.site.register(models.Administrator, AdministratorAdmin)
+admin.site.register(models.Member, MemberAdmin)
+admin.site.register(models.Club, ClubAdmin)
+admin.site.register(models.Team, TeamAdmin)
+admin.site.register(models.Venue, VenueAdmin)
+admin.site.register(models.Fixture, FixtureAdmin)
+admin.site.register(models.Division, DivisionAdmin)
+admin.site.register(models.Season, SeasonAdmin)
+admin.site.register(models.Player, PlayerAdmin)
+admin.site.register(models.Penalty, PenaltyAdmin)
+admin.site.register(models.ClubNight, ClubNightAdmin)
+admin.site.register(models.Performance, PerformanceAdmin)
+admin.site.register(models.TeamNomination, NominationAdmin)
+admin.site.register(models.LeagueSettings, SettingsAdmin)

@@ -52,7 +52,7 @@
               <td>{{ fix.0.get_status_display }}</td>
               <td><a href="{{ fix.0.id }}/fix">View</a></td>
               {% if fix.1 %}
-                <td><a href="{{ fix.0.id }}/update/fix">Update</a></td>
+                <td><a href="/fixtures/update/{{ fix.0.id }}/options/fix">Update</a></td>
               {% else %}
                 <td></td>
               {% endif %}

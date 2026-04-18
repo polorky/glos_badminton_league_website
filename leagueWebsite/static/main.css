@@ -97,6 +97,19 @@ a {
   color: black;
 }
 
+.buttongreen {
+  background-color: #2e8552;
+  color: white;
+  transition-duration: 0.4s;
+  border-radius: 4px;
+  font-size: 14px
+}
+
+.buttongreen:hover {
+  background-color: #8ee387;
+  color: black;
+}
+
 /* Menu bar styling */
 ul.nav {
   list-style-type: none;
@@ -108,6 +121,20 @@ ul.nav {
 
 li.nav {
   float: left;
+}
+
+li.nav button {
+  display: block;
+  background-color: #2596be;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 15px 15px 15px 15px;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  text-shadow: 2px 2px #000000;
 }
 
 a.nav {
@@ -122,6 +149,10 @@ a.nav {
 
 li a.nav:hover:not(.active) {
   background-color: #063970;
+}
+
+li.nav button:hover {
+    background-color: #063970;
 }
 
 .active {
