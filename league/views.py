@@ -19,6 +19,7 @@ from .utilities.season import get_adj_seasons
 from .utilities.roster import build_roster
 import league.constants as constants
 from datetime import date
+from collections import defaultdict
 
 import urllib
 import pandas as pd
@@ -404,10 +405,10 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             for field in ['home_player1','home_player2','home_player3','home_player4']:
                 resform.fields[field].choices = home_players
 
-        context.update({'resform':resform, 
+        context.update({'resform':resform,
                         'resformset':resformset,
                         'games_fields': games_fields,})
-        
+
         return context
 
 class ClubsView(GenericViewMixin, TemplateView):
@@ -718,7 +719,7 @@ def clubadmin(request, update=''):
         return redirect('league_admin')
     elif request.user.username == 'websiteAdmin':
         return redirect('website_admin')
-    
+
     try:
         Administrator.objects.get(user=request.user)
         return redirect('club_admin')
@@ -764,7 +765,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             'penalties': penalties})
         
         return context
-    
+
     def post(self, request, **kwargs):
         context = self.get_context_data(**kwargs)
         update = self.kwargs.get('update', '')
@@ -776,7 +777,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             if clubform.is_valid():
                 clubform.save()
                 context.update({'status': 'contactupdated'})
-        
+
         # Player form submitted
         elif update == 'players':
             playerform = PlayerForm(request.POST)
@@ -788,7 +789,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
                 else:
                     Player.objects.create(club=club,name=name,level=level)
                     context.update({'status': 'playeradded'})
-        
+
         # Venue form submitted
         elif update == 'venue':
             venueform = VenueForm(request.POST)
@@ -823,7 +824,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             player_id = update.replace('deleteplayer','')
             Player.objects.filter(id=player_id).delete()
             context.update({'status': 'playerdeleted'})
-        
+
         # Player error reported
         elif 'duplicateplayer' in update:
             player_id = update.replace('duplicateplayer','')
@@ -832,7 +833,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             player_options = [(p.id, p.name) for p in club_players]
             form = DuplicatePlayerForm(player=[(player.id,player.name)],players=player_options)
             context.update({'status':'duplicateplayer', 'player':player, 'form':form})
-        
+
         # Player error form submitted
         elif 'duplicatesubmit' in update:
             form = DuplicatePlayerForm(request.POST)
@@ -851,7 +852,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
                 else:
                     email_admin(inc_player, cor_player, fix[0], 'notfound')
                     context.update({'status':'duplicateerror'})
-        
+
         return self.render_to_response(context)
 
 @method_decorator(login_required, name='dispatch')
@@ -863,7 +864,7 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
         if request.user.username != 'leagueAdmin':
             return redirect('home')
         return super().dispatch(request, *args, **kwargs)
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)    
         
@@ -889,7 +890,7 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
     def post(self, request, **kwargs):
         context = self.get_context_data(**kwargs)
         update = self.kwargs.get('update', '')
-    
+
         if 'delpen' in update:
             penID = update.replace('delpen','')
             penalty = Penalty.objects.get(id=penID)
@@ -929,7 +930,7 @@ class WebsiteAdminView(GenericViewMixin, TemplateView):
         })
 
         return context
-    
+
     def post(self, request, **kwargs):
         context = self.get_context_data(kwargs)
         update = self.kwargs.get('update', '')
@@ -949,7 +950,7 @@ class WebsiteAdminView(GenericViewMixin, TemplateView):
                 'status': 'gotperm',
                 'log': log
                 })
-        
+
         elif update == 'clearnoms':
             
             TeamNomination.objects.all().delete()
@@ -1069,6 +1070,7 @@ class NominationsView(GenericViewMixin, TemplateView):
             context.update({'view':'indiupdate', 'playerselectform':form, 'current_nom':nom})
 
         return context
+
 
     def post(self, request, **kwargs):
         context = self.get_context_data(**kwargs)
