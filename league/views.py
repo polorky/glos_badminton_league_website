@@ -46,7 +46,7 @@ class GenericViewMixin:
         else:
             user = None
             admin = None
-            
+
         if user:
             try:
                 admin = Administrator.objects.get(user=user)
@@ -93,7 +93,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
         all_divs = Division.objects.all().order_by("number")
 
         if pagename == 'home':
-            
+
             # Extract all divisions, split into the three leagues and active/not active
             context.update({
                 'status': 'home',
@@ -261,7 +261,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
         context = self.get_context_data(**kwargs)
         context['errors'] = False
-        
+
         pagename = self.kwargs.get('pagename','')
 
         # Get relevant fixture
@@ -293,7 +293,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         return self.render_to_response(context)
 
     def _reschedule_match(self, fixture):
-        
+
         # Instantiate reschedule form
         rform = RescheduleForm(self.request.POST, instance=fixture)
         temp_date = fixture.date_time
@@ -312,22 +312,22 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             penalty_value = constants.PENALTY_MIXED_CONCEDED
         else:
             penalty_value = constants.PENALTY_LEVEL_CONCEDED
-        
+
         if pagename == "concededhome":
             fixture.status = 'Conceded (H)'
             team=fixture.home_team
         else:
             fixture.status = 'Conceded (A)'
             team=fixture.away_team
-       
+
         fixture.save()
-        
-        Penalty.objects.create(season=fixture.season, 
-                               team=team, 
-                               penalty_value=penalty_value, 
-                               penalty_type='Match Conceded', 
+
+        Penalty.objects.create(season=fixture.season,
+                               team=team,
+                               penalty_value=penalty_value,
+                               penalty_type='Match Conceded',
                                fixture=fixture)
-        
+
         email_notification(pagename, fixture)
 
     def _process_result(self, fixture):
@@ -339,36 +339,36 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         else:
             resform = LevelFixtureForm(self.request.POST, instance=fixture)
             resformset = LevelScoreFormSet(self.request.POST)
-        
+
         if resform.is_valid() and resformset.is_valid():
 
             # Find matches for away players or create new ones
             a = resform.cleaned_data
             found_players = resform.cleaned_data['players_found']
             verify_away_players(fixture, found_players)
-            
+
             # Change fixture status
             fixture.status = 'Played'
-            
+
             # Bundle up game results
             game_results = [self._get_game_result(form.cleaned_data) for form in resformset if form.cleaned_data]
             fixture.game_results = ','.join(game_results)
-            
+
             # Save form and fixture data
             resform.save()
             fixture.save()
-            
+
             # Check for illegal players and apply any penalties
             fixture.check_player_eligibility()
             email_notification('result', fixture)
-            
+
             context['pagename'] = 'submitted'
-        
+
         else:
             # If forms is not valid, change pageview returned
             context['errors'] = True
             context = self._setup_result_forms(context, fixture, resform, resformset)
-        
+
         return context
 
     def _get_game_result(self, cleaned_data: dict) -> str:
@@ -388,7 +388,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             else:
                 resform = LevelFixtureForm(instance=fixture)
                 resformset = LevelScoreFormSet()
-        
+
         games_fields = []
         games_names = constants.GAME_NAMES_MIXED if fixture.division.type == "Mixed" else constants.GAME_NAMES_LEVEL
         for i, game_name in enumerate(games_names):
@@ -656,7 +656,7 @@ class PlayerView(GenericViewMixin, TemplateView):
             'teams': teams,
             'test': player_id,
             })
-        
+
         return context
 
 class ArchivesView(GenericViewMixin, TemplateView):
@@ -738,7 +738,7 @@ def clubadmin(request, update=''):
 class ClubAdminView(GenericViewMixin, TemplateView):
     template_name = "league/clubadmin.html"
     active_tab = 'clubadmin'
-    
+
     def dispatch(self, request, *args, **kwargs):
         if request.user.username == 'leagueAdmin':
             return redirect('league_admin')
@@ -763,7 +763,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             'playerstats': build_roster(club),
             'teams': club.get_clubs_teams('roster'),
             'penalties': penalties})
-        
+
         return context
 
     def post(self, request, **kwargs):
@@ -805,20 +805,20 @@ class ClubAdminView(GenericViewMixin, TemplateView):
                         ["schofieldmark@gmail.com"],
                         )
                     return redirect("/clubadmin/club/?updated=newvenue#newvenue")
-        
+
         # Club Night form submitted
         elif update == 'clubnight':
             cnform = ClubNightForm(request.POST)
             if cnform.is_valid():
                 ClubNight.objects.create(club=club,venue=cnform.cleaned_data['venue'],timings=cnform.cleaned_data['timings'])
                 return redirect("/clubadmin/club/?updated=clubnightadded#clubnights")
-        
+
         # Club Night deleted
         elif 'deletecn' in update:
             cn_id = update.replace('deletecn','')
             ClubNight.objects.filter(id=cn_id).delete()
             return redirect("/clubadmin/club/?updated=clubnightdeleted#clubnights")
-        
+
         # Player deleted
         elif 'deleteplayer' in update:
             player_id = update.replace('deleteplayer','')
@@ -866,8 +866,8 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)    
-        
+        context = super().get_context_data(**kwargs)
+
         current_season = Season.objects.get(current=True)
 
         # Get nomination stats
@@ -875,7 +875,7 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
         last_teams = [team for team in active_teams if team.last_team()]
         nom_teams = [team for team in active_teams if not team.last_team()]
         nom_stats = [(team, team.check_nominations()) for team in nom_teams]
-        
+
         # Update context
         context.update({
             'status': 'leagueAdmin',
@@ -902,7 +902,7 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             settings.nomination_window_open = 'nomination_window_open' in request.POST
             settings.save()
             return redirect(f"{self.request.path}?noms_updated=true")
-        
+
         return self.render_to_response(context)
 
 @method_decorator(login_required, name='dispatch')
@@ -932,7 +932,7 @@ class WebsiteAdminView(GenericViewMixin, TemplateView):
         return context
 
     def post(self, request, **kwargs):
-        context = self.get_context_data(kwargs)
+        context = self.get_context_data(**kwargs)
         update = self.kwargs.get('update', '')
 
         if update == 'upload':
@@ -952,7 +952,7 @@ class WebsiteAdminView(GenericViewMixin, TemplateView):
                 })
 
         elif update == 'clearnoms':
-            
+
             TeamNomination.objects.all().delete()
 
             context.update({'status': 'nomscleared'})
@@ -969,14 +969,14 @@ class NominationsView(GenericViewMixin, TemplateView):
 
             women = Player.objects.filter(club=club).filter(level="Womens").order_by("name")
             men = Player.objects.filter(club=club).filter(level="Mens").order_by("name")
-            
+
             form_list = []
 
             for team in club_teams:
 
                 if team.last_team():
                     continue
-                
+
                 existing_noms = TeamNomination.objects.filter(
                     team=team,
                     date_to=None  # currently active nominations
@@ -990,7 +990,7 @@ class NominationsView(GenericViewMixin, TemplateView):
 
                     WomensFormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=women_extra)
                     MensFormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=men_extra)
-                    
+
                     womens_formset = WomensFormSet(
                         data,
                         queryset=women_existing,
@@ -1009,7 +1009,7 @@ class NominationsView(GenericViewMixin, TemplateView):
                 else:
                     players = women if team.type == 'Womens' else men
                     extra = 4 - existing_noms.count()
-                    
+
                     FormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=extra)
 
                     formset = FormSet(
@@ -1044,7 +1044,7 @@ class NominationsView(GenericViewMixin, TemplateView):
 
         # If 'update' page requested but nomination window closed, return 'unavailable'
         elif pagename == 'update':
-            
+
             context.update({'view':'unavailable'})
 
         # If admin view requested return current and requested nominations and player stats
@@ -1052,12 +1052,12 @@ class NominationsView(GenericViewMixin, TemplateView):
             nom = TeamNomination.objects.get(id=kwargs['type'])
             current_nom = TeamNomination.objects.get(team=nom.team, position=nom.position, date_to=None, approved=True)
 
-            context.update({'view': 'admin', 
-                            'nom': nom, 
-                            'current_nom': current_nom, 
+            context.update({'view': 'admin',
+                            'nom': nom,
+                            'current_nom': current_nom,
                             'new_player_stats': get_player_appearances(nom.player),
                             'cur_player_stats': get_player_appearances(nom.player)})
-        
+
         # Otherwise return specific individual nomination form
         else:
 
@@ -1076,7 +1076,7 @@ class NominationsView(GenericViewMixin, TemplateView):
         context = self.get_context_data(**kwargs)
 
         if context['view'] == 'teamupdate':
-            
+
             # Check which team was submitted
             team = Team.objects.get(id=self.kwargs['pagename'])
             current = next(form_list for form_list in context['forms'] if form_list[0] == team)
@@ -1085,14 +1085,14 @@ class NominationsView(GenericViewMixin, TemplateView):
             if team.type == 'Mixed':
                 womens_formset = current[1]
                 mens_formset = current[2]
-                
+
                 if womens_formset.is_valid() and mens_formset.is_valid():
                     self.save_nominations(womens_formset, team, range(1, 4))
                     self.save_nominations(mens_formset, team, range(4, 7))
                     return redirect(request.path)
             else:
                 formset = current[1]
-                
+
                 if formset.is_valid():
                     self.save_nominations(formset, team, range(1, 5))
                     return redirect(request.path)

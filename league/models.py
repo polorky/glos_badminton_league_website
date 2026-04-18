@@ -38,7 +38,7 @@ class Division(models.Model):
     # In some seasons there were A and B divisions on the same level
     # the 'historic' attribute gives the actual name of the division in this instance and 'number' becomes irrelevant
     historic = models.CharField(max_length=3,blank=True,null=True,default=None)
-    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Mens","Men's")))
+    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Ladies","Ladies"),("Womens","Women's"),("Mens","Men's")))
     active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -99,13 +99,13 @@ class Club(models.Model):
                          "Mixed":{team:0 for team in mixed},
                          "Womens":{team:0 for team in womens},
                          "Mens":{team:0 for team in mens},
-                         }      
+                         }
         # Otherwise just return the lists of teams
         else:
             team_dict = {"Mixed":mixed, "Womens":womens, "Mens":mens}
 
         return team_dict
-    
+
     def requires_noms(self):
         '''Checks whether club needs to submit nominations'''
         teams = Team.objects.filter(club=self)
@@ -123,7 +123,7 @@ class Member(models.Model):
 
 class Player(models.Model):
     name = models.CharField(max_length=50)
-    level = models.CharField(max_length=10,choices=(("Womens","Women's"),("Mens","Men's")))
+    level = models.CharField(max_length=10,choices=(("Womens","Women's"),("Ladies","Ladies"),("Mens","Men's")))
     club = models.ForeignKey(Club,on_delete=models.CASCADE)
 
     def __str__(self):
@@ -182,7 +182,7 @@ class Player(models.Model):
         home_player_q = (
             Q(home_player1=self) | Q(home_player2=self) |
             Q(home_player3=self) | Q(home_player4=self) |
-            Q(home_player5=self) | Q(home_player6=self) 
+            Q(home_player5=self) | Q(home_player6=self)
         )
         away_player_q = (
             Q(away_player1=self) | Q(away_player2=self) |
@@ -199,7 +199,7 @@ class Player(models.Model):
         '''Checks whether player has played any fixtures or been nominated, if so they can't be deleted'''
         if len(self.get_own_fixtures()) > 0:
             return False
-        
+
         if TeamNomination.objects.filter(player=self).exists():
             return False
 
@@ -211,7 +211,7 @@ class Player(models.Model):
 class Team(models.Model):
     division = models.ForeignKey(Division,on_delete=models.SET_NULL,blank=True,null=True)
     club = models.ForeignKey(Club,on_delete=models.CASCADE)
-    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Mens","Men's")))
+    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Ladies","Ladies"),("Mens","Men's")))
     number = models.IntegerField(default=1)
     penalties = models.IntegerField(default=0)
     captain = models.CharField(max_length=30,blank=True,null=True)
@@ -276,7 +276,7 @@ class Team(models.Model):
         position_dict = {pos:0 for pos in all_pos}
         for values in players_nom.values():
             position_dict[values['pos']] += position_dict[values['count']]
-        
+
         final_str = f'{len(fixtures)} - {len(played)}'
         for pos, count in position_dict.items():
             final_str += f'{pos} - {round(count/len(fixtures)*100,1)}% ({count})'
@@ -284,25 +284,25 @@ class Team(models.Model):
         return final_str
 
     def get_nomination_stats(self):
-        
+
         season = Season.objects.get(current=True)
 
         fixtures = (Fixture.objects
                     .filter(season=season)
                     .filter(Q(home_team=self) | Q(away_team=self))
                     .filter(status='Played'))
-        
+
         total_matches = fixtures.count()
         nominations = TeamNomination.objects.filter(team=self, season=season)
-        
+
         positions = {}
         for nomination in nominations:
             if nomination.position not in positions:
                 positions[nomination.position] = []
             positions[nomination.position].append(nomination.player)
-        
+
         stats = {}
-        
+
         for position, players in positions.items():
             played = sum(
                 1 for fix in fixtures
@@ -314,7 +314,7 @@ class Team(models.Model):
                 'total': total_matches,
                 'percent': round(played / total_matches * 100, 1) if total_matches else 0,
             }
-        
+
         return stats
 
 class TeamNomination(models.Model):
@@ -325,7 +325,7 @@ class TeamNomination(models.Model):
     date_to = models.DateField(null=True, blank=True)
     approved = models.BooleanField(default=False)
     notes = models.TextField(null=True, blank=True)
-    
+
     class Meta:
         unique_together = ['team', 'position', 'date_from', 'approved']
 
@@ -465,9 +465,9 @@ class Fixture(models.Model):
             return all_women, all_men
 
         else:
-            
+
             nom_players = [tn.player for tn in home_noms]
-            
+
             if self.division.type == "Womens":
                 all_players = nom_players + [woman for woman in home_women if woman not in home_noms]
             else:

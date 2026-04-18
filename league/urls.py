@@ -14,7 +14,7 @@ urlpatterns = [
     path('juniors', views.JuniorsView.as_view(), name='juniors'),
     path('help', views.HelpView.as_view(), name='help'),
     path('stats', views.StatsView.as_view(), name='stats'),
-    
+
     path('fixtures/update/<str:fixid>/<str:pagename>/<str:source>', views.FixUpdateView.as_view(), name='fixture_update'),
     path('fixtures/<str:pagename>/<str:source>', views.FixturesView.as_view(), name='fixtures'),
     path('fixtures/<str:pagename>', views.FixturesView.as_view(), name='fixtures'),
@@ -22,6 +22,7 @@ urlpatterns = [
     path('clubadmin/', views.clubadmin, name='clubadmin'),
     path('clubadmin/league/', views.LeagueAdminView.as_view(), name='league_admin'),
     path('clubadmin/website/', views.WebsiteAdminView.as_view(), name='website_admin'),
+    path('clubadmin/website/<str:update>', views.WebsiteAdminView.as_view(), name='website_admin'),
     path('clubadmin/club/', views.ClubAdminView.as_view(), name='club_admin'),
     path('clubadmin/club/<str:update>', views.ClubAdminView.as_view(), name='club_admin'),
     path('nominations/<str:pagename>', views.NominationsView.as_view(), name='nominations'),
@@ -29,6 +30,4 @@ urlpatterns = [
     path('verify-player/<str:token>/<str:action>/', verify_player, name='verify_player'), # note this view is in the player.py file
 
     path('', views.HomeView.as_view(), name='home'),
-
-    path('stats', views.StatsView.as_view(), name='stats'),
 ]
