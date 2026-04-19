@@ -29,7 +29,7 @@ class FixtureAdmin(admin.ModelAdmin):
     list_editable = ['status']
 
 class TeamAdmin(admin.ModelAdmin):
-    list_display = ('club','type','number','active','division','penalties','captain')
+    list_display = ('club','type','number','active','division','captain')
     list_filter = ['active','club','type','number']
 
 class DivisionAdmin(admin.ModelAdmin):

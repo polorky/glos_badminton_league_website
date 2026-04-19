@@ -38,7 +38,7 @@ class Division(models.Model):
     # In some seasons there were A and B divisions on the same level
     # the 'historic' attribute gives the actual name of the division in this instance and 'number' becomes irrelevant
     historic = models.CharField(max_length=3,blank=True,null=True,default=None)
-    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Ladies","Ladies"),("Womens","Women's"),("Mens","Men's")))
+    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Mens","Men's")))
     active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -123,7 +123,7 @@ class Member(models.Model):
 
 class Player(models.Model):
     name = models.CharField(max_length=50)
-    level = models.CharField(max_length=10,choices=(("Womens","Women's"),("Ladies","Ladies"),("Mens","Men's")))
+    level = models.CharField(max_length=10,choices=(("Womens","Women's"),("Mens","Men's")))
     club = models.ForeignKey(Club,on_delete=models.CASCADE)
 
     def __str__(self):
@@ -211,9 +211,8 @@ class Player(models.Model):
 class Team(models.Model):
     division = models.ForeignKey(Division,on_delete=models.SET_NULL,blank=True,null=True)
     club = models.ForeignKey(Club,on_delete=models.CASCADE)
-    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Ladies","Ladies"),("Mens","Men's")))
+    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Mens","Men's")))
     number = models.IntegerField(default=1)
-    penalties = models.IntegerField(default=0)
     captain = models.CharField(max_length=30,blank=True,null=True)
     captain_num = models.CharField(max_length=15,blank=True,null=True)
     captain_email = models.EmailField(blank=True,null=True)
