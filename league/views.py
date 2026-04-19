@@ -16,7 +16,7 @@ from .utilities.fixture import get_fixture_stats, get_scores
 from .utilities.email import email_notification, email_admin, get_all_club_contacts
 from .utilities.table import build_table
 from .utilities.season import get_adj_seasons
-from .utilities.roster import build_roster
+from .utilities.roster import build_roster, get_clubs_teams
 import league.constants as constants
 from datetime import date
 from collections import defaultdict
@@ -761,7 +761,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             'players': Player.objects.filter(club=club).order_by("level","name"),
             'playerform': PlayerForm(),
             'playerstats': build_roster(club),
-            'teams': club.get_clubs_teams('roster'),
+            'teams': get_clubs_teams(club),
             'penalties': penalties})
 
         return context
