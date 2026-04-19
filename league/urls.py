@@ -21,6 +21,7 @@ urlpatterns = [
 
     path('clubadmin/', views.clubadmin, name='clubadmin'),
     path('clubadmin/league/', views.LeagueAdminView.as_view(), name='league_admin'),
+    path('clubadmin/league/<str:update>', views.LeagueAdminView.as_view(), name='league_admin'),
     path('clubadmin/website/', views.WebsiteAdminView.as_view(), name='website_admin'),
     path('clubadmin/website/<str:update>', views.WebsiteAdminView.as_view(), name='website_admin'),
     path('clubadmin/club/', views.ClubAdminView.as_view(), name='club_admin'),
