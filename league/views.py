@@ -29,12 +29,11 @@ import pandas as pd
 ##############################################################################################################################################
 
 class GenericViewMixin:
-    user = None
-    admin = None
     type_dict = {'X':'Mixed','W':'Womens','M':'Mens'}
 
     def get_context_data(self, **kwargs):
-
+        '''Checks the user level, gets current season and league settings'''
+        
         context = super().get_context_data(**kwargs)
 
         path = self.request.path.strip('/').split('/')
@@ -1004,7 +1003,7 @@ class NominationsView(GenericViewMixin, TemplateView):
                     )
 
                     form_list.append((team,formset))
-
+            
             return form_list
 
         context = super().get_context_data(**kwargs)

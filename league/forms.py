@@ -55,8 +55,7 @@ class NominationForm(forms.ModelForm):
 
     def __init__(self, *args, players=None, variant='Team', **kwargs):
         super().__init__(*args, **kwargs)
-        if players:
-            self.fields['player'].queryset = players
+        self.fields['player'].queryset = players
         if variant == 'Team':
             del self.fields['notes']
 

@@ -20,13 +20,13 @@
             {% csrf_token %}
             
             {% if team_list.0.type == 'Mixed' %}
-                <h3>Women</h3>
+                <b>Women</b>
                 {{ team_list.1.management_form }}
                 {% for form in team_list.1 %}
                     {{ form.as_p }}
                 {% endfor %}
                 
-                <h3>Men</h3>
+                <b>Men</b>
                 {{ team_list.2.management_form }}
                 {% for form in team_list.2 %}
                     {{ form.as_p }}
