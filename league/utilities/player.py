@@ -303,6 +303,8 @@ def get_player_appearances(player):
     noms = player.get_noms_strings()
     team_dict["noms"] = {"mixed":noms[0],"level":noms[1]}
 
+    return team_dict
+
 def _count_appearances(fixtures, team_dict, player):
     '''Count the times player has played for each team'''
     for fixture in fixtures:

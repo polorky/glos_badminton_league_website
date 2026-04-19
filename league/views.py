@@ -631,29 +631,13 @@ class PlayerView(GenericViewMixin, TemplateView):
 
         player_id = int(kwargs['playerid'])
         player = Player.objects.get(id=player_id)
-        playerstats = {player: get_player_appearances(player)}
-        playermatches = player.get_own_fixtures()
-
-        club_teams = Team.objects.filter(active=True).filter(club=player.club)
-
-        # Split out teams
-        teams = {"Mixed":club_teams.filter(type="Mixed"),
-                    "Womens":club_teams.filter(type="Womens"),
-                    "Mens":club_teams.filter(type="Mens"),
-                    "All":club_teams}
-        # Get length of team lists
-        teams.update({"Lengths":{"Mixed":len(teams["Mixed"]),
-                                    "Womens":len(teams["Womens"]),
-                                    "Mens": len(teams["Mens"]),
-                                    "All": len(teams["All"]),
-                                    }})
 
         context.update({
             'status': 'player',
             'player': player,
-            'playerstats': playerstats,
-            'matches': playermatches,
-            'teams': teams,
+            'playerstats': {player: get_player_appearances(player)},
+            'matches': player.get_own_fixtures(),
+            'teams': get_clubs_teams(player.club),
             'test': player_id,
             })
 
