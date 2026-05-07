@@ -5,9 +5,9 @@
 {% block content %}
 
   <h2>Login</h2>
-
+  <br>
   <p>Please enter your club's username and password:</p>
-
+  <br>
   <form method="post" action="{% url 'login' %}">
     {% csrf_token %}
     <table>
@@ -16,7 +16,7 @@
     <input type="submit" value="Login">
     <input type="hidden" name="next" value="{{ next }}" />
   </form>
-
+  <br>
   <p>If your club login details have been mislaid, please contact the league to have the details resent to the registered club officials.</p>
 
 {% endblock content %}

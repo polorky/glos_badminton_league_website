@@ -1,58 +1,192 @@
 {% load static %}
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>
-  		{% block title %}
-  			Untitled Document
-  		{% endblock title %}
-  	</title>
-    <link href="{% static 'mobile.css' %}" rel="stylesheet" type="text/css" media="only screen and (max-width: 700px)">
-    <link href="{% static 'main.css' %}" rel="stylesheet" type="text/css" media="only screen and (min-width: 700px)">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gloucestershire Badminton League{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}The official website for the Gloucestershire Badminton League — fixtures, results, standings and club information.{% endblock %}">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: {
+                            50:  '#f0f4ff',
+                            100: '#dbe4ff',
+                            200: '#bac8ff',
+                            300: '#91a7ff',
+                            400: '#5c7cfa',
+                            500: '#3b5bdb',
+                            600: '#2f4ac4',
+                            700: '#253daa',
+                            800: '#1e3390',
+                            900: '#162878',
+                            950: '#0d1b52',
+                        },
+                        slate: {
+                            50:  '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        gold: '#f0b429',
+                    }
+                }
+            }
+        }
+    </script>
     <script src="{% static 'main.js' %}"></script>
-    <link rel="icon" type="image/x-icon" href="{% static 'GBLicon.svg' %}">
-  </head>
-  <body>
-    <div>
-      <header>
-        <img src="{% static 'Banner6.png' %}" width="100%"></img>
-        <ul class="nav">
-          {% block menubar %}
-          
-            <li class="nav"><a class="nav {% if active_tab == 'home' %}active{% endif %}" href="/">Home</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'divisions' %}active{% endif %}" href="/divisions/home">Divisions</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'fixtures' %}active{% endif %}" href="/fixtures/home">Fixtures</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'clubs' %}active{% endif %}" href="/clubs/home">Clubs</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'teams' %}active{% endif %}" href="/teams/home">Teams</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'venues' %}active{% endif %}" href="/venues/home">Venues</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'clubadmin' %}active{% endif %}" href="/clubadmin">Club Admin</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'archive' %}active{% endif %}" href="/archive/home">Archive</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'juniors' %}active{% endif %}" href="/juniors">Juniors</a></li>
-            <li class="nav"><a class="nav {% if active_tab == 'help' %}active{% endif %}" href="/help">Help!</a></li>
-            <li class="nav" style="float:right;">
-              {% if user.is_authenticated %}
-                <form method="post" action="{% url 'logout' %}">
-                  {% csrf_token %}
-                  <button type="submit" class="nav {% if active_tab == 'logout' %}active{% endif %}">Logout</button>
-                </form>
-              {% else %}
-                  <a class="nav" href="{% url 'login' %}?next={{ request.path }}">Login</a>
-              {% endif %}
-            </li>
 
-          {% endblock menubar %}
-        </ul>
-      </header>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
 
-      <section>
-        {% block content %}
-          <h1>Welcome!</h1>
-          <p>This is the site for the Gloucestershire Badminton League</p>
-        {% endblock content %}
-      </section>
+    <link rel="stylesheet" href="{% static 'base.css' %}">
 
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body class="min-h-screen flex flex-col">
+
+    <!-- ── Top bar ── -->
+    <div class="bg-navy-950 text-navy-300 text-xs py-1.5 px-4 hidden sm:block">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <span>Gloucestershire Badminton League — 2025/26 Season</span>
+            <span>
+                <a href="/login/" class="hover:text-white transition-colors">Member login</a>
+                &nbsp;·&nbsp;
+                <a href="/help" class="hover:text-white transition-colors">Help</a>
+            </span>
+        </div>
     </div>
-  </body>
-  </html>
+
+    <!-- ── Main nav ── -->
+    <header class="bg-navy-800 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+
+            <!-- Logo -->
+            <a href="/" class="flex items-center gap-2.5 flex-shrink-0 group">
+                <img src="{% static 'glos_flag_navbar.svg' %}" alt="Glos flag" height="36" style="width:auto">
+                <span class="text-base leading-tight hidden sm:block">
+                    Glocestershire<br>
+                    <span class="text-base leading-tight hidden sm:block">Badminton League</span>
+                </span>
+            </a>
+
+            <!-- Desktop nav — core items only -->
+            <nav class="hidden md:flex items-center gap-6 text-sm font-medium">
+                <a href="/" class="nav-link hover:text-gold transition-colors {% block nav_home %}{% endblock %}">Home</a>
+                <a href="/divisions/home" class="nav-link hover:text-gold transition-colors {% block nav_divisions %}{% endblock %}">Divisions</a>
+                <a href="/fixtures/home" class="nav-link hover:text-gold transition-colors {% block nav_fixtures %}{% endblock %}">Fixtures</a>
+                <a href="/clubs/home" class="nav-link hover:text-gold transition-colors {% block nav_clubs %}{% endblock %}">Clubs</a>
+                <a href="/venues/home" class="nav-link hover:text-gold transition-colors {% block nav_teams %}{% endblock %}">Venues</a>
+                <a href="/clubadmin" class="nav-link hover:text-gold transition-colors {% block nav_venues %}{% endblock %}">Club Admin</a>
+            </nav>
+
+            <!-- Right: more + mobile toggle -->
+            <div class="flex items-center gap-3">
+                <!-- "More" dropdown for secondary nav items -->
+                <div class="hidden md:block relative group">
+                    <button class="text-sm text-navy-300 hover:text-white flex items-center gap-1 transition-colors py-1">
+                        More
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div class="absolute right-0 top-full mt-1 w-44 bg-navy-900 rounded-lg shadow-xl py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                        <a href="/teams/home" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Teams</a>
+                        <a href="/juniors" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Juniors</a>
+                        <a href="/archive/home" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Archive</a>
+                        <div class="border-t border-navy-700 my-1"></div>
+                        <a href="/help" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Help</a>
+                        <a href="/login/" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Login</a>
+                    </div>
+                </div>
+
+                <!-- Mobile hamburger -->
+                <button id="mobile-btn" class="md:hidden p-2 rounded-md hover:bg-navy-700 transition-colors" aria-label="Menu">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-navy-950 px-4 pb-3">
+            <nav class="grid grid-cols-2 gap-x-4 gap-y-0.5 pt-2 text-sm">
+                <a href="/" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Home</a>
+                <a href="/divisions/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Divisions</a>
+                <a href="/fixtures/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Fixtures</a>
+                <a href="/clubs/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Clubs</a>
+                <a href="/teams/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Teams</a>
+                <a href="/venues/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Venues</a>
+                <a href="/clubadmin" class="py-2.5 border-b border-navy-800 text-navy-400 hover:text-gold transition-colors">Club Admin</a>
+                <a href="/archive/home" class="py-2.5 border-b border-navy-800 text-navy-400 hover:text-gold transition-colors">Archive</a>
+                <a href="/juniors" class="py-2.5 text-navy-400 hover:text-gold transition-colors">Juniors</a>
+                <a href="/login/" class="py-2.5 text-navy-400 hover:text-gold transition-colors">Login</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- ── Page content ── -->
+    <main class="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- ── Footer ── -->
+    <footer class="bg-navy-950 text-navy-400 mt-8">
+        <div class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
+            <div class="col-span-2 md:col-span-1">
+                <p style="font-family:'DM Serif Display',serif" class="text-white text-base mb-2">Glos Badminton League</p>
+                <p class="text-navy-500 text-xs leading-relaxed">Official website for the Gloucestershire Badminton League.</p>
+            </div>
+            <div>
+                <p class="text-white font-medium mb-2 text-xs uppercase tracking-wider">League</p>
+                <ul class="space-y-1.5">
+                    <li><a href="/divisions/home" class="hover:text-white transition-colors">Divisions</a></li>
+                    <li><a href="/fixtures/home" class="hover:text-white transition-colors">Fixtures</a></li>
+                    <li><a href="/archive/home" class="hover:text-white transition-colors">Archive</a></li>
+                </ul>
+            </div>
+            <div>
+                <p class="text-white font-medium mb-2 text-xs uppercase tracking-wider">Clubs</p>
+                <ul class="space-y-1.5">
+                    <li><a href="/clubs/home" class="hover:text-white transition-colors">All clubs</a></li>
+                    <li><a href="/teams/home" class="hover:text-white transition-colors">Teams</a></li>
+                    <li><a href="/venues/home" class="hover:text-white transition-colors">Venues</a></li>
+                    <li><a href="/juniors" class="hover:text-white transition-colors">Junior clubs</a></li>
+                </ul>
+            </div>
+            <div>
+                <p class="text-white font-medium mb-2 text-xs uppercase tracking-wider">Contact</p>
+                <ul class="space-y-1.5 text-xs">
+                    <li><span class="text-navy-500">Fixtures:</span><br><a href="mailto:GlosBadFixtures@outlook.com" class="hover:text-white transition-colors break-all">GlosBadFixtures@outlook.com</a></li>
+                    <li class="mt-2"><span class="text-navy-500">Website:</span><br><a href="mailto:GlosBadWebsite@gmail.com" class="hover:text-white transition-colors break-all">GlosBadWebsite@gmail.com</a></li>
+                    <li class="mt-2"><span class="text-navy-500">General:</span><br><a href="mailto:GlosBadCorrespondence@outlook.com" class="hover:text-white transition-colors break-all">GlosBadCorrespondence@outlook.com</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="border-t border-navy-900 text-center text-navy-600 text-xs py-3">
+            &copy; {% now "Y" %} Gloucestershire Badminton League
+        </div>
+    </footer>
+
+    <script>
+        document.getElementById('mobile-btn').addEventListener('click', () => {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

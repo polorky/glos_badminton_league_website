@@ -50,7 +50,7 @@ class Division(models.Model):
 
     def get_short_name(self):
         '''Used in on All Fixtures page'''
-        return f'{self.get_type_display()} Div {self.number}'
+        return f'{self.get_type_display()} {self.number}'
 
     def get_division_url(self):
         type_dict = {'Mixed':'X', 'Womens':'W', 'Mens':'M'}
@@ -335,6 +335,7 @@ class TeamNomination(models.Model):
 
 class Venue(models.Model):
     name = models.CharField(max_length=50)
+    short_name = models.CharField(max_length=20,blank=True,null=True)
     address = models.CharField(max_length=255)
     additional_information = models.CharField(max_length=255,blank=True,null=True)
     map = models.CharField(max_length=500,blank=True,null=True)

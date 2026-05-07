@@ -36,7 +36,7 @@ class DivisionAdmin(admin.ModelAdmin):
     list_display = ('number','historic','type','active')
 
 class VenueAdmin(admin.ModelAdmin):
-    list_display = ('name','address','additional_information','map')
+    list_display = ('name','short_name','address','additional_information','map')
 
 class PenaltyAdmin(admin.ModelAdmin):
     list_display = ('season','team','penalty_type','player','fixture')

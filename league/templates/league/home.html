@@ -1,36 +1,114 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Home{% endblock title %}
+{% block title %}Gloucestershire Badminton League{% endblock title %}
 
 {% block content %}
 
-<h1>Gloucestershire Badminton League</h1>
+<!-- Page header -->
+<img src="{% static 'glos_badminton_league_banner.svg' %}" style="display:block; margin: 0 auto; max-height:12rem;"></img>
+<br>
+<!-- Quick links row -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
 
-<h3>Welcome!</h3>
-<p>Welcome to the website for the Gloucestershire Badminton League!</p>
+    <a href="/divisions/home" class="block bg-navy-800 hover:bg-navy-700 text-white rounded-xl p-5 transition-colors no-underline">
+        <div class="text-2xl mb-2">🏆</div>
+        <p class="font-semibold">Divisions & Standings</p>
+        <p class="text-navy-300 text-sm mt-1">View league tables for all divisions</p>
+    </a>
 
-<h3>New to Gloucestershire? Looking for a badminton club to join?</h3>
-<p>Head to our <a href="clubs/home">Clubs page</a> for further details on the clubs that play in the Gloucestershire league.</p>
+    <a href="/fixtures/home" class="block bg-navy-800 hover:bg-navy-700 text-white rounded-xl p-5 transition-colors no-underline">
+        <div class="text-2xl mb-2">📅</div>
+        <p class="font-semibold">Fixtures & Results</p>
+        <p class="text-navy-300 text-sm mt-1">Upcoming matches and recent results</p>
+    </a>
 
-<h3>Introduction to the Website</h3>
-<p>For any issues surrounding league fixtures, please contact: <a href="mailto:GlosBadFixtures@outlook.com">GlosBadFixtures@outlook.com</a></p>
-<p>For any technical issues with this website, please contact: <a href="mailto:GlosBadWebsite@gmail.com">GlosBadWebsite@gmail.com</a></p>
-<p>For any other issues surrounding the league, please contact: <a href="mailto:GlosBadCorrespondence@outlook.com">GlosBadCorrespondence@outlook.com</a></p>
+    <a href="/clubs/home" class="block bg-navy-800 hover:bg-navy-700 text-white rounded-xl p-5 transition-colors no-underline">
+        <div class="text-2xl mb-2">🏸</div>
+        <p class="font-semibold">Clubs</p>
+        <p class="text-navy-300 text-sm mt-1">Find a club or look up contact details</p>
+    </a>
 
-<p>If you need to contact other clubs, you can find general club contact details on the <a href="/clubs/home">Clubs page</a> and potentially team captain details
- on the <a href="/teams/home">Teams page</a> (if the club has entered these). Note that to see this information you will need to be logged in using your club's
- credentials. These will have been sent to the club administrators registered with the league</p>
+</div>
 
-<p>You will also need to be logged in to make changes to fixtures and submit results.</p>
+<!-- Main content: two columns on desktop -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
 
-<h3>Scorecard</h3>
-<p><a href="static\New Scorecard.pdf" download>Click here</a> to download the scorecard for league matches.</p>
+    <!-- Left: main info (2/3 width) -->
+    <div class="md:col-span-2 space-y-8">
 
-<h3>Rules</h3>
-<p><a href="static\League Rules-2025-26.pdf">Click here</a> to download the rules for the 2025-26 season.</p>
+        <!-- New to Gloucestershire -->
+        <div>
+            <h2>New to Gloucestershire?</h2>
+            <p>Looking for a badminton club to join? Head to our <a href="/clubs/home">Clubs page</a> for details on all the clubs that play in the Gloucestershire league.</p>
+        </div>
 
-<h3> Club Administration</h3>
-<p>There is a <a href="\clubadmin">Club Admin</a> section which will allow club administrators to update club details such as
-  club contacts, player roster and match venues. You will need to be logged in to access this area.</p>
+        <div class="section-divider"></div>
+
+        <!-- Downloads -->
+        <div>
+            <h2>Downloads</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
+                <a href="static\New Scorecard.pdf" download
+                   class="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-4 hover:border-navy-400 hover:shadow-sm transition-all no-underline">
+                    <span class="text-2xl">📄</span>
+                    <div>
+                        <p class="font-semibold text-navy-800 text-sm">Match Scorecard</p>
+                        <p class="text-slate-400 text-xs">Download PDF</p>
+                    </div>
+                </a>
+                <a href="static\League Rules-2025-26.pdf"
+                   class="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-4 hover:border-navy-400 hover:shadow-sm transition-all no-underline">
+                    <span class="text-2xl">📋</span>
+                    <div>
+                        <p class="font-semibold text-navy-800 text-sm">League Rules 2025–26</p>
+                        <p class="text-slate-400 text-xs">Download PDF</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Member info -->
+        <div>
+            <h2>Club Administration</h2>
+            <p>The <a href="/clubadmin">Club Admin</a> section allows club administrators to update club details including contacts, player rosters and match venues.</p>
+            <p class="mt-2">Contact details for other clubs can be found on the <a href="/clubs/home">Clubs page</a> and team captain details on the <a href="/teams/home">Teams page</a>.</p>
+            <p class="mt-2 text-sm text-slate-500">You will need to be logged in with your club's credentials to access this area and to submit results. Login details will have been sent to your club's registered administrators.</p>
+        </div>
+
+    </div>
+
+    <!-- Right: contact panel (1/3 width) -->
+    <div class="space-y-4">
+
+        <h2>Contact Us</h2>
+
+        <div class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+            <div class="p-4">
+                <p class="text-xs font-semibold text-navy-500 uppercase tracking-wider mb-1">Fixtures</p>
+                <a href="mailto:GlosBadFixtures@outlook.com" class="text-sm break-all">GlosBadFixtures@outlook.com</a>
+            </div>
+            <div class="p-4">
+                <p class="text-xs font-semibold text-navy-500 uppercase tracking-wider mb-1">Website</p>
+                <a href="mailto:GlosBadWebsite@gmail.com" class="text-sm break-all">GlosBadWebsite@gmail.com</a>
+            </div>
+            <div class="p-4">
+                <p class="text-xs font-semibold text-navy-500 uppercase tracking-wider mb-1">General</p>
+                <a href="mailto:GlosBadCorrespondence@outlook.com" class="text-sm break-all">GlosBadCorrespondence@outlook.com</a>
+            </div>
+        </div>
+
+        <!-- Login prompt -->
+        <div class="bg-navy-50 border border-navy-100 rounded-xl p-4">
+            <p class="text-sm text-navy-700 font-semibold mb-1">Club login</p>
+            <p class="text-xs text-slate-500 mb-3">Log in to submit results, manage fixtures and update club details.</p>
+            <a href="/login/" class="btn text-sm">Log in</a>
+        </div>
+
+    </div>
+
+</div>
 
 {% endblock content %}

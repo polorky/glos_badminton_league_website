@@ -7,16 +7,20 @@
 {% if status == "home" %}
 
   <h1>Current Teams</h1>
+  <br>
   <p>This is the list of current teams in the league.</p>
-  <ul class="teamlist">
+  <br>
+  <ul class="col-list">
     {% for team in teams %}
     <li><a href="{{ team.get_team_url }}">{{ team }}</a></li>
     {% endfor %}
   </ul>
-
-  <h3>Historic Teams</h3>
+  <br>
+  <h1>Historic Teams</h1>
+  <br>
   <p>This is the list of teams that have previously played in the league but either the club is no longer active or the club has withdrawn the team.</p>
-  <ul class="teamlist">
+  <br>
+  <ul class="col-list">
     {% for team in old_teams %}
     <li><a href="{{ team.get_team_url }}">{{ team }}</a></li>
     {% endfor %}
@@ -52,45 +56,47 @@
   {% endif %}
 
   <h3>Current Season - Fixtures and Results</h3>
-  <table id="table" class="table">
-    <tr><th onclick="sortTable(0)">Date ↕</th><th onclick="sortTable(1)">Day ↕</th><th>Start</th><th>End</th>
-      <th onclick="sortTable(4)">Home Team ↕</th><th colspan="2">Scores</th><th onclick="sortTable(8)">Away Team ↕</th>
-      <th onclick="sortTable(9)">Venue ↕</th><th onclick="sortTable(10)">Status ↕</th><th>View</th><th>Update</th></tr>
-    {% for fix in fixtures %}
-      {% if fix.0.status == "Postponed" %}
-        <tr class="postponed">
-      {% elif fix.0.status == "Proposed" %}
-        <tr class="proposed">
-      {% elif fix.0.status == "Rearranged" %}
-        <tr class="rearranged">
-      {% elif fix.0.status == "Played" %}
-        <tr class="played">
-      {% elif fix.0.status == "Conceded (H)" %}
-        <tr class="conceded">
-      {% elif fix.0.status == "Conceded (A)" %}
-        <tr class="conceded">
-      {% else %}
-        <tr class="unplayed">
-      {% endif %}
-          <td>{{ fix.0.date_time|date:'Y-m-d' }}</td>
-          <td>{{ fix.0.date_time|date:'D' }}</td>
-          <td>{{ fix.0.date_time|date:'H:i' }}</td>
-          <td>{{ fix.0.end_time|date:'H:i' }}</td>
-          <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team }}</a></td>
-          <td>{{ fix.0.home_points }}</td>
-          <td>{{ fix.0.away_points }}</td>
-          <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team }}</a></td>
-          <td><a href="/venues/{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td>
-          <td>{{ fix.0.get_status_display }}</td>
-          <td><a href="/fixtures/{{ fix.0.id }}/div">View</a></td>
-          {% if fix.1 %}
-            <td><a href="/fixtures/{{ fix.0.id }}/update/div">Update</a></td>
-          {% else %}
-            <td></td>
-          {% endif %}
-        </tr>
-    {% endfor %}
-  </table>
+  <div class="table-wrap">
+    <table id="table" class="table">
+      <tr><th onclick="sortTable(0)">Date ↕</th><th onclick="sortTable(1)">Day ↕</th><th>Start</th><th>End</th>
+        <th onclick="sortTable(4)">Home Team ↕</th><th colspan="2">Scores</th><th onclick="sortTable(8)">Away Team ↕</th>
+        <th onclick="sortTable(9)">Venue ↕</th><th onclick="sortTable(10)">Status ↕</th><th>View</th><th>Update</th></tr>
+      {% for fix in fixtures %}
+        {% if fix.0.status == "Postponed" %}
+          <tr class="postponed">
+        {% elif fix.0.status == "Proposed" %}
+          <tr class="proposed">
+        {% elif fix.0.status == "Rearranged" %}
+          <tr class="rearranged">
+        {% elif fix.0.status == "Played" %}
+          <tr class="played">
+        {% elif fix.0.status == "Conceded (H)" %}
+          <tr class="conceded">
+        {% elif fix.0.status == "Conceded (A)" %}
+          <tr class="conceded">
+        {% else %}
+          <tr class="unplayed">
+        {% endif %}
+            <td>{{ fix.0.date_time|date:'Y-m-d' }}</td>
+            <td>{{ fix.0.date_time|date:'D' }}</td>
+            <td>{{ fix.0.date_time|date:'H:i' }}</td>
+            <td>{{ fix.0.end_time|date:'H:i' }}</td>
+            <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team }}</a></td>
+            <td>{{ fix.0.home_points }}</td>
+            <td>{{ fix.0.away_points }}</td>
+            <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team }}</a></td>
+            <td><a href="/venues/{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td>
+            <td>{{ fix.0.get_status_display }}</td>
+            <td><a href="/fixtures/{{ fix.0.id }}/div">View</a></td>
+            {% if fix.1 %}
+              <td><a href="/fixtures/{{ fix.0.id }}/update/div">Update</a></td>
+            {% else %}
+              <td></td>
+            {% endif %}
+          </tr>
+      {% endfor %}
+    </table>
+  </div>
   <h3>Past Performance</h3>
   <ul>
       {% for perm in performances %}

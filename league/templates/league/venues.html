@@ -6,17 +6,17 @@
 
 {% if status == "home" %}
   <h1>League Venues</h1>
+  <br>
   <p>These are the match venues currently registered by clubs. If your club is planning on using a new venue for matches, even if
     temporarily, please register it in the <a href="\clubadmin\home">Club Admin page</a> to help other clubs find it.</p>
-  <div style="text-align:center;" class="mapmain">
-      <iframe src="https://www.google.com/maps/d/u/0/embed?mid=1-Ss_nuZtJxhR8s74hIJyHq2sfe0H4AY&ehbc=2E312F" width="640" height="480"></iframe>
+  <br>
+  <div class="w-full">
+      <iframe src="https://www.google.com/maps/d/u/0/embed?mid=1-Ss_nuZtJxhR8s74hIJyHq2sfe0H4AY&ehbc=2E312F" width="100%" height="400" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
   </div>
-  <div style="text-align:center;" class="mapmobile">
-      <iframe src="https://www.google.com/maps/d/u/0/embed?mid=1-Ss_nuZtJxhR8s74hIJyHq2sfe0H4AY&ehbc=2E312F"></iframe>
-  </div>
-  <ul class="clublist">
+  <br>
+  <ul class="col-list">
     {% for venue in venues %}
-      <li><a href="{{ venue.get_venue_url }}">{{ venue.name }}</a></li><br>
+      <li><a href="{{ venue.get_venue_url }}">{{ venue.name }}</a></li>
     {% endfor %}
   </ul>
 
@@ -36,8 +36,10 @@
     {% if request.GET.updated == "true" %}
         <p style="color:red;">Details updated!</p>
     {% endif %}
+    <br>
   {% else %}
     <h2>{{ venue.name }}</h2>
+    <br>
     <p><b>Address: </b>{{ venue.address }}</p>
     <p><b>Additional Information: </b>{{ venue.additional_information }}</p>
   {% endif %}
@@ -50,7 +52,8 @@
   <br>
   {% if venue.map == None %}
     <p>Map view not yet available for this venue</p>
-  {% else %}
+  {% else %}  
+    <br>
     <iframe
     src="{{ venue.map }}"
     width="600"

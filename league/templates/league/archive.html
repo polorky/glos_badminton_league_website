@@ -7,7 +7,9 @@
 {% if view == "home" %}
 
     <h2>Previous Seasons</h2>
+    <br>
     <p>Note that it can take a short while to load these pages as all the divisions are loaded together.</p>
+    <br>
     <ul>
         {% for season in seasons %}
             <li><a href="/archive/{{ season }}">{{ season }}</a></li>
@@ -17,69 +19,77 @@
 {% else %}
 
     <h2>{{ season }}</h2>
-
+    <br>
     {% if season.archive_info %}
         <p>{{ season.archive_info }}</p>
+        <br>
     {% endif %}
 
     <form method="post">
     {% csrf_token %}
     <input class="button" type="submit" value="Download All Results">
     </form>
+    <br>
 
     {% for divdict in divisions %}
 
         {% if season.historic_divs %}
             <h3>{{ divdict.division.get_historic_name }}</h3>
+            <br>
         {% else %}
             <h3>{{ divdict.division }}</h3>
+            <br>
         {% endif %}
 
-        <table id="resultstable" class="resultstable">
-            <tr>
-              <th>Team</th>
-              <th><abbr title="Played">P</abbr></th>
-              <th><abbr title="Won">W</abbr></th>
-              <th><abbr title="Drawn">D</abbr></th>
-              <th><abbr title="Lost">L</abbr></th>
-              <th><abbr title="Points For">PF*</abbr></th>
-              <th><abbr title="Points Against">PA</abbr></th>
-              <th><abbr title="Penalties">Pen*</abbr></th>
-            </tr>
-            {% for team_tuple in divdict.table %}
+        <div class="table-wrap">
+            <table id="resultstable" class="resultstable">
                 <tr>
-                    <td><a href="{% url 'teams' team_tuple.1.Object.get_team_url %}">{{ team_tuple.0 }}</a></td>
-                    <td>{{ team_tuple.1.Played }}</td>
-                    <td>{{ team_tuple.1.Won }}</td>
-                    <td>{{ team_tuple.1.Drawn }}</td>
-                    <td>{{ team_tuple.1.Lost }}</td>
-                    <td>{{ team_tuple.1.PFor }}</td>
-                    <td>{{ team_tuple.1.PAgainst }}</td>
-                    <td>{{ team_tuple.1.Penalties }}</td>
+                <th>Team</th>
+                <th><abbr title="Played">P</abbr></th>
+                <th><abbr title="Won">W</abbr></th>
+                <th><abbr title="Drawn">D</abbr></th>
+                <th><abbr title="Lost">L</abbr></th>
+                <th><abbr title="Points For">PF*</abbr></th>
+                <th><abbr title="Points Against">PA</abbr></th>
+                <th><abbr title="Penalties">Pen*</abbr></th>
                 </tr>
-            {% endfor %}
-         </table>
-
+                {% for team_tuple in divdict.table %}
+                    <tr>
+                        <td><a href="{% url 'teams' team_tuple.1.Object.get_team_url %}">{{ team_tuple.0 }}</a></td>
+                        <td>{{ team_tuple.1.Played }}</td>
+                        <td>{{ team_tuple.1.Won }}</td>
+                        <td>{{ team_tuple.1.Drawn }}</td>
+                        <td>{{ team_tuple.1.Lost }}</td>
+                        <td>{{ team_tuple.1.PFor }}</td>
+                        <td>{{ team_tuple.1.PAgainst }}</td>
+                        <td>{{ team_tuple.1.Penalties }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <br>
         <h3>Results</h3>
-
-        <table id="table" class="table">
-            <tr class="headings" style="cursor:pointer;">
-                <th onclick="sortTable(3)">Home Team ↕</th>
-                <th colspan="2">Scores</th>
-                <th onclick="sortTable(7)">Away Team ↕</th>
-                <th>Link</th>
-            </tr>
-            {% for fix in divdict.fixtures %}
-                <tr>
-                  <td><a href="/teams/{{ fix.home_team.get_team_url }}">{{ fix.home_team }}</a></td>
-                  <td>{{ fix.home_points }}</td>
-                  <td>{{ fix.away_points }}</td>
-                  <td><a href="/teams/{{ fix.away_team.get_team_url }}">{{ fix.away_team }}</a></td>
-                  <td><a href="/fixtures/{{ fix.id }}/fix">View</a></td>
+        <br>
+        <div class="table-wrap">
+            <table id="table" class="table">
+                <tr class="headings" style="cursor:pointer;">
+                    <th onclick="sortTable(3)">Home Team ↕</th>
+                    <th colspan="2">Scores</th>
+                    <th onclick="sortTable(7)">Away Team ↕</th>
+                    <th>Link</th>
                 </tr>
-            {% endfor %}
-        </table>
-
+                {% for fix in divdict.fixtures %}
+                    <tr>
+                    <td><a href="/teams/{{ fix.home_team.get_team_url }}">{{ fix.home_team }}</a></td>
+                    <td>{{ fix.home_points }}</td>
+                    <td>{{ fix.away_points }}</td>
+                    <td><a href="/teams/{{ fix.away_team.get_team_url }}">{{ fix.away_team }}</a></td>
+                    <td><a href="/fixtures/{{ fix.id }}/fix">View</a></td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <br>
     {% endfor %}
 
 {% endif %}
