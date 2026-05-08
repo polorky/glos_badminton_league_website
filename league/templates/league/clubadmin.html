@@ -38,7 +38,19 @@
 
     <h1>{{ admin.club }}</h1>
     <br>
-    
+    {% if not member %}
+      {% if settings.team_selection_window_open %}    
+        <h3>Team Selection</h3>
+        <br>
+        <p>Please <a href="/teams/select{{ admin.club.get_club_url }}">click here</a> to select the teams you plan on submitting this season.</p>
+        <br>
+        <p>Please also <a href="/teams/venue{{ admin.club.get_club_url }}">click here</a> to select the normal venues and timings for each team.
+        If not all your planned teams appear on this page, please use the link above to update the number of teams you wish to enter.</p>
+        
+        <br><div class="section-divider"></div><br>
+      {% endif %}
+    {% endif %}
+        
     {% if not member %}
       {% if settings.nomination_window_open and not admin.club.requires_noms %}
         <h3>Team Nominations</h3>
@@ -47,11 +59,13 @@
         <br><div class="section-divider"></div><br>
       {% elif settings.nomination_window_open %}
         <h3>Team Nominations</h3>
+        <br>
         <p>You are now able to make nominations for your club's teams, <a href="/nominations/update">click here</a> to go to the nomination page.</p>
         <p style="color:red;">Nominations must be made before the end of September or the team's first match, whichever is sooner.</p>
         <br><div class="section-divider"></div><br>
       {% elif admin.club.requires_noms %}
         <h3>Team Nominations</h3>
+        <br>
         <p>If you wish to request a change in one of your teams' nominations, please click on the relevant link under the nomination
           columns in the Player Roster below.
         <br><div class="section-divider"></div><br>

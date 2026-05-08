@@ -40,7 +40,24 @@ class TeamForm(ModelForm):
 
     class Meta:
         model = Team
-        fields = ['captain','captain_num','captain_email']
+        fields = ['captain','captain_num','captain_email',
+                  'home_venue','start_time','end_time']
+
+    def __init__(self, *args, variant='Captain', **kwargs):
+        super().__init__(*args, **kwargs)
+        if variant == 'Captain':
+            del self.fields['home_venue']
+            del self.fields['start_time']
+            del self.fields['end_time']
+        else:
+            del self.fields['captain']
+            del self.fields['captain_num']
+            del self.fields['captain_email']
+
+class TeamSelectForm(Form):
+    mixed_teams = IntegerField()
+    womens_teams = IntegerField()
+    mens_teams = IntegerField()
 
 class PlayerForm(ModelForm):
 
@@ -48,7 +65,8 @@ class PlayerForm(ModelForm):
         model = Player
         fields = ['name','level']
 
-class NominationForm(forms.ModelForm):
+class NominationForm(ModelForm):
+
     class Meta:
         model = TeamNomination
         fields = ['player','notes']

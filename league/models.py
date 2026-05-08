@@ -8,6 +8,7 @@ from django.core.exceptions import ObjectDoesNotExist
 class LeagueSettings(models.Model):
     '''Holds league settings that need changing by league admins mid-sesason'''
     nomination_window_open = models.BooleanField(default=False)
+    team_selection_window_open = models.BooleanField(default=False)
 
     class Meta:
         verbose_name_plural = 'League settings'
@@ -42,15 +43,15 @@ class Division(models.Model):
     active = models.BooleanField(default=True)
 
     def __str__(self):
-            return f'{self.get_type_display()} Division {self.number}'
+            return f'{self.type} Division {self.number}'
 
     def get_historic_name(self):
         '''Used on the archive page'''
-        return f'{self.get_type_display()} Division {self.historic}'
+        return f'{self.type} Division {self.historic}'
 
     def get_short_name(self):
         '''Used in on All Fixtures page'''
-        return f'{self.get_type_display()} {self.number}'
+        return f'{self.type} {self.number}'
 
     def get_division_url(self):
         type_dict = {'Mixed':'X', 'Womens':'W', 'Mens':'M'}
@@ -110,6 +111,19 @@ class Club(models.Model):
         '''Checks whether club needs to submit nominations'''
         teams = Team.objects.filter(club=self)
         return any([team.number > 1 for team in teams])
+
+class Venue(models.Model):
+    name = models.CharField(max_length=50)
+    short_name = models.CharField(max_length=20,blank=True,null=True)
+    address = models.CharField(max_length=255)
+    additional_information = models.CharField(max_length=255,blank=True,null=True)
+    map = models.CharField(max_length=500,blank=True,null=True)
+
+    def __str__(self):
+        return self.name
+
+    def get_venue_url(self):
+        return urllib.parse.quote(self.name)
 
 class Administrator(models.Model):
     '''Club administrator - has access to all editable sections'''
@@ -217,9 +231,12 @@ class Team(models.Model):
     captain_num = models.CharField(max_length=15,blank=True,null=True)
     captain_email = models.EmailField(blank=True,null=True)
     active = models.BooleanField(default=True)
+    home_venue = models.ForeignKey(Venue,on_delete=models.SET_NULL,blank=True,null=True)
+    start_time = models.TimeField(default=None,blank=True,null=True)
+    end_time = models.TimeField(default=None,blank=True,null=True)
 
     def __str__(self):
-        return f'{self.club.short_name} {self.get_type_display()} {self.number}'
+        return f'{self.club.short_name} {self.type} {self.number}'
 
     def get_short_name(self):
         return f'{self.club.short_name} {self.number}'
@@ -332,19 +349,6 @@ class TeamNomination(models.Model):
         club_players = Player.objects.filter(club=self.team.club, level=self.player.level)
         eligible_ids = [p.id for p in club_players if p.check_eligibility(self.team)]
         return Player.objects.filter(id__in=eligible_ids)
-
-class Venue(models.Model):
-    name = models.CharField(max_length=50)
-    short_name = models.CharField(max_length=20,blank=True,null=True)
-    address = models.CharField(max_length=255)
-    additional_information = models.CharField(max_length=255,blank=True,null=True)
-    map = models.CharField(max_length=500,blank=True,null=True)
-
-    def __str__(self):
-        return self.name
-
-    def get_venue_url(self):
-        return urllib.parse.quote(self.name)
 
 class Fixture(models.Model):
 

@@ -11,9 +11,11 @@
 {% elif status == "leagueAdmin" %}
 
     <h1>League Admin Options</h1>
-
+    <br>
     <h2>Nomination Window</h2>
+    <br>
     <p>Check or uncheck the box below and click save to toggle the nomination window prior to the season starting.</p>
+    <br>
     <form action="/clubadmin/league/noms" method="post">
     {% csrf_token %}
     <label>
@@ -21,15 +23,30 @@
                name="nomination_window_open" 
                {% if settings.nomination_window_open %}checked{% endif %}>
         Nomination Window Open
-    </label>    
+    </label>  
+    <button type="submit">Save</button>  
     {% if request.GET.noms_updated == "true" %}
       <p style="color:red;">Setting updated!</p>
-    {% else %}
-      <br><br>
     {% endif %}
-    <button class="buttongreen" type="submit">Save</button>
     </form>
-
+    <br>
+    <h2>Team Selection Window</h2>
+    <br>
+    <p>Check or uncheck the box below and click save to toggle the team selection window prior to the season starting.</p>
+    <br>
+    <form action="/clubadmin/league/teamsel" method="post">
+    {% csrf_token %}
+    <label>
+        <input type="checkbox" 
+               name="team_selection_window_open" 
+               {% if settings.team_selection_window_open %}checked{% endif %}>
+        Team Selection Window Open
+    </label>  
+    <button type="submit">Save</button>  
+    {% if request.GET.teamsel_updated == "true" %}
+      <p style="color:red;">Setting updated!</p>
+    {% endif %}
+    </form>
     <br>
     <h2>Penalties for current season</h2>
     <br>

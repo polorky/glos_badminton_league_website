@@ -342,7 +342,6 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         if resform.is_valid() and resformset.is_valid():
 
             # Find matches for away players or create new ones
-            a = resform.cleaned_data
             found_players = resform.cleaned_data['players_found']
             verify_away_players(fixture, found_players)
 
@@ -492,6 +491,46 @@ class TeamsView(GenericViewMixin, TemplateView):
                 'old_teams': Team.objects.filter(active=False).order_by("club__name", "type", "number"),
             })
 
+        # If 'select' in pagename, set up club team selection
+        elif 'select' in pagename:
+            
+            # Check club exists
+            try:
+                club = Club.objects.get(name=urllib.parse.unquote(pagename.replace('select','')))
+            except ObjectDoesNotExist:
+                return {'status':'clubdoesnotexist'}
+            
+            # Create form for team selection
+            team_select_form = TeamSelectForm(None)
+
+            # Update context
+            context.update({'status': 'select',
+                            'team_select_form': team_select_form, 
+                            'club': club})
+
+        elif 'venue' in pagename:
+
+            # Check club exists
+            try:
+                club = Club.objects.get(name=urllib.parse.unquote(pagename.replace('venue','')))
+            except ObjectDoesNotExist:
+                return {'status':'clubdoesnotexist'}
+
+            # Get all teams
+            teams = Team.objects.filter(club=club, active=True)
+            
+            # Get forms for each team
+            forms = [
+                TeamForm(instance=team, prefix=f'team_{team.pk}', variant='venue')
+                for team in teams
+            ]
+
+            # Update context
+            context.update({'status': 'venue',
+                            'club': club,
+                            'teams': teams,
+                            'forms': forms,})
+
         # Otherwise return team requested
         else:
 
@@ -528,14 +567,67 @@ class TeamsView(GenericViewMixin, TemplateView):
     def post(self, request, **kwargs):
 
         pagename = self.kwargs.get('pagename','')
+        
+        context = self.get_context_data(**kwargs)
 
-        team = Team.objects.get(id=urllib.parse.unquote(pagename))
+        if 'select' in pagename:
 
-        form = TeamForm(self.request.POST, instance=team)
+            form = TeamSelectForm(self.request.POST)
 
-        if form.is_valid():
-            form.save()
-            return redirect(f"{self.request.path}?updated=true")
+            if form.is_valid():
+                
+                self.update_club_teams(context['club'], 'Mixed', form.cleaned_data['mixed_teams'])
+                self.update_club_teams(context['club'], 'Womens', form.cleaned_data['womens_teams'])
+                self.update_club_teams(context['club'], 'Mens', form.cleaned_data['mens_teams'])              
+                
+                return redirect(f"{self.request.path}?updated=true")
+            
+        elif 'venue' in pagename:
+
+            forms = [
+                TeamForm(request.POST, instance=team, prefix=f'team_{team.pk}', variant='venue')
+                for team in context['teams']
+            ]
+            
+            if all(form.is_valid() for form in forms):
+                
+                for form in forms:
+                    form.save()
+
+                return redirect(f"{self.request.path}?updated=true")
+
+        else:
+
+            team = Team.objects.get(id=urllib.parse.unquote(pagename))
+
+            form = TeamForm(self.request.POST, instance=team)
+
+            if form.is_valid():
+                form.save()
+                return redirect(f"{self.request.path}?updated=true")
+            
+    def update_club_teams(self, club, type, num):
+
+        current_teams = Team.objects.filter(club=club, type=type, active=True)
+        current_count = current_teams.count()
+
+        if current_count > num:
+            for i in range(current_count, num, -1):
+                team = current_teams.get(number=i)
+                team.active = False
+                team.save()
+        elif current_count < num:
+            all_club_teams = Team.objects.filter(club=club, type=type)
+            for i in range(current_count, num, 1):
+                try:
+                    team = all_club_teams.get(number=i+1)
+                    team.active = True
+                    team.save()
+                except ObjectDoesNotExist:
+                    Team.objects.create(club=club,
+                                        type=type,
+                                        number=i+1,
+                                        active=True)                   
 
 class VenuesView(GenericViewMixin, TemplateView):
     template_name = "league/venues.html"
@@ -885,6 +977,12 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             settings.nomination_window_open = 'nomination_window_open' in request.POST
             settings.save()
             return redirect(f"{self.request.path}?noms_updated=true")
+
+        if 'teamsel' in update:
+            settings = LeagueSettings.get()
+            settings.team_selection_window_open = 'team_selection_window_open' in request.POST
+            settings.save()
+            return redirect(f"{self.request.path}?teamsel_updated=true")
 
         return self.render_to_response(context)
 
