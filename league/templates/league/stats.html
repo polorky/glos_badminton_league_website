@@ -24,6 +24,8 @@
 
 {% block content %}
 
+    <h1>Stats for {{ season }}</h1>
+    <br>
     {% for stat, value in stats.items %}
         <p><b>{{ stat }}</b> - {{ value }}</p>
     {% endfor %}

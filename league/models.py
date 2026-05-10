@@ -43,15 +43,15 @@ class Division(models.Model):
     active = models.BooleanField(default=True)
 
     def __str__(self):
-            return f'{self.type} Division {self.number}'
+            return f'{self.get_type_display()} Division {self.number}'
 
     def get_historic_name(self):
         '''Used on the archive page'''
-        return f'{self.type} Division {self.historic}'
+        return f'{self.get_type_display()} Division {self.historic}'
 
     def get_short_name(self):
         '''Used in on All Fixtures page'''
-        return f'{self.type} {self.number}'
+        return f'{self.get_type_display()} {self.number}'
 
     def get_division_url(self):
         type_dict = {'Mixed':'X', 'Womens':'W', 'Mens':'M'}
@@ -236,7 +236,7 @@ class Team(models.Model):
     end_time = models.TimeField(default=None,blank=True,null=True)
 
     def __str__(self):
-        return f'{self.club.short_name} {self.type} {self.number}'
+        return f'{self.club.short_name} {self.get_type_display()} {self.number}'
 
     def get_short_name(self):
         return f'{self.club.short_name} {self.number}'

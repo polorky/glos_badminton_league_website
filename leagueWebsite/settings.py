@@ -9,7 +9,7 @@ SECRET_KEY = config('SECRET_KEY')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'gloubadleague.pythonanywhere.com']
+ALLOWED_HOSTS = ['127.0.0.1', '192.168.0.52','localhost', 'gloubadleague.pythonanywhere.com']
 
 # Application definition
 INSTALLED_APPS = [

@@ -139,7 +139,7 @@ def get_league_stats(season='current'):
                 current = float(stats['Biggest Average Game Winning Margin (Mixed)'].split('(')[1].replace(')',''))
                 if avemgn > current:
                     stats['Biggest Average Game Winning Margin (Mixed)'] = f'{team} ({avemgn})'
-        elif team_type == 'Ladies':
+        elif team_type == 'Womens':
             if not stats["Women's Team with most points per match"]:
                 stats["Women's Team with most points per match"] = f'{team} ({ppm})'
             else:

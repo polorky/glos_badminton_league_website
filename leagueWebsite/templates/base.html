@@ -52,6 +52,8 @@
 
     <link rel="stylesheet" href="{% static 'base.css' %}">
 
+    <link rel="icon" type="image/x-icon" href="{% static 'glos_flag_navbar.svg' %}">
+
     {% block extra_head %}{% endblock %}
 </head>
 
@@ -76,9 +78,9 @@
             <!-- Logo -->
             <a href="/" class="flex items-center gap-2.5 flex-shrink-0 group">
                 <img src="{% static 'glos_flag_navbar.svg' %}" alt="Glos flag" height="36" style="width:auto">
-                <span class="text-base leading-tight hidden sm:block">
+                <span class="text-base leading-tight sm:block">
                     Gloucestershire<br>
-                    <span class="text-base leading-tight hidden sm:block">Badminton League</span>
+                    <span class="text-base leading-tight sm:block">Badminton League</span>
                 </span>
             </a>
 
@@ -104,6 +106,7 @@
                     </button>
                     <div class="absolute right-0 top-full mt-1 w-44 bg-navy-900 rounded-lg shadow-xl py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                         <a href="/teams/home" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Teams</a>
+                        <a href="/stats" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Stats</a>
                         <a href="/juniors" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Juniors</a>
                         <a href="/archive/home" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Archive</a>
                         <div class="border-t border-navy-700 my-1"></div>
@@ -128,9 +131,9 @@
                 <a href="/divisions/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Divisions</a>
                 <a href="/fixtures/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Fixtures</a>
                 <a href="/clubs/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Clubs</a>
-                <a href="/teams/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Teams</a>
                 <a href="/venues/home" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Venues</a>
-                <a href="/clubadmin" class="py-2.5 border-b border-navy-800 text-navy-400 hover:text-gold transition-colors">Club Admin</a>
+                <a href="/clubadmin" class="py-2.5 border-b border-navy-800 hover:text-gold transition-colors">Club Admin</a>
+                <a href="/teams/home" class="py-2.5 border-b border-navy-800 text-navy-400 hover:text-gold transition-colors">Teams</a>
                 <a href="/archive/home" class="py-2.5 border-b border-navy-800 text-navy-400 hover:text-gold transition-colors">Archive</a>
                 <a href="/juniors" class="py-2.5 text-navy-400 hover:text-gold transition-colors">Juniors</a>
                 <a href="/login/" class="py-2.5 text-navy-400 hover:text-gold transition-colors">Login</a>

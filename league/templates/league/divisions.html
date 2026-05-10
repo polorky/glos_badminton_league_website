@@ -7,9 +7,6 @@
 {% if status == "home" %}
   <h1>Leagues and Divisions</h1>
   <br>
-  <!-- <div style="overflow:hidden;"> -->
-    <!-- <div style="width:33%;float:left;"><br></div> -->
-    <!-- <div style="width:34%;float:left;"> -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div class="table-wrap">
         <table id="table" style="float: left;">
@@ -36,8 +33,6 @@
         </table>
       </div>
     </div>
-    <!-- <div style="width:33%;float:left;"><br></div> -->
-  <!-- </div> -->
   <br>
   <h1>Historic Divisions</h1>
   <br>
@@ -76,136 +71,120 @@
 
 {% else %}
 
-    {% if exist %}
+  <h1>{{ division }} - {{ current_season.year }}</h1>
+  <br>
+  {% if not prev_season %}
+      <p><a href="/divisions/{{ division.get_division_url }}/{{ next_season.year }}">Next Season</a></p>
+  {% elif not next_season %}
+      <p><a href="/divisions/{{ division.get_division_url }}/{{ prev_season.year }}">Previous Season</a></p>
+  {% else %}
+      <p><a href="/divisions/{{ division.get_division_url }}/{{ prev_season.year }}">Previous Season</a> -
+      <a href="/divisions/{{ division.get_division_url }}/{{ next_season.year }}">Next Season</a></p>
+  {% endif %}
+  {% if not prev_div %}
+      <p><a href="/divisions/{{ next_div.0.get_division_url }}/{{ current_season.year }}">Next Division</a></p>
+  {% elif not next_div %}
+      <p><a href="/divisions/{{ prev_div.0.get_division_url }}/{{ current_season.year }}">Previous Division</a></p>
+  {% else %}
+      <p><a href="/divisions/{{ prev_div.0.get_division_url }}/{{ current_season.year }}">Previous Division</a> -
+      <a href="/divisions/{{ next_div.0.get_division_url }}/{{ current_season.year }}">Next Division</a></p>
+  {% endif %}
+  <br>
 
-        <h1>{{ division }} - {{ current_season.year }}</h1>
-        <br>
-        {% if not prev_season %}
-            <p><a href="/divisions/{{ division.get_division_url }}/{{ next_season.year }}">Next Season</a></p>
-        {% elif not next_season %}
-            <p><a href="/divisions/{{ division.get_division_url }}/{{ prev_season.year }}">Previous Season</a></p>
-        {% else %}
-            <p><a href="/divisions/{{ division.get_division_url }}/{{ prev_season.year }}">Previous Season</a> -
-            <a href="/divisions/{{ division.get_division_url }}/{{ next_season.year }}">Next Season</a></p>
-        {% endif %}
-        {% if not prev_div %}
-            <p><a href="/divisions/{{ next_div.0.get_division_url }}/{{ current_season.year }}">Next Division</a></p>
-        {% elif not next_div %}
-            <p><a href="/divisions/{{ prev_div.0.get_division_url }}/{{ current_season.year }}">Previous Division</a></p>
-        {% else %}
-            <p><a href="/divisions/{{ prev_div.0.get_division_url }}/{{ current_season.year }}">Previous Division</a> -
-            <a href="/divisions/{{ next_div.0.get_division_url }}/{{ current_season.year }}">Next Division</a></p>
-        {% endif %}
-        <br>
-        <h3>Division Table</h3>
-        <br>
-        <div class="table-wrap">
-          <table id="resultstable" class="resultstable">
+  {% if not exist %}
+
+    <p>This division did not exist in this season.</p>
+
+  {% else %}
+
+    <h3>Division Table</h3>
+    <br>
+    <div class="table-wrap">
+      <table id="resultstable" class="resultstable">
+      <tr>
+        <th>Team</th>
+        <th><abbr title="Played">P</abbr></th>
+        <th><abbr title="Won">W</abbr></th>
+        <th><abbr title="Drawn">D</abbr></th>
+        <th><abbr title="Lost">L</abbr></th>
+        <th><abbr title="Points For">PF*</abbr></th>
+        <th><abbr title="Points Against">PA</abbr></th>
+        <th><abbr title="Penalties">Pen*</abbr></th>
+      </tr>
+      {% for team_tuple in table %}
           <tr>
-            <th>Team</th>
-            <th><abbr title="Played">P</abbr></th>
-            <th><abbr title="Won">W</abbr></th>
-            <th><abbr title="Drawn">D</abbr></th>
-            <th><abbr title="Lost">L</abbr></th>
-            <th><abbr title="Points For">PF*</abbr></th>
-            <th><abbr title="Points Against">PA</abbr></th>
-            <th><abbr title="Penalties">Pen*</abbr></th>
+              <td><a href="{% url 'teams' team_tuple.1.Object.get_team_url %}">{{ team_tuple.0 }}</a></td>
+              <td>{{ team_tuple.1.Played }}</td>
+              <td>{{ team_tuple.1.Won }}</td>
+              <td>{{ team_tuple.1.Drawn }}</td>
+              <td>{{ team_tuple.1.Lost }}</td>
+              <td>{{ team_tuple.1.PFor }}</td>
+              <td>{{ team_tuple.1.PAgainst }}</td>
+              <td>{{ team_tuple.1.Penalties }}</td>
           </tr>
-          {% for team_tuple in table %}
-              <tr>
-                  <td><a href="{% url 'teams' team_tuple.1.Object.get_team_url %}">{{ team_tuple.0 }}</a></td>
-                  <td>{{ team_tuple.1.Played }}</td>
-                  <td>{{ team_tuple.1.Won }}</td>
-                  <td>{{ team_tuple.1.Drawn }}</td>
-                  <td>{{ team_tuple.1.Lost }}</td>
-                  <td>{{ team_tuple.1.PFor }}</td>
-                  <td>{{ team_tuple.1.PAgainst }}</td>
-                  <td>{{ team_tuple.1.Penalties }}</td>
-              </tr>
-          {% endfor %}
-          </table>
-        </div>
-        <p style="font-size:12px;">* "Points For" include the deduction of any penalty points incurred by the team, the penalties are also listed in a separate column for reference.</p>
-        {% if concessions %}
-        <p style="font-size:12px;"><b style="color:red;">NOTE: </b>This division has conceded matches. The conceding team(s) will have had penalties already applied. The team they
-        were due to play will receive the average number of points obtained by other teams against the conceding team in their home/away matches (depending whether the conceding
-        team was due to play home or away). The table shows the current average (which might be zero if no relevant matches have yet been played) but this will vary until all the
-        relevant fixtures have been completed.</p>
-        {% endif %}
-        <br>
-        <h3>Fixtures and Results</h3>
-        <br>
-        <form method="post">
-        {% csrf_token %}
-        <input class="button" type="submit" value="Download Fixtures">
-        </form>
-        <br>
-        <div class="table-wrap">
-          <table id="table" class="table">
-          <tr class="headings" style="cursor:pointer;">
-            <th onclick="sortTable(0)">Date ↕</th><th onclick="sortTable(1)">Day ↕</th><th>Start</th><th>End</th>
-            <th onclick="sortTable(4)">Home Team ↕</th><th colspan="2">Scores</th><th onclick="sortTable(7)">Away Team ↕</th>
-            <th onclick="sortTable(8)">Venue ↕</th><th onclick="sortTable(9)">Status ↕</th><th>View</th><th>Update</th></tr>
-          {% for fix in fixtures %}
-            {% if fix.0.status == "Postponed" %}
-              <tr class="postponed">
-            {% elif fix.0.status == "Proposed" %}
-              <tr class="proposed">
-            {% elif fix.0.status == "Rearranged" %}
-              <tr class="rearranged">
-            {% elif fix.0.status == "Played" %}
-              <tr class="played">
-            {% elif fix.0.status == "Conceded (H)" %}
-              <tr class="conceded">
-            {% elif fix.0.status == "Conceded (A)" %}
-              <tr class="conceded">
-            {% else %}
-              <tr class="unplayed">
-            {% endif %}
-                <td>{{ fix.0.date_time|date:'Y-m-d' }}</td>
-                <td>{{ fix.0.date_time|date:'D' }}</td>
-                <td>{{ fix.0.date_time|date:'H:i' }}</td>
-                <td>{{ fix.0.end_time|date:'H:i' }}</td>
-                <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team.get_short_name }}</a></td>
-                <td>{{ fix.0.home_points }}</td>
-                <td>{{ fix.0.away_points }}</td>
-                <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team.get_short_name }}</a></td>
-                <td><a href="/venues/{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td>
-                <td>{{ fix.0.get_status_display }}</td>
-                <td><a href="/fixtures/{{ fix.0.id }}/div">View</a></td>
-                {% if fix.1 %}
-                  <td><a href="/fixtures/update/{{ fix.0.id }}/options/div">Update</a></td>
-                {% else %}
-                  <td></td>
-                {% endif %}
-              </tr>
-          {% endfor %}
-          </table>
-        </div>
-        <br>
-
-    {% else %}
-
-        <h1>{{ division }} - {{ current_season.year }}</h1>
-        {% if not prev_season %}
-            <p><a href="/divisions/{{ division.get_division_url }}/{{ next_season.year }}">Next Season</a></p>
-        {% elif not next_season %}
-            <p><a href="/divisions/{{ division.get_division_url }}/{{ prev_season.year }}">Previous Season</a></p>
-        {% else %}
-            <p><a href="/divisions/{{ division.get_division_url }}/{{ prev_season.year }}">Previous Season</a> -
-            <a href="/divisions/{{ division.get_division_url }}/{{ next_season.year }}">Next Season</a></p>
-        {% endif %}
-        {% if not prev_div %}
-            <p><a href="/divisions/{{ next_div.0.get_division_url }}/{{ current_season.year }}">Next Division</a></p>
-        {% elif not next_div %}
-            <p><a href="/divisions/{{ prev_div.0.get_division_url }}/{{ current_season.year }}">Previous Division</a></p>
-        {% else %}
-            <p><a href="/divisions/{{ prev_div.0.get_division_url }}/{{ current_season.year }}">Previous Division</a> -
-            <a href="/divisions/{{ next_div.0.get_division_url }}/{{ current_season.year }}">Next Division</a></p>
-        {% endif %}
-        <p>This division did not exist in this season.</p>
-
+      {% endfor %}
+      </table>
+    </div>
+    <p style="font-size:12px;">* "Points For" include the deduction of any penalty points incurred by the team, the penalties are also listed in a separate column for reference.</p>
+    {% if concessions %}
+    <p style="font-size:12px;"><b style="color:red;">NOTE: </b>This division has conceded matches. The conceding team(s) will have had penalties already applied. The team they
+    were due to play will receive the average number of points obtained by other teams against the conceding team in their home/away matches (depending whether the conceding
+    team was due to play home or away). The table shows the current average (which might be zero if no relevant matches have yet been played) but this will vary until all the
+    relevant fixtures have been completed.</p>
     {% endif %}
+    <br>
+    <h3>Fixtures and Results</h3>
+    <br>
+    <form method="post">
+    {% csrf_token %}
+    <input class="button" type="submit" value="Download Fixtures">
+    </form>
+    <br>
+    <div class="table-wrap">
+      <table id="table" class="table">
+      <tr class="headings" style="cursor:pointer;">
+        <th onclick="sortTable(0)">Date ↕</th><th onclick="sortTable(1)">Day ↕</th><th>Start</th><th>End</th>
+        <th onclick="sortTable(4)">Home Team ↕</th><th colspan="2">Scores</th><th onclick="sortTable(7)">Away Team ↕</th>
+        <th onclick="sortTable(8)">Venue ↕</th><th onclick="sortTable(9)">Status ↕</th><th>View</th><th>Update</th></tr>
+      {% for fix in fixtures %}
+        {% if fix.0.status == "Postponed" %}
+          <tr class="postponed">
+        {% elif fix.0.status == "Proposed" %}
+          <tr class="proposed">
+        {% elif fix.0.status == "Rearranged" %}
+          <tr class="rearranged">
+        {% elif fix.0.status == "Played" %}
+          <tr class="played">
+        {% elif fix.0.status == "Conceded (H)" %}
+          <tr class="conceded">
+        {% elif fix.0.status == "Conceded (A)" %}
+          <tr class="conceded">
+        {% else %}
+          <tr class="unplayed">
+        {% endif %}
+            <td>{{ fix.0.date_time|date:'Y-m-d' }}</td>
+            <td>{{ fix.0.date_time|date:'D' }}</td>
+            <td>{{ fix.0.date_time|date:'H:i' }}</td>
+            <td>{{ fix.0.end_time|date:'H:i' }}</td>
+            <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team.get_short_name }}</a></td>
+            <td>{{ fix.0.home_points }}</td>
+            <td>{{ fix.0.away_points }}</td>
+            <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team.get_short_name }}</a></td>
+            <td><a href="/venues/{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td>
+            <td>{{ fix.0.get_status_display }}</td>
+            <td><a href="/fixtures/{{ fix.0.id }}/div">View</a></td>
+            {% if fix.1 %}
+              <td><a href="/fixtures/update/{{ fix.0.id }}/options/div">Update</a></td>
+            {% else %}
+              <td></td>
+            {% endif %}
+          </tr>
+      {% endfor %}
+      </table>
+    </div>
+    <br>
+
+  {% endif %}
 
 {% endif %}
 

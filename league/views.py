@@ -1221,6 +1221,7 @@ class StatsView(GenericViewMixin, TemplateView):
 
         context = super().get_context_data(**kwargs)
 
-        context.update({'stats': get_league_stats()})
+        context.update({'season':'2025-2026', 
+                        'stats': get_league_stats('2025-2026')})
 
         return context
