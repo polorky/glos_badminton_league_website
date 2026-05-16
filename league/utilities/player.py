@@ -302,7 +302,7 @@ def get_player_appearances(player):
     
     noms = player.get_noms_strings()
     team_dict["noms"] = {"mixed":noms[0],"level":noms[1]}
-
+    
     return team_dict
 
 def _count_appearances(fixtures, team_dict, player):
@@ -330,5 +330,5 @@ def _add_eligibility(team_dict, player):
                     team_dict["teams"][team_type][team_num] = "X"
                 else:
                     team_dict["teams"][team_type][team_num] = "X (" + str(count) + ")"
-
+    
     return team_dict

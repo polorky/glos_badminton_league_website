@@ -1,4 +1,5 @@
-# Team related functions
+from league.models import Season, Fixture, Performance
+
 def get_performances():
     '''
     Creates performance records for all teams 

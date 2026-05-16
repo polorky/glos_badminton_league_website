@@ -5,41 +5,67 @@
 {% block content %}
 
     <h1>Team Nominations</h1>
-
+    <br>
     {% if view == 'teamupdate' %}
+        <p>Below is the list of teams your club has confirmed for the upcoming season.</p>
+        <p>Please select the players you want to nominate for each team and click "Save Nominations" to update the nominations.</p>
+        <p>If any players are not present in the dropdown, please add them on the <a href="/clubadmin">Club Admin</a> page.</p>
+        <br>
+        <p><b>NOTE</b>: each button will ONLY save the nominations for the team whose section is it in.</p>
+        <br>
+        <p>You can return to this page at any time and adjust your nominations up until the end of September</p>
+        <br>
 
-      <p>Below is the list of teams your club has confirmed for the upcoming season.</p>
-      <p>Please select the players you want to nominate for each team and click "Save Nominations" to update the nominations.</p>
-      <p>If any players are not present in the dropdown, please add them on the <a href="/clubadmin">Club Admin</a> page.</p>
-      <p>NOTE: each button will ONLY save the nominations for the team whose section is it in.</p>
-      <p>You can return to this page at any time and adjust your nominations up until the closing date of TBC</p>
+        {% for team_list in forms %}
 
-      {% for team_list in forms %}
         <h3>{{ team_list.0 }}</h3>
-        <form action="{% url 'nominations' team_list.0.id %}" method="post">
-            {% csrf_token %}
-            
-            {% if team_list.0.type == 'Mixed' %}
-                <b>Women</b>
-                {{ team_list.1.management_form }}
-                {% for form in team_list.1 %}
-                    {{ form.as_p }}
-                {% endfor %}
-                
-                <b>Men</b>
-                {{ team_list.2.management_form }}
-                {% for form in team_list.2 %}
-                    {{ form.as_p }}
-                {% endfor %}
-            {% else %}
-                {{ team_list.1.management_form }}
-                {% for form in team_list.1 %}
-                    {{ form.as_p }}
-                {% endfor %}
+        <br>
+        <section id="team-{{ team_list.0.id }}">
+                <form action="{% url 'nom_change' 'teamupdate' team_list.0.id %}" method="post">
+                    {% csrf_token %}
+                    
+                    {% if team_list.0.type == 'Mixed' %}
+
+                        <b>Women</b>
+                        <br><br>
+                        {{ team_list.1.management_form }}
+                        {% for form in team_list.1 %}
+                            {{ form.as_p }}
+                        {% endfor %}
+                        {% for error in team_list.1.non_form_errors %}
+                            <p class="errorlist">ERROR: {{ error }}</p>
+                        {% endfor %}
+
+                        <b>Men</b>
+                        <br><br>
+                        {{ team_list.2.management_form }}
+                        {% for form in team_list.2 %}
+                            {{ form.as_p }}
+                        {% endfor %}
+                        {% for error in team_list.2.non_form_errors %}
+                            <p class="errorlist">ERROR: {{ error }}</p>
+                        {% endfor %}
+
+                    {% else %}
+
+                        {{ team_list.1.management_form }}
+                        {% for form in team_list.1 %}
+                            {{ form.as_p }}
+                        {% endfor %}
+                        {% for error in team_list.1.non_form_errors %}
+                            <p class="errorlist">ERROR: {{ error }}</p>
+                        {% endfor %}
+
+                    {% endif %}
+                    <button class="buttongreen" type="submit">Save {{ team_list.0 }} Nominations</button>
+                </form>
+            <br>
+            {% if request.GET.updated == "teamupdated" and id|add:"0" == team_list.0.id %}
+                <p style="color: green;">Nominations updated!</p>
             {% endif %}
-            <button class="buttongreen" type="submit">Save {{ team_list.0 }} Nominations</button>
-        </form>
-      {% endfor %}
+        </section>
+        <br>
+        {% endfor %}
     
     {% elif view == 'indiupdate' %}
 

@@ -79,6 +79,8 @@ class Club(models.Model):
     # Notifications of upcoming fixtures by email
     club_notifications = models.BooleanField(default=False)
     captain_notifications = models.BooleanField(default=False)
+    # Admin fields
+    teams_confirmed = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -106,11 +108,28 @@ class Club(models.Model):
             team_dict = {"Mixed":mixed, "Womens":womens, "Mens":mens}
 
         return team_dict
+    
+    def venues_confirmed(self):
+        all_teams = Team.objects.filter(club=self, active=True)
+        for team in all_teams:
+            if not team.home_venue or not team.start_time or not team.end_time:
+                return False
+        return True
 
     def requires_noms(self):
         '''Checks whether club needs to submit nominations'''
         teams = Team.objects.filter(club=self)
         return any([team.number > 1 for team in teams])
+    
+    def nominations_submitted(self):
+        all_teams = Team.objects.filter(club=self, active=True)
+        for team in all_teams:
+            if not team.last_team():
+                expected_count = 6 if team.type == 'Mixed' else 4
+                tm = TeamNomination.objects.filter(team=team)
+                if tm.count() < expected_count:
+                    return False
+        return True
 
 class Venue(models.Model):
     name = models.CharField(max_length=50)
@@ -193,6 +212,10 @@ class Player(models.Model):
         return self.get_higher_plays(team).count() <= constants.MAX_PLAYS_FOR_HIGHER_TEAMS
 
     def get_higher_plays(self, team):
+        
+        current_season = Season.objects.get(current=True)
+        season_q = Q(season=current_season)
+
         home_player_q = (
             Q(home_player1=self) | Q(home_player2=self) |
             Q(home_player3=self) | Q(home_player4=self) |
@@ -205,8 +228,8 @@ class Player(models.Model):
         )
 
         return Fixture.objects.filter(
-            Q(home_player_q & Q(home_team__number__lt=team.number) & Q(division__type=team.type)) |
-            Q(away_player_q & Q(away_team__number__lt=team.number) & Q(division__type=team.type))
+            Q(season_q & home_player_q & Q(home_team__number__lt=team.number) & Q(division__type=team.type)) |
+            Q(season_q & away_player_q & Q(away_team__number__lt=team.number) & Q(division__type=team.type))
         )
 
     def deletable(self):
@@ -275,27 +298,37 @@ class Team(models.Model):
 
     def check_nominations(self):
 
+        # Get all nominations for this team
         noms = TeamNomination.objects.filter(team=self, approved=True)
+        # Set up counter dictionary
         players_nom = {tm.player: {'pos':tm.position, 'count':0} for tm in noms}
+        # Get team fixtures
         fixtures = self.get_fixtures()
+        # Get team fixtures that have been played
         played = self.get_fixtures('Played')
 
+        # Iterate through fixtures
         for fixture in fixtures:
+            # Check whether home or away
             team_str = 'home' if fixture.home_team == self else 'away'
             counter = 7 if self.type == 'Mixed' else 5
+            # Check whether player played
             for i in range(1,counter):
                 player = getattr(fixture, f'{team_str}_player{i}')
+                # If so add one to the count
                 if player in players_nom:
                     players_nom[player]['count'] += 1
 
+        
         all_pos = {x['pos'] for x in players_nom.values()}
         position_dict = {pos:0 for pos in all_pos}
         for values in players_nom.values():
-            position_dict[values['pos']] += position_dict[values['count']]
+            position_dict[values['pos']] += values['count']
 
         final_str = f'{len(fixtures)} - {len(played)}'
-        for pos, count in position_dict.items():
-            final_str += f'{pos} - {round(count/len(fixtures)*100,1)}% ({count})'
+        if fixtures:
+            for pos, count in position_dict.items():
+                final_str += f'{pos} - {round(count/len(fixtures)*100,1)}% ({count})'
 
         return final_str
 

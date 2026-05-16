@@ -579,6 +579,8 @@ class TeamsView(GenericViewMixin, TemplateView):
                 self.update_club_teams(context['club'], 'Mixed', form.cleaned_data['mixed_teams'])
                 self.update_club_teams(context['club'], 'Womens', form.cleaned_data['womens_teams'])
                 self.update_club_teams(context['club'], 'Mens', form.cleaned_data['mens_teams'])              
+                context['club'].teams_confirmed = True
+                context['club'].save()
                 
                 return redirect(f"{self.request.path}?updated=true")
             
@@ -731,7 +733,7 @@ class PlayerView(GenericViewMixin, TemplateView):
             'teams': get_clubs_teams(player.club),
             'test': player_id,
             })
-
+        
         return context
 
 class ArchivesView(GenericViewMixin, TemplateView):
@@ -826,6 +828,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
 
         club = context['admin'].club
         penalties = Penalty.objects.filter(team__club=club).filter(season=Season.objects.get(current=True))
+        team_dict = get_clubs_teams(club)
 
         context.update({
             'status': 'admin',
@@ -836,8 +839,10 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             'players': Player.objects.filter(club=club).order_by("level","name"),
             'playerform': PlayerForm(),
             'playerstats': build_roster(club),
-            'teams': get_clubs_teams(club),
-            'penalties': penalties})
+            'teams': team_dict,
+            'penalties': penalties,
+            'entry_fee': constants.TEAM_ENTRY_FEE,
+            'total_fee': constants.TEAM_ENTRY_FEE * team_dict['Lengths']['All']})
 
         return context
 
@@ -1046,165 +1051,206 @@ class NominationsView(GenericViewMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
 
-        def get_form_list(data, club, club_teams):
-
-            women = Player.objects.filter(club=club).filter(level="Womens").order_by("name")
-            men = Player.objects.filter(club=club).filter(level="Mens").order_by("name")
-
-            form_list = []
-
-            for team in club_teams:
-
-                if team.last_team():
-                    continue
-
-                existing_noms = TeamNomination.objects.filter(
-                    team=team,
-                    date_to=None  # currently active nominations
-                ).order_by('position')
-
-                if team.type == 'Mixed':
-                    women_existing = existing_noms.filter(player__level='Womens')
-                    men_existing = existing_noms.filter(player__level='Mens')
-                    women_extra = 3 - women_existing.count()
-                    men_extra = 3 - men_existing.count()
-
-                    WomensFormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=women_extra)
-                    MensFormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=men_extra)
-
-                    womens_formset = WomensFormSet(
-                        data,
-                        queryset=women_existing,
-                        form_kwargs={'players': women},
-                        prefix=f'women_{team.id}'
-                    )
-                    mens_formset = MensFormSet(
-                        data,
-                        queryset=men_existing,
-                        form_kwargs={'players': men},
-                        prefix=f'men_{team.id}'
-                    )
-
-                    form_list.append((team,womens_formset,mens_formset))
-
-                else:
-                    players = women if team.type == 'Womens' else men
-                    extra = 4 - existing_noms.count()
-
-                    FormSet = modelformset_factory(TeamNomination, form=NominationForm, extra=extra)
-
-                    formset = FormSet(
-                        data,
-                        queryset=existing_noms,
-                        form_kwargs={'players': players},
-                        prefix=f'team_{team.id}'
-                    )
-
-                    form_list.append((team,formset))
-            
-            return form_list
-
         context = super().get_context_data(**kwargs)
         pagename = context.get('pagename','')
 
         # If 'update' page requested and nomination window open, return team forms
-        if pagename == 'update' and context['settings'].nomination_window_open:
-
-            data = self.request.POST or None
-            club = context['admin'].club
-            club_teams = Team.objects.filter(active=True).filter(club=club).order_by("type", "number")
-
-            form_list = get_form_list(data, club, club_teams)
-
-            # Set up context
-            context.update({
-                'teams': club_teams,
-                'forms': form_list,
-                'view': 'teamupdate',
-            })
-
-        # If 'update' page requested but nomination window closed, return 'unavailable'
-        elif pagename == 'update':
-
-            context.update({'view':'unavailable'})
+        if pagename == 'teamupdate':
+            if context['settings'].nomination_window_open:
+                context.update(self._teamupdate_context(context, data=None))
+            # If 'update' page requested but nomination window closed, return 'unavailable'
+            else:
+                context.update({'view':'unavailable'})
 
         # If admin view requested return current and requested nominations and player stats
         elif pagename == 'admin':
-            nom = TeamNomination.objects.get(id=kwargs['type'])
-            current_nom = TeamNomination.objects.get(team=nom.team, position=nom.position, date_to=None, approved=True)
-
-            context.update({'view': 'admin',
-                            'nom': nom,
-                            'current_nom': current_nom,
-                            'new_player_stats': get_player_appearances(nom.player),
-                            'cur_player_stats': get_player_appearances(nom.player)})
+            context.update(self._admin_context(kwargs))
 
         # Otherwise return specific individual nomination form
-        else:
-
-            nom_player = Player.objects.get(id=pagename)
-            team_type = 'Mixed' if context['type'] == 'mixed' else nom_player.level
-            nom = TeamNomination.objects.get(player=nom_player, date_to=None, approved=True, team__type=team_type)
-            replacement_options = nom.get_possible_replacements()
-            form = NominationForm(None, players=replacement_options, variant='change')
-
-            context.update({'view':'indiupdate', 'playerselectform':form, 'current_nom':nom})
+        elif pagename == 'indiupdate':
+            context.update(self._indiupdate_context(context))
 
         return context
 
+    def _teamupdate_context(self, context, data):
+        """Build context for the team nomination update page."""
+        club = context['admin'].club
+        club_teams = Team.objects.filter(active=True, club=club).order_by('type', 'number')
+        form_list = self._build_form_list(data, club, club_teams)
+        return {
+            'view': 'teamupdate',
+            'teams': club_teams,
+            'forms': form_list,
+        }
+
+    def _build_form_list(self, data, club, club_teams):
+
+        women = Player.objects.filter(club=club).filter(level="Womens").order_by("name")
+        men = Player.objects.filter(club=club).filter(level="Mens").order_by("name")
+        form_list = []
+
+        for team in club_teams:
+
+            if team.last_team():
+                continue
+
+            existing_noms = (TeamNomination.objects
+                             .filter(team=team, date_to=None)
+                             .order_by('position'))
+
+            if team.type == 'Mixed':
+                form_list.append(self._mixed_formsets(data, team, existing_noms, women, men))
+            else:
+                form_list.append(self._single_formset(data, team, existing_noms, women, men))
+        
+        return form_list
+
+    def _mixed_formsets(self, data, team, existing_noms, women, men):
+        # Get existing noms
+        women_existing = existing_noms.filter(player__level='Womens')
+        men_existing   = existing_noms.filter(player__level='Mens')
+
+        # Build formsets - 'extra' adds blank forms where there are no current noms
+        WomensFormSet = modelformset_factory(
+            TeamNomination, form=NominationForm, formset=BaseNominationFormSet, extra=3 - women_existing.count()
+        )
+        MensFormSet = modelformset_factory(
+            TeamNomination, form=NominationForm, formset=BaseNominationFormSet, extra=3 - men_existing.count()
+        )
+
+        # Return formsets with data, existing noms, player lists and prefix
+        return (
+            team,
+            WomensFormSet(data, queryset=women_existing,
+                          form_kwargs={'players':women, 'team':team}, prefix=f'women_{team.id}'),
+            MensFormSet(data, queryset=men_existing,
+                        form_kwargs={'players':men, 'team':team},   prefix=f'men_{team.id}'),
+        )
+
+    def _single_formset(self, data, team, existing_noms, women, men):
+        # Get list of players to select from
+        players = women if team.type == 'Womens' else men
+
+        # Build formsets - 'extra' adds blank forms where there are no current noms
+        FormSet = modelformset_factory(
+            TeamNomination, form=NominationForm, formset=BaseNominationFormSet, extra=4 - existing_noms.count()
+        )
+
+        # Return formsets with data, existing noms, player lists and prefix
+        return (
+            team,
+            FormSet(data, queryset=existing_noms,
+                    form_kwargs={'players': players}, prefix=f'team_{team.id}'),
+        )
+
+    def _admin_context(self, kwargs):
+        """Build context for the admin approval page."""
+        nom = TeamNomination.objects.get(id=kwargs['type'])
+        current_nom = TeamNomination.objects.get(
+            team=nom.team, position=nom.position, date_to=None, approved=True
+        )
+        return {
+            'view': 'admin',
+            'nom': nom,
+            'current_nom': current_nom,
+            'new_player_stats': get_player_appearances(nom.player),
+            'cur_player_stats': get_player_appearances(current_nom.player),
+        }
+
+    def _indiupdate_context(self, context):
+        """Build context for the individual nomination update page."""
+        nom_player = Player.objects.get(id=context['id'][:-1])
+        team_type = 'Mixed' if context['id'][-1] == 'M' else nom_player.level
+        nom = TeamNomination.objects.get(
+            player=nom_player, date_to=None, approved=True, team__type=team_type
+        )
+        form = NominationForm(None, players=nom.get_possible_replacements(), variant='change')
+        return {
+            'view': 'indiupdate',
+            'playerselectform': form,
+            'current_nom': nom,
+        }
 
     def post(self, request, **kwargs):
-        context = self.get_context_data(**kwargs)
 
-        if context['view'] == 'teamupdate':
+        context = super().get_context_data(**kwargs)
+        
+        pagename = context.get('pagename', '')
 
-            # Check which team was submitted
-            team = Team.objects.get(id=self.kwargs['pagename'])
-            current = next(form_list for form_list in context['forms'] if form_list[0] == team)
-
-            # Rebind the relevant formsets with POST data
-            if team.type == 'Mixed':
-                womens_formset = current[1]
-                mens_formset = current[2]
-
-                if womens_formset.is_valid() and mens_formset.is_valid():
-                    self.save_nominations(womens_formset, team, range(1, 4))
-                    self.save_nominations(mens_formset, team, range(4, 7))
-                    return redirect(request.path)
-            else:
-                formset = current[1]
-
-                if formset.is_valid():
-                    self.save_nominations(formset, team, range(1, 5))
-                    return redirect(request.path)
-
-            return redirect('nominations_success')
-
+        if pagename == 'teamupdate':
+            return self._handle_teamupdate_post(request, context)
         elif context['view'] == 'admin_approved':
-
-            context['cur_nom'].approved = True
-            context['cur_nom'].save()
-            email_notification('nomination_approved', None, {'nom':context['cur_num']})
-
+            return self._handle_admin_approved(context)
         elif context['view'] == 'admin_rejected':
-
-            context['cur_nom'].delete()
-
+            return self._handle_admin_rejected(context)
         else:
+            return self._handle_indiupdate_post(request, context)
 
-            player_in = Player.objects.get(id=request.POST.get('player'))
+    def _handle_teamupdate_post(self, request, context):
 
-            TeamNomination.objects.create(
-                team=context['current_nom'].team,
-                player=player_in,
-                position=context['current_nom'].position,
-                date_from=date.today(),
-                notes=request.POST.get('notes')
-            )
+        # Get team submitted
+        team = Team.objects.get(id=self.kwargs['id'])
+        # Get club and club teams
+        club = context['admin'].club
+        club_teams = (Team.objects
+                      .filter(active=True, club=club)
+                      .order_by('type', 'number'))
 
-            return redirect('nomination_change_success')
+        # Get existing noms
+        existing_noms = (TeamNomination.objects
+                            .filter(team=team, date_to=None)
+                            .order_by('position'))
 
-    def save_nominations(self, formset, team, positions):
+        # Get male and female players for club
+        women = Player.objects.filter(club=club, level='Womens').order_by('name')
+        men   = Player.objects.filter(club=club, level='Mens').order_by('name')
+
+        if team.type == 'Mixed':
+            current = self._mixed_formsets(request.POST, team, existing_noms, women, men)
+            womens_formset, mens_formset = current[1], current[2]
+            if womens_formset.is_valid() and mens_formset.is_valid():
+                self._save_nominations(womens_formset, team, range(1, 4))
+                self._save_nominations(mens_formset, team, range(4, 7))
+                return redirect(f'/nominations/teamupdate/{team.id}/?updated=teamupdated#team-{team.id}')
+        else:
+            current = self._single_formset(request.POST, team, existing_noms, women, men)
+            formset = current[1]
+            if formset.is_valid():
+                self._save_nominations(formset, team, range(1, 5))
+                return redirect(f'/nominations/teamupdate/{team.id}/?updated=teamupdated#team-{team.id}')
+
+        # Validation failed — rebuild full form list for re-render,
+        # with only this team's formsets bound
+        form_list = self._build_form_list(None, club, club_teams)
+        current_index = next(i for i, e in enumerate(form_list) if e[0] == team)
+        form_list[current_index] = current  # swap in the bound (invalid) formset
+        
+        context.update({'view': 'teamupdate', 'teams': club_teams, 'forms': form_list, 'scroll_to':f'#team-{team.id}'})
+        
+        return self.render_to_response(context)
+
+    def _handle_admin_approved(self, context):
+        context['current_nom'].approved = True
+        context['current_nom'].save()
+        email_notification('nomination_approved', None, {'nom': context['current_nom']})
+        return redirect('nominations')
+
+    def _handle_admin_rejected(self, context):
+        context['current_nom'].delete()
+        return redirect('nominations')
+
+    def _handle_indiupdate_post(self, request, context):
+        player_in = Player.objects.get(id=request.POST.get('player'))
+        TeamNomination.objects.create(
+            team=context['current_nom'].team,
+            player=player_in,
+            position=context['current_nom'].position,
+            date_from=date.today(),
+            notes=request.POST.get('notes'),
+        )
+        return redirect('nomination_change_success')
+
+    def _save_nominations(self, formset, team, positions):
         for position, form in zip(positions, formset):
             if form.cleaned_data.get('player'):
                 nomination = form.save(commit=False)

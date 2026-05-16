@@ -1,6 +1,7 @@
 # League defined parameters
 MIXED_PLAYERS = 6
 LEVEL_PLAYERS = 4
+TEAM_ENTRY_FEE = 5 # in pounds
 
 # Scoring formats
 SCORING_MIXED = 'point per game' # Current scoring format for mixed league (used as default for new seasons)

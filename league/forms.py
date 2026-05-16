@@ -4,7 +4,7 @@ from .models import Fixture, Club, ClubNight, Player, Venue, Team, TeamNominatio
 from django.core.exceptions import ValidationError
 import league.constants as constants
 from .utilities.player import find_away_players
-
+from django.forms import BaseModelFormSet
 
 class ClubForm(ModelForm):
 
@@ -71,15 +71,50 @@ class NominationForm(ModelForm):
         model = TeamNomination
         fields = ['player','notes']
 
-    def __init__(self, *args, players=None, variant='Team', **kwargs):
+    def __init__(self, *args, players=None, variant='Team', team=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set the options for player field to those inputted
         self.fields['player'].queryset = players
+        # Get team from kwargs or from instance if already existing
+        self.team = team or (self.instance.team if self.instance.pk else None)
+        # If nominating entire team in pre-season, don't need notes
         if variant == 'Team':
             del self.fields['notes']
+
+    def clean_player(self):
+        player = self.cleaned_data['player']
+        # If another TN object for this player and team type exists, raise error
+        if (TeamNomination.objects
+            .filter(player=player,
+                   team__type=self.team.type, 
+                   date_to=None,
+                   approved=True)
+            .exclude(team=self.team)
+            .exists()):
+            raise forms.ValidationError(f'{player.name} is already nominated for another team')
+        return player
+
+class BaseNominationFormSet(BaseModelFormSet):
+
+    def clean(self):
+        super().clean()
+        players_seen = []
+        for form in self.forms:
+            # Skip forms that failed their own validation or are empty
+            if not form.cleaned_data or form.cleaned_data.get('DELETE'):
+                continue
+            player = form.cleaned_data.get('player')
+            if player:
+                if player in players_seen:
+                    raise forms.ValidationError(
+                        f'{player.name} has been selected more than once in this formset.'
+                    )
+                players_seen.append(player)
 
 NominationFormSet = modelformset_factory(
     TeamNomination,
     form=NominationForm,
+    formset=BaseNominationFormSet,
     extra=0,
 )            
 

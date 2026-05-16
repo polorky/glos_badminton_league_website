@@ -227,9 +227,9 @@ main textarea {
     min-height: 100px;
 }
 
-.errorlist {
+main .errorlist {
     color: #dc2626;
-    font-size: 0.75rem;
+    font-size: 1rem;
     margin-top: 0.25rem;
     list-style: none;
     padding: 0;
@@ -284,20 +284,6 @@ main a:hover {
 .nav-link:hover::after,
 .nav-link.active::after { width: 100%; }
 
-/* ── Status badges ── */
-.badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    white-space: nowrap;
-}
-.badge-played    { background: #dcfce7; color: #166534; }
-.badge-scheduled { background: #dbeafe; color: #1e40af; }
-.badge-postponed { background: #fef9c3; color: #854d0e; }
-.badge-void      { background: #fee2e2; color: #991b1b; }
-
 /* ── Page header ── */
 .page-header {
     background: linear-gradient(135deg, #1e3390 0%, #253daa 100%);
@@ -313,3 +299,130 @@ main a:hover {
     gap: 4px;
 }
 .table-wrap th a:hover { text-decoration: none; opacity: 0.85; }
+
+/* ── Club Admin formatting ── */
+.tab-bar {
+    display: flex;
+    gap: 4px;
+    border-bottom: 2px solid #1e3390;
+    margin-bottom: 1rem;
+}
+
+.tab-btn {
+    background: #f0f0f0;
+    border: 1px solid #1e3390;
+    border-bottom: none;
+    padding: 8px 16px;
+    cursor: pointer;
+    font: inherit;
+    border-radius: 4px 4px 0 0;
+    display: flex; 
+    align-items: center; 
+    gap: 6px;
+}
+
+.tab-btn.active {
+    background: white;
+    border-bottom: 2px solid white;
+    margin-bottom: -2px;
+    font-weight: bold;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+details {
+    border: 1px solid #1e3390;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    overflow: hidden;
+}
+
+details summary {
+    cursor: pointer;
+    list-style: none;
+    padding: 12px 16px;
+    background: var(--color-background-secondary);
+    font-weight: 500;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+}
+
+details summary::-webkit-details-marker {
+    display: none;
+}
+
+details summary::after {
+    content: '+';
+    font-size: 18px;
+    color: var(--color-text-secondary);
+}
+
+details[open] summary::after {
+    content: '−';
+}
+
+details[open] summary {
+    border-bottom: 1px solid #1e3390;
+}
+
+details .detail-body {
+    padding: 16px;
+}
+
+main .banner {
+    border-radius: 6px;
+    padding: 10px 16px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+main .banner-warning {
+    background: #fff3cd;
+    border: 0.5px solid #ffc107;
+    color: #854f0b;
+}
+
+main .banner-warning a {
+    color: #854f0b;
+    font-weight: 500;
+}
+
+main .banner-success {
+    background: #eaf3de;
+    border: 0.5px solid #639922;
+    color: #3b6d11;
+}
+
+main .banner-success a {
+    color: #3b6d11;
+    font-weight: 500;
+}
+
+.badge {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.badge-done {
+    background: #eaf3de;
+    color: #3b6d11;
+}
+
+.badge-pending {
+    background: #faeeda;
+    color: #854f0b;
+}
