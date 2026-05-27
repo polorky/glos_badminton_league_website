@@ -11,7 +11,6 @@ h2 { font-size: 1.25rem !important; }
 h3 { font-size: 1.1rem !important; }
 
 h1, h2, h3 {
-    font-family: 'DM Serif Display', Georgia, serif !important;
     color: #1e3390 !important;
 }
 
@@ -182,7 +181,7 @@ main input[type="number"],
 main input[type="date"],
 main select,
 main textarea {
-    width: 100%;
+    width: 100% !important;
     border: 1px solid #1e3390;
     border-radius: 0.5rem;
     padding: 0.45rem 0.875rem;

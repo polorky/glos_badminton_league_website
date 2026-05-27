@@ -82,9 +82,16 @@
         <button class="button" type="submit">Submit</button>
       </form>
 
+    {% elif view == 'indiunavailable' %}
+
+        <p>The nomination window is still open so individual nomination changes are not available.</p>
+        <br>
+        <p>If you want to change your team nominations, please <a href="/nominations/teamupdate">click here</a>.</p>  
+
     {% else %}
 
-        <p>Nominations are not currently available.</p>  
+        <p>The nomination window is now closed. If you wish to change a nomination, please click on the relevant 
+            link on your club's player roster under the Club Admin page.</p>  
 
     {% endif %}
 

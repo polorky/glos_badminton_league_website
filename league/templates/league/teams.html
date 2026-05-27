@@ -41,9 +41,9 @@
 
 {% elif status == "select" %}
 
-  <h1>Team Selection Page</h1>
+  <h1>Team Entry Page</h1>
   <br>
-  <p>Please enter the number of each team type you wish to enter in the upcoming season</p>
+  <p>Please provide the number of each team type you wish to enter in the upcoming season</p>
   <br>
   <form action="/teams/select{{ club.get_club_url }}" method="post">
     {% csrf_token %}
@@ -65,7 +65,7 @@
 
   <h1>Venue Selection Page</h1>
   <br>
-  <p>Please select the normal venue, start and end times for each team:</p>
+  <p>Please select the normal venue, start and end times for each team (you can create new venues via the Club Admin page):</p>
   <p><b style="color:red;">ALL TIMES IN 24 HOUR TIME PLEASE! (e.g. 8pm = 20:00)</b></p>
   <br>
   <form action="/teams/venue{{ club.get_club_url }}" method="post">

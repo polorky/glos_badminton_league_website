@@ -151,17 +151,6 @@
         <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
     {% endif %}
 
-{% elif pageview == "unupdateable" %}
-
-    <br>
-    <p>Sorry, you are unable to update that fixture, probably because the result has already been submitted or because it is not a home match for your club.</p>
-    <br>
-    {% if source == "fix" %}
-        <a href="/fixtures/home">Back to all fixtures</a>
-    {% else %}
-        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
-    {% endif %}
-
 {% endif %}
 
 {% endblock content %}

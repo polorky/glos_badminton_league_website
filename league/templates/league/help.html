@@ -5,17 +5,20 @@
 {% block content %}
 
 <h1>Help Page</h1>
-
-<p>If you have any difficulties navigating the wesbite, please see the sections below which will hopefully help you out. If you are still having issues or come across any bugs or
-would like to suggest improvements or for anything else related to the website, please email GlosBadWebsite@gmail.com</p>
-
+<br>
+<p>If you have any difficulties navigating the wesbite, please see the sections below which will hopefully 
+    help you out. If you are still having issues or come across any bugs or would like to suggest improvements 
+    or for anything else related to the website, please email GlosBadWebsite@gmail.com</p>
+<br>
 <h2>User Permissions</h2>
-<p>Most information on the website is available to anyone. The main exception to this is contact details which are mostly available only to users that are logged in to the
-website (although clubs have the option of entering public contact details for people wanting to join the club). There are then two levels of website users for each club. The
-first is Member level which can make changes to fixtures and view private contact details, the second is Admin level which has full control over the club. This is summarised
-in the table below:</p>
-
-<table id="table" class="table">
+<p>Most information on the website is available to anyone. The main exception to this is contact details which 
+    are mostly available only to users that are logged in to the website (although clubs have the option of 
+    entering public contact details for people wanting to join the club). There are then two levels of website 
+    users for each club. The first is Member level which can make changes to fixtures and view private contact 
+    details, the second is Admin level which has full control over the club. This is summarised in the table 
+    below:</p>
+<br>
+<div class="table-wrap"><table>
     <tr><th>Action</th><th>Not Logged In</th><th>Member</th><th>Admin</th></tr>
     <tr><td>Rearrange fixtures</td><td>NO</td><td>YES</td><td>YES</td></tr>
     <tr><td>Submit results</td><td>NO</td><td>YES</td><td>YES</td></tr>
@@ -29,61 +32,86 @@ in the table below:</p>
     <tr><td>Add players</td><td>NO</td><td>NO</td><td>YES</td></tr>
     <tr><td>Add club nights</td><td>NO</td><td>NO</td><td>YES</td></tr>
     <tr><td>Submit nominations</td><td>NO</td><td>NO</td><td>YES</td></tr>
-    <tr><td>Change passwords</td><td>NO</td><td>NO</td><td>YES</td></tr>
+    <tr><td>Change password</td><td>NO</td><td>NO</td><td>YES</td></tr>
 </table>
-
+</div>
+<br>
 <h2>Fixtures</h2>
-<p>The main aim of the website is to manage league fixtures in a more automated way, allowing the postponing and rescheduling of matches online as well as an automatically updated
-league table upon submission of results. Therefore, fixtures can be in a number of different statuses:</p>
-<ul>
-    <li><b>Unplayed</b> - this is the default status so the match remains unchanged from the original fixture list and no result has been submitted.</li>
-    <li><b>Postponed</b> - simply means the match has been postponed and a new date has yet to be agreed by the teams involved.</li>
-    <li><b>New Date Proposed</b> - the home team have proposed a new date for a postponed match but the away team have not yet confirmed this date. Hopefully, you shouldn't see
-    this status much because the teams should have talked to eachother throughout and the noting of the new date on the website should just be a formality.</li>
+<p>The main aim of the website is to manage league fixtures in a more automated way, allowing the postponing 
+    and rescheduling of matches online as well as an automatically updated league table upon submission of 
+    results. Therefore, fixtures can be in a number of different statuses:</p>
+<br>
+<p><ul style="list-style-type:disc;padding-left: 1.5rem;">
+    <li><b>Unplayed</b> - this is the default status so the match remains unchanged from the original fixture 
+        list and no result has been submitted.</li>
+    <li><b>Postponed</b> - simply means the match has been postponed and a new date has yet to be agreed by the 
+        teams involved.</li>
+    <li><b>New Date Proposed</b> - the home team have proposed a new date for a postponed match but the away 
+        team have not yet confirmed this date. Hopefully, you shouldn't see this status much because the teams 
+        should have talked to eachother throughout and the noting of the new date on the website should just be 
+        a formality.</li>
     <li><b>Rearranged</b> - match has been rearranged to a new date and/or venue but has not yet been played.</li>
-    <li><b>Played</b> - match result has been submitted (same status whether the match was played on the original date or rearranged).</li>
-    <li><b>Conceded (H)</b> - match has been conceded by the home team - points will be allocated at the end of the season.</li>
-    <li><b>Conceded (A)</b> - match has been conceded by the away team - points will be allocated at the end of the season.</li>
-</ul>
-
-<p>From fixture lists, you can view and fixture by clicking the "View" link under the View column. For matches not yet played, this will have little additional information
-but once the match has been played, you will be able to see the game breakdown of the match. For some fixtures, you will also see an "Update" link under the Update column,
-see below for more details.</p>
-
-<p>The fixture tables can be ordered by clicking on the relevant column heading. Under the main <a href="/fixtures/home">Fixtures page</a> you can also filter the fixtures
-by team using the search box at the top. There is also a button to "Download Fixtures" above the table although note that this will just download all fixtures and ignore
-any filtering you currently have on the table.</p>
-
+    <li><b>Played</b> - match result has been submitted (same status whether the match was played on the 
+        original date or rearranged).</li>
+    <li><b>Conceded (H)</b> - match has been conceded by the home team - points will be allocated at the end 
+        of the season.</li>
+    <li><b>Conceded (A)</b> - match has been conceded by the away team - points will be allocated at the end 
+        of the season.</li>
+</ul></p>
+<br>
+<p>From fixture lists, you can view a fixture by clicking the "View" link under the View column. For matches not 
+    yet played, this will have little additional information but once the match has been played, you will be able 
+    to see the game breakdown of the match. For some fixtures, you will also see an "Update" link under the Update 
+    column, see below for more details.</p>
+<br>
+<p>The fixture tables can be ordered by clicking on the relevant column heading. Under the main 
+    <a href="/fixtures/home">Fixtures page</a> you can also filter the fixtures by team using the search box at 
+    the top. There is also a button to "Download Fixtures" above the table although note that this will just 
+    download all fixtures and ignore any filtering you currently have on the table.</p>
+<br>
 <h2>Updating Fixtures</h2>
-<p>To change the status of a fixture, you will need to navigate either to your team's division from the <a href="/divisions/home">Divisions page</a> or to the main
-<a href="/fixtures/home">Fixtures page</a>. Find the fixture you wish to update and click on the relevant "Update" link under the Update column.</p>
-<p>You will see that you are only able to update certain fixtures. These will mostly be the home matches for your club's teams since the home team is responsible for
-submitting the result and rearranging matches. However, if the home team in one of your away matches has proposed a new date/venue for a match then you will also be able
-to update those fixtures to either accept or reject the new date.</p>
-
+<p>To change the status of a fixture, you will need to navigate either to your team's division from the 
+    <a href="/divisions/home">Divisions page</a> or to the main <a href="/fixtures/home">Fixtures page</a>. 
+    Find the fixture you wish to update and click on the relevant "Update" link under the Update column.</p>
+<br>
+<p>You will see that you are only able to update certain fixtures. These will mostly be the home matches for 
+    your club's teams since the home team is responsible for submitting the result and rearranging matches. 
+    However, if the home team in one of your away matches has proposed a new date or venue for a match then you 
+    will also be able to update those fixtures to either accept or reject the new details.</p>
+<br>
 <h3>Rearranging Matches</h3>
-
-<p><b>Please ensure you contact the other club BEFORE postponing or rearranging a fixture on this site. Club contacts can be found under the relevant club's page on the
-<a href="/clubs/home">Clubs section</a>, some teams may also have entered contact details for their captain and these can be viewed under the relevant team's page on the
-<a href="/teams/home">Teams section</a>. Note that you will need to be logged in to see these details.</b></p>
-
+<p><b>Please ensure you contact the other club BEFORE postponing or rearranging a fixture on this site. Club 
+    contacts can be found under the relevant club's page on the<a href="/clubs/home">Clubs section</a>, some 
+    teams may also have entered contact details for their captain and these can be viewed under the relevant 
+    team's page on the<a href="/teams/home">Teams section</a>. Note that you will need to be logged in to see 
+    these details.</b></p>
+<br>
 <p>After clicking the "Update" link next to the relevant fixture, you have several options available to you.</p>
-
-<p>If you have agreed with the away team to <b>postpone</b> a match, simply click the "Postpone Match" button in the "Postpone Match" section of the page.</p>
-
-<p>If you have already agreed a <b>new date and/or venue</b> with the away team, you can enter these under the "Rearrange Match" section and then click "Reschedule Match". Note
-that the away team will then be sent an email asking them to confirm the new date/venue. If they accept it then the match status will be set to "Rearranged" but if they
-reject the details then it will return to "Postponed" status.</p>
-
-<p>Matches can be rearranged as much as required though obviously please keep communicating directly with the other club involved so that the email updates the wesbite sends
-out are not a surprise.</p>
-
+<br>
+<p>If you have agreed with the away team to <b>postpone</b> a match, simply select "Postpone Match" from the 
+    list and on the page that appears, click the 'Postpone Match' button.</p>
+<br>
+<p>If you have already agreed a <b>new date and/or venue</b> with the away team, you can enter these by selecting
+    'Reschedule Match'. You will then be taken to a new page where you can edit the details of the match as 
+    required. Then click the 'Reschedule Match'. Note that the away team will then be sent an email asking them 
+    to confirm the new date/venue. If they accept it then the match status will be set to "Rearranged" but if 
+    they reject the details then it will return to the "Postponed" status.</p>
+<br>
+<p>Matches can be rearranged as much as required though please keep communicating directly with the other club 
+    involved so that the email updates the wesbite sends out are not a surprise.</p>
+<br>
 <h3>Conceding Matches</h3>
-
-<p>Hopefully, this will be a rarely needed function, but there are two buttons to signify that a match has been conceded by either the home team or the away team. Due to the
-complicated way of dealing with these in terms of the league table, these fixtures will be marked "Conceded", no points will be allocated and the situation will be resolved
-by the league committee at the end of the season.</p>
-
+<p>Hopefully, this will be a rarely needed function, but to do so select the 'Record a Conceded Match' option. 
+    This will take you to a page with two buttons, simply click the appropriate one depending on whether the 
+    match has been conceded by the home team or the away team.</p>
+<br>
+<p>The match will be marked as conceded and the conceding team will receive a penalty. The non-conceding team
+    will receive an average of the points that all other teams score against the conceding team in the relevant
+    fixture (i.e. if the conceding team were at home then it will be their home matches that will be used). 
+    There will likely still be relevant matches to be played so the table will apply the current average to the
+    non-conceding team but this will be adjusted as each relevant match is played.
+</p>
+<br>
 <h3>Submitting a Result</h3>
 
 <p>There are several sections to submitting a result and a few complexities. Here are the different bits of information required:</p>

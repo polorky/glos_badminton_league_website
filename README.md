@@ -95,3 +95,7 @@ The following models are less intuitive but used for administration purposes:
     * created_at (DateTime)
     * resolved (bool)
     * resolved_player (Player)
+
+## Todo List
+
+* Change member password?

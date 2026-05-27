@@ -1068,7 +1068,10 @@ class NominationsView(GenericViewMixin, TemplateView):
 
         # Otherwise return specific individual nomination form
         elif pagename == 'indiupdate':
-            context.update(self._indiupdate_context(context))
+            if context['settings'].nomination_window_open:
+                context.update({'view':'indiunavailable'})
+            else:
+                context.update(self._indiupdate_context(context))
 
         return context
 
@@ -1160,7 +1163,7 @@ class NominationsView(GenericViewMixin, TemplateView):
     def _indiupdate_context(self, context):
         """Build context for the individual nomination update page."""
         nom_player = Player.objects.get(id=context['id'][:-1])
-        team_type = 'Mixed' if context['id'][-1] == 'M' else nom_player.level
+        team_type = 'Mixed' if context['id'][-1] == 'X' else nom_player.level
         nom = TeamNomination.objects.get(
             player=nom_player, date_to=None, approved=True, team__type=team_type
         )

@@ -42,11 +42,11 @@
     {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
         <div class="banner banner-success">
             <i class="ti ti-circle-check" aria-hidden="true"></i>
-            <span><strong>Team selection submitted.</strong> You can still make changes before the end of July deadline. <a href="/teams/select{{ admin.club.get_club_url }}">Edit submission</a></span>
+            <span><strong>Team Entries submitted.</strong> You can still make changes before the end of July deadline. <a href="/teams/select{{ admin.club.get_club_url }}">Edit submission</a></span>
         </div>
     {% else %}
         <div class="banner banner-warning">
-        ⚠️ <b>Team Selection deadline: end of July.</b>
+        ⚠️ <b>Team Entry deadline: end of July.</b>
         <a href="/teams/select{{ admin.club.get_club_url }}">Submit teams</a> |
         <a href="/teams/venue{{ admin.club.get_club_url }}">Submit venues &amp; timings</a>
         </div>
@@ -85,7 +85,7 @@
         </button>
         {% if settings.team_selection_window_open %}
             <button class="tab-btn" data-tab="teamselection">
-                Team selection
+                Team Entries
                 {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
                     <span class="badge badge-done">Done</span>
                 {% else %}
@@ -214,7 +214,7 @@
     {% endif %}
 </div>
 
-{# ======== TEAM SELECTION TAB ======== #}
+{# ======== TEAM ENTRY TAB ======== #}
 {% if settings.team_selection_window_open %}
 <div id="tab-teamselection" class="tab-content">
     <br>
@@ -235,7 +235,7 @@
         <br><br>
         <p>Your club has entered {{ teams.Lengths.All }} teams. The cost of entering a team is £{{ entry_fee }} so your total is £{{ total_fee }}.</p>
     {% else %}
-        <p>Please <a href="/teams/select{{ admin.club.get_club_url }}">click here</a> to select the teams you plan to submit this season.</p>
+        <p>Please <a href="/teams/select{{ admin.club.get_club_url }}">click here</a> to select the teams you plan to entry next season.</p>
         <br>
         <p>Please also <a href="/teams/venue{{ admin.club.get_club_url }}">click here</a> to select normal venues and timings for each team.</p>
         <br>
