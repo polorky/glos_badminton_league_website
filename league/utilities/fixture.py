@@ -1,4 +1,5 @@
 from league import constants
+from league.models import Season, Fixture, Division, Team
 
 # Fixture related functions
 def get_fixture_stats():
@@ -147,3 +148,32 @@ def parse_results(fixtures):
         fixture.save()
 
     return
+
+def create_season_fixtures():
+
+    current_season = Season.objects.get(current=True)
+    
+    if Fixture.objects.filter(season=current_season).exists():
+        return
+    
+    divisions = Division.objects.filter(active=True)
+
+    for division in divisions:
+
+        teams = Team.objects.filter(active=True, division=division)
+
+        for home_team in teams:
+
+            for away_team in teams:
+
+                if home_team == away_team:
+                    continue
+
+                Fixture.objects.create(
+                    home_team = home_team,
+                    away_team = away_team,
+                    end_time = home_team.end_time,
+                    season = current_season,
+                    venue = home_team.home_venue,
+                    division = division,
+                )

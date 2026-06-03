@@ -29,7 +29,7 @@ import pandas as pd
 ##############################################################################################################################################
 
 class GenericViewMixin:
-    type_dict = {'X':'Mixed','W':'Womens','M':'Mens'}
+    type_dict = {'X':'Mixed','W':'Womens','L':'Womens','M':'Mens'}
 
     def get_context_data(self, **kwargs):
         '''Checks the user level, gets current season and league settings'''
@@ -105,7 +105,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
 
             # Get specified division
             try:
-                division = Division.objects.get(number=pagename[1:],type=self.type_dict[pagename[0]])
+                division = Division.objects.get(number=pagename[1:],type=self.type_dict.get(pagename[0]))
             except ObjectDoesNotExist:
                 return {'status':'doesnotexist'}
 
@@ -149,7 +149,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         pagename = kwargs.get('pagename','')
 
-        division = Division.objects.get(number=pagename[1:],type=self.type_dict[pagename[0]])
+        division = Division.objects.get(number=pagename[1:],type=self.type_dict.get(pagename[0]))
         fixtures = Fixture.objects.filter(season=context['current_season']).filter(division=division.id).order_by("date_time")
 
         if fixtures:

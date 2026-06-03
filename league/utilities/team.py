@@ -1,10 +1,9 @@
-from league.models import Season, Fixture, Performance
+from league.models import Season, Fixture, Performance, Club, Team
 
 def get_performances():
     '''
     Creates performance records for all teams 
     '''
-    from league.models import Season, Fixture, Performance
 
     season = Season.objects.get(current=True)
     log = f'Season: {season}'
@@ -25,3 +24,26 @@ def get_performances():
             position += 1
 
     return log
+
+def check_team_entries():
+
+    results_dict = {}
+    errors_dict = {'Clubs':[], 'Teams':[]}
+
+    for club in Club.objects.filter(active=True):
+
+        if not club.teams_confirmed:
+            errors_dict['Clubs'].append(club)
+
+        all_teams = Team.objects.filter(active=True, club=club)
+        mixed_teams = Team.objects.filter(active=True, club=club, type='Mixed')
+        womens_teams = Team.objects.filter(active=True, club=club, type='Womens')
+        mens_teams = Team.objects.filter(active=True, club=club, type='Mens')
+
+        results_dict[club] = {'Mixed': mixed_teams, 'Womens': womens_teams, 'Mens': mens_teams}
+
+        for team in all_teams:
+            if not team.home_venue or not team.start_time or not team.end_time:
+                errors_dict['Teams'].append({'Venue': team.home_venue, 'Start': team.start_time, 'End': team.end_time})
+
+    return results_dict, errors_dict

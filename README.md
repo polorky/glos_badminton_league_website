@@ -99,3 +99,5 @@ The following models are less intuitive but used for administration purposes:
 ## Todo List
 
 * Change member password?
+* Tasks
+* Nomination change authorisations

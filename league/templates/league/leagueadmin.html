@@ -10,66 +10,94 @@
 
 {% elif status == "leagueAdmin" %}
 
-    <h1>League Admin Options</h1>
+    <h1>League Admin Page</h1>
     <br>
-    <h2>Nomination Window</h2>
-    <br>
-    <p>Check or uncheck the box below and click save to toggle the nomination window prior to the season starting.</p>
-    <br>
-    <form action="/clubadmin/league/noms" method="post">
-    {% csrf_token %}
-    <label>
-        <input type="checkbox" 
-               name="nomination_window_open" 
-               {% if settings.nomination_window_open %}checked{% endif %}>
-        Nomination Window Open
-    </label>  
-    <button type="submit">Save</button>  
-    {% if request.GET.noms_updated == "true" %}
-      <p style="color:red;">Setting updated!</p>
-    {% endif %}
-    </form>
-    <br>
-    <h2>Team Selection Window</h2>
-    <br>
-    <p>Check or uncheck the box below and click save to toggle the team selection window prior to the season starting.</p>
-    <br>
-    <form action="/clubadmin/league/teamsel" method="post">
-    {% csrf_token %}
-    <label>
-        <input type="checkbox" 
-               name="team_selection_window_open" 
-               {% if settings.team_selection_window_open %}checked{% endif %}>
-        Team Selection Window Open
-    </label>  
-    <button type="submit">Save</button>  
-    {% if request.GET.teamsel_updated == "true" %}
-      <p style="color:red;">Setting updated!</p>
-    {% endif %}
-    </form>
-    <br>
-    <h2>Penalties for current season</h2>
-    <br>
-    <table id="table" class="table">
-      <tr><th>Team</th><th>Penalty Type</th><th>Player Name</th><th>Fixture</th><th>Remove</th></tr>
-      {% for penalty in penalties %}
-        <tr>
-            <td>{{ penalty.team }}</td><td>{{ penalty.penalty_type }}</td><td>{{ penalty.player }}</td><td>{{ penalty.fixture }}</td>
-            <td><form action="/leagueadmin/delpen{{ penalty.id }}" method="post">
-                {% csrf_token %}
-                <input class="buttonred" type="submit" value="Remove Penalty">
-            </form></td>
-        </tr>
-      {% endfor %}
-    </table>
     
-    <br>
-    <h2>League Contacts</h2>
-    <ul>
-        {% for contact, email in club_contacts.items %}
-            <li>{{ contact }} - {{ email }}</li>
+    {# ---- Tab navigation ---- #}
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="info">Information</button>
+        <button class="tab-btn" data-tab="actions">Actions</button>
+    </div>
+
+    {# ======== INFO TAB ======== #}
+    <div id="tab-info" class="tab-content active">
+
+        <h2>Penalties for current season</h2>
+        <br>
+        <table id="table" class="table-wrap">
+        <tr><th>Team</th><th>Penalty Type</th><th>Player Name</th><th>Fixture</th><th>Remove</th></tr>
+        {% for penalty in penalties %}
+            <tr>
+                <td>{{ penalty.team }}</td><td>{{ penalty.penalty_type }}</td><td>{{ penalty.player }}</td><td>{{ penalty.fixture }}</td>
+                <td><form action="/leagueadmin/delpen{{ penalty.id }}" method="post">
+                    {% csrf_token %}
+                    <input class="buttonred" type="submit" value="Remove Penalty">
+                </form></td>
+            </tr>
         {% endfor %}
-    </ul>
+        </table>
+        <br>
+            
+        <h2>Nominations</h2>
+        <p>Teams which require nominations</p>
+        <br>
+        <table id="table" class="table-wrap">
+        <tr><th>Team</th><th>Num of Nominations</th><th>Status</th></tr>
+        {% for team in nom_teams %}
+        <tr><td>{{ team.0 }}</td><td>{{ team.0.count_nominations }}{% if team.0.type == "Mixed" %}/6{% else %}/4{% endif %}</td><td>{{ team.1 }}</td></tr>
+        {% endfor %}
+        </table>
+        <br>
+
+        <h2>League Contacts</h2>
+        <ul>
+            {% for contact, email in club_contacts.items %}
+                <li>{{ contact }} - {{ email }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {# ======== ACTIONS TAB ======== #}
+    <div id="tab-actions" class="tab-content">
+
+        <h2>Nomination Window</h2>
+        <br>
+        <p>Check or uncheck the box below and click save to toggle the nomination window prior to the season starting.</p>
+        <br>
+        <form action="/clubadmin/league/noms" method="post">
+        {% csrf_token %}
+        <label>
+            <input type="checkbox" 
+                name="nomination_window_open" 
+                {% if settings.nomination_window_open %}checked{% endif %}>
+            Nomination Window Open
+        </label>  
+        <button type="submit">Save</button>  
+        {% if request.GET.noms_updated == "true" %}
+        <p style="color:red;">Setting updated!</p>
+        {% endif %}
+        </form>
+        <br>
+        <h2>Team Selection Window</h2>
+        <br>
+        <p>Check or uncheck the box below and click save to toggle the team selection window prior to the season starting.</p>
+        <br>
+        <form action="/clubadmin/league/teamsel" method="post">
+        {% csrf_token %}
+        <label>
+            <input type="checkbox" 
+                name="team_selection_window_open" 
+                {% if settings.team_selection_window_open %}checked{% endif %}>
+            Team Selection Window Open
+        </label>  
+        <button type="submit">Save</button>  
+        {% if request.GET.teamsel_updated == "true" %}
+        <p style="color:red;">Setting updated!</p>
+        {% endif %}
+        </form>
+        <br>
+    </div>
+
 
 <!--
     <p>To send an email to all club contacts, complete the form below below and click "Send Email".</p>
@@ -83,14 +111,6 @@
     </form>
 -->
 
-    <h2>Nominations</h2>
-    <h3>Teams which require nominations</h3>
-    <table id="table" class="table">
-      <tr><th>Team</th><th>Num of Nominations</th><th>Status</th></tr>
-      {% for team in nom_teams %}
-      <tr><td>{{ team.0 }}</td><td>{{ team.0.count_nominations }}{% if team.0.type == "Mixed" %}/6{% else %}/4{% endif %}</td><td>{{ team.1 }}</td></tr>
-      {% endfor %}
-    </table>
 
 {% elif status == "penaltydeleted" %}
 
@@ -99,3 +119,39 @@
 {% endif %}
 
 {% endblock content %}
+
+{% block extra_scripts %}
+<script>
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+        });
+    });
+
+    // Open correct tab and accordion if URL has a hash or scroll_to
+    {% if scroll_to %}
+    const scrollTarget = '{{ scroll_to }}';
+    const targetEl = document.querySelector(scrollTarget);
+    if (targetEl) {
+        // If target is inside an accordion, open it
+        const details = targetEl.closest('details');
+        if (details) details.open = true;
+        // Switch to correct tab
+        const tabContent = targetEl.closest('.tab-content');
+        if (tabContent) {
+            const tabId = tabContent.id.replace('tab-', '');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            const btn = document.querySelector(`[data-tab="${tabId}"]`);
+            if (btn) btn.classList.add('active');
+            tabContent.classList.add('active');
+        }
+        targetEl.scrollIntoView({ behavior: 'smooth' });
+    }
+    {% endif %}
+</script>
+{% endblock %}

@@ -73,7 +73,11 @@
         <div class="max-w-6xl mx-auto flex justify-between items-center">
             <span>Gloucestershire Badminton League — 2026/27 Season</span>
             <span>
+                {% if user.is_authenticated %}
+                <a href="/logout/" class="hover:text-white transition-colors">Member logout</a>
+                {% else %}
                 <a href="/login/" class="hover:text-white transition-colors">Member login</a>
+                {% endif %}
                 &nbsp;·&nbsp;
                 <a href="/help" class="hover:text-white transition-colors">Help</a>
             </span>
@@ -120,7 +124,11 @@
                         <a href="/archive/home" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Archive</a>
                         <div class="border-t border-navy-700 my-1"></div>
                         <a href="/help" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Help</a>
-                        <a href="/login/" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Login</a>
+                        {% if user.is_authenticated %}
+                            <a href="/logout/" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Logout</a>
+                        {% else %}
+                            <a href="/login/" class="block px-4 py-2 text-sm text-navy-200 hover:bg-navy-700 hover:text-white">Login</a>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -145,7 +153,11 @@
                 <a href="/teams/home" class="py-2.5 border-b border-navy-800 text-navy-400 hover:text-gold transition-colors">Teams</a>
                 <a href="/archive/home" class="py-2.5 border-b border-navy-800 text-navy-400 hover:text-gold transition-colors">Archive</a>
                 <a href="/juniors" class="py-2.5 text-navy-400 hover:text-gold transition-colors">Juniors</a>
-                <a href="/login/" class="py-2.5 text-navy-400 hover:text-gold transition-colors">Login</a>
+                {% if user.is_authenticated %}
+                    <a href="/login/" class="py-2.5 text-navy-400 hover:text-gold transition-colors">Login</a>
+                {% else %}
+                    <a href="/logout/" class="py-2.5 text-navy-400 hover:text-gold transition-colors">Logout</a>
+                {% endif %}
             </nav>
         </div>
     </header>
