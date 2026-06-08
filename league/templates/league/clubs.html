@@ -4,7 +4,7 @@
 
 {% block content %}
 
-{% if status == "home" %}
+{% if view == "home" %}
 
   <h1>Gloucestershire Badminton Clubs</h1>
   <br>
@@ -32,7 +32,7 @@
     </ul>
   </div>
 
-{% elif status == "doesnotexist" %}
+{% elif view == "doesnotexist" %}
 
   <h1>Club does not exist</h1>
   <p>Not sure how you got to this page but a club of this name does not exist.</p>

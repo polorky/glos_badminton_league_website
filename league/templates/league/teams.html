@@ -4,7 +4,7 @@
 
 {% block content %}
 
-{% if status == "home" %}
+{% if view == "home" %}
 
   <h1>Current Teams</h1>
   <br>
@@ -26,20 +26,26 @@
     {% endfor %}
   </ul>
 
-{% elif status == "doesnotexist" %}
+{% elif view == "doesnotexist" %}
 
   <h1>Team does not exist</h1>
   <br>
   <p>Not sure how you got here but a team with this ID does not exist.</p>
 
 
-{% elif status == "clubdoesnotexist" %}
+{% elif view == "clubdoesnotexist" %}
 
   <h1>Club does not exist</h1>
   <br>
   <p>Not sure how you got here but a club with this ID does not exist.</p>
 
-{% elif status == "select" %}
+{% elif view == "windowclosed" %}
+
+  <h1>Window Closed</h1>
+  <br>
+  <p>The teame entry window is now closed so you are unable to make changes.</p>
+
+{% elif view == "select" %}
 
   <h1>Team Entry Page</h1>
   <br>
@@ -61,7 +67,7 @@
       <p style="color:red;">Teams updated!</p>
   {% endif %}
 
-{% elif status == "venue" %}
+{% elif view == "venue" %}
 
   <h1>Venue Selection Page</h1>
   <br>

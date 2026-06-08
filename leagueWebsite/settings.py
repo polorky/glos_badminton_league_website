@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sitemaps',
     'django_extensions',
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -47,6 +48,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'league.context_processors.current_season',
             ],
         },
     },
@@ -111,6 +113,15 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+    'DEFAULT_AUTHENTICATION_CLASSES': [],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 100,
+    'DEFAULT_THROTTLE_CLASSES': ['rest_framework.throttling.AnonRateThrottle'],
+    'DEFAULT_THROTTLE_RATES': {'anon': '60/min'},
+}
 
 # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

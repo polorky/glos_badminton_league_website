@@ -71,7 +71,7 @@
     <!-- ── Top bar ── -->
     <div class="bg-navy-950 text-navy-300 text-xs py-1.5 px-4 hidden sm:block">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
-            <span>Gloucestershire Badminton League — 2026/27 Season</span>
+            <span>Gloucestershire Badminton League — {{ season_menu }} Season</span>
             <span>
                 {% if user.is_authenticated %}
                 <a href="/logout/" class="hover:text-white transition-colors">Member logout</a>

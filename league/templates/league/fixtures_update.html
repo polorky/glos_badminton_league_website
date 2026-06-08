@@ -215,12 +215,16 @@
         <p><b>Original Date:</b> {{ fixture.old_date_time }}</p>
     {% endif %}
     <p><b>Venue Proposed:</b> {{ fixture.venue }}</p>
-    <p>If this date and venue is acceptable to your club, please click the button below.</p>
+    <br>
+    <p>If this date and venue is acceptable to your club, please click the button below:</p>
+    <br>
     <form action="/fixtures/{{ fixture.id }}/confirmed/{{ source }}" method="post">
     {% csrf_token %}
     <input class="button" type="submit" value="Confirm New Date/Venue">
     </form>
-    <p>If the details are not those you were expecting or your team can no longer make the new date, click the button below to reject them.</p>
+    <br>
+    <p>If the details are not those you were expecting or your team can no longer make the new date, click the button below to reject them:</p>
+    <br>
     <form action="/fixtures/{{ fixture.id }}/rejected/{{ source }}" method="post">
     {% csrf_token %}
     <input class="button" type="submit" value="Reject New Date/Venue">

@@ -12,4 +12,5 @@ urlpatterns = [
     path('', include('django.contrib.auth.urls')),
     path('change-password', auth_views.PasswordChangeView.as_view(template_name='registration/change-password.html'), name='change-password'),
     path('', include('league.urls')),
+    path('api/', include('league.api.urls')),
 ]

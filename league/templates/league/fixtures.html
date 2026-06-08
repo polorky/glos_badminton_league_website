@@ -4,7 +4,7 @@
 
 {% block content %}
 
-{% if pageview == "home" %}
+{% if view == "home" %}
 
     <h1>All Fixtures - {{ current_season }}</h1>
     <br>
@@ -70,13 +70,13 @@
         </table>
     </div>
 
-{% elif pageview == "doesnotexist" %}
+{% elif view == "doesnotexist" %}
 
     <h1>Fixture does not exist</h1>
     <br>
     <p>Not sure how you got here but a fixture with this ID does not yet exist so nothing to see here!</p>
 
-{% elif pageview == "view" %}
+{% else %}
 
     <h1>{{ fixture }}</h1>
     <br>

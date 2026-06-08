@@ -4,7 +4,7 @@
 
 {% block content %}
 
-{% if status == "home" %}
+{% if view == "home" %}
 
   <h1>League Venues</h1>
   <br>
@@ -21,7 +21,7 @@
     {% endfor %}
   </ul>
 
-{% elif status == "doesnotexist" %}
+{% elif view == "doesnotexist" %}
 
   <h1>Venue does not exist</h1>
   <br>

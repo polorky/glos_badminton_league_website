@@ -4,7 +4,7 @@
 
 {% block content %}
 
-{% if status == "home" %}
+{% if view == "home" %}
   <h1>Leagues and Divisions</h1>
   <br>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -64,7 +64,7 @@
   </div>
   <br><br>
 
-{% elif status == "doesnotexist" %}
+{% elif view == "doesnotexist" %}
 
   <h1>Division does not exist</h1>
   <p>Not sure how you got here but the address provided does not match an existing division.</p>

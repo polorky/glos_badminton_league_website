@@ -176,19 +176,31 @@ class Player(models.Model):
 
         return player_fixtures
 
-    def get_nominated_team(self, match_type):
+    def get_nominated_team(self, match_type, approved=True, end_date=False):
         '''Returns team for which player has been nominated - team type determined by input'''
-        return TeamNomination.objects.filter(team__type=match_type, player=self, date_to=None, approved=True)
+        if end_date:
+            return TeamNomination.objects.filter(~Q(date_to=None), team__type=match_type, player=self, approved=approved)
+        else:
+            return TeamNomination.objects.filter(team__type=match_type, player=self, date_to=None, approved=approved)
 
     def get_noms_strings(self):
         noms = [self.get_nominated_team('Mixed'), self.get_nominated_team(self.level)]
+        pends = [self.get_nominated_team('Mixed', approved=False), self.get_nominated_team(self.level, approved=False)]
+        olds = [self.get_nominated_team('Mixed', end_date=True), self.get_nominated_team(self.level, end_date=True)]
         noms_strings = ['','']
         cardinal_dict = {1:'st',2:'nd',3:'rd'}
         if noms[0]:
             noms_strings[0] = f'{noms[0][0].team.number}{cardinal_dict.get(noms[0][0].team.number, "th")}'
+        elif pends[0]:
+            noms_strings[0] = f'{pends[0][0].team.number}{cardinal_dict.get(pends[0][0].team.number, "th")} (P)'
+        elif olds[0]:
+            noms_strings[0] = f'{olds[0][0].team.number}{cardinal_dict.get(olds[0][0].team.number, "th")} (R)'
         if noms[1]:
             noms_strings[1] = f'{noms[1][0].team.number}{cardinal_dict.get(noms[1][0].team.number, "th")}'
-
+        elif pends[1]:
+            noms_strings[0] = f'{pends[0][0].team.number}{cardinal_dict.get(pends[0][0].team.number, "th")} (P)'
+        elif olds[1]:
+            noms_strings[0] = f'{olds[0][0].team.number}{cardinal_dict.get(olds[0][0].team.number, "th")} (R)'
         return noms_strings
 
     def check_eligibility(self, team):

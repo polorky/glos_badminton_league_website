@@ -192,6 +192,8 @@ class BaseScoreFormSet(BaseFormSet):
         all_scores = []
         for form in self.forms:
             cd = form.cleaned_data
+            if not cd:
+                raise ValidationError(['game','Some games scores (or forfeits) are missing.'])
             if cd['forfeit']:
                 all_scores.append([cd['forfeit'], cd['forfeit']])
             else:

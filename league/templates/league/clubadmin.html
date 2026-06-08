@@ -133,13 +133,27 @@
             <tr>
                 <td><a href="/player/{{ player.id }}/clubadmin">{{ player.name }}</a></td>
                 <td>{{ player.level }}</td>
-                <td {% if stats.noms.mixed %}id="greencell"{% endif %}>
-                    {% if stats.noms.mixed %}<a href="/nominations/indiupdate/{{ player.id }}X">{{ stats.noms.mixed }}</a>
-                    {% else %}{{ stats.noms.mixed }}{% endif %}
+                <td {% if 'P' in stats.noms.mixed %}id="yellowcell"
+                    {% elif 'R' in stats.noms.mixed %}id="greycell"
+                    {% elif stats.noms.mixed %}id="greencell"
+                    {% endif %}
+                >
+                    {% if 'P' not in stats.noms.mixed and 'R' not in stats.noms.mixed %}
+                        <a href="/nominations/indiupdate/{{ player.id }}X">{{ stats.noms.mixed }}</a>
+                    {% else %}
+                        {{ stats.noms.mixed }}
+                    {% endif %}
                 </td>
-                <td {% if stats.noms.level %}id="greencell"{% endif %}>
-                    {% if stats.noms.level %}<a href="/nominations/indiupdate/{{ player.id }}L">{{ stats.noms.level }}</a>
-                    {% else %}{{ stats.noms.level }}{% endif %}
+                <td {% if 'P' in stats.noms.level %}id="yellowcell"
+                    {% elif 'R' in stats.noms.level %}id="greycell"
+                    {% elif stats.noms.level %}id="greencell"
+                    {% endif %}
+                >
+                    {% if 'P' not in stats.noms.level and 'R' not in stats.noms.level %}    
+                        <a href="/nominations/indiupdate/{{ player.id }}L">{{ stats.noms.level }}</a>
+                    {% else %}
+                        {{ stats.noms.level }}
+                    {% endif %}
                 </td>
                 {% for stat in stats.appearances.Mixed.values %}
                     <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>

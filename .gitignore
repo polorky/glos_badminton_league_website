@@ -28,5 +28,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Claude Code
+CLAUDE.md
+.claude/
+
 # Static files
 staticfiles/

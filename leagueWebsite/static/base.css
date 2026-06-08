@@ -121,6 +121,14 @@ main .table-compact {
     background-color: #6AE58D;
 }
 
+#yellowcell {
+    background-color: #f3e45e;
+}
+
+#greycell {
+    background-color: #bcbcba;
+}
+
 .postponed {
   background-color: #EF9A9A !important;
 }

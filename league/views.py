@@ -95,7 +95,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
 
             # Extract all divisions, split into the three leagues and active/not active
             context.update({
-                'status': 'home',
+                'view': 'home',
                 **{f"{'old_' if not a else ''}{t.lower()}_divs":
                    [d for d in all_divs if d.type == t and d.active == a]
                    for t in ["Mixed", "Womens", "Mens"] for a in [True, False]}
@@ -107,7 +107,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
             try:
                 division = Division.objects.get(number=pagename[1:],type=self.type_dict.get(pagename[0]))
             except ObjectDoesNotExist:
-                return {'status':'doesnotexist'}
+                return {'view':'doesnotexist'}
 
             # If season other than current one requested, override current_season
             if season != '' and season != context['current_season'].year:
@@ -130,7 +130,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
             concessions = any(fix.status in ["Conceded (H)", "Conceded (A)"] for fix in fixtures)
 
             context.update({
-                'status': 'view',
+                'view': 'view',
                 'division': division,
                 'fixtures': fix_list,
                 'table': table,
@@ -169,7 +169,7 @@ class FixturesView(GenericViewMixin, TemplateView):
         if pagename == 'home':
 
             context.update({
-                'pageview': 'home',
+                'view': 'home',
                 'fixtures': [(fix,fix.updateable(context['user'])) for fix in fixtures],
             })
 
@@ -180,7 +180,7 @@ class FixturesView(GenericViewMixin, TemplateView):
             try:
                 fixture = Fixture.objects.get(id=pagename)
             except ObjectDoesNotExist:
-                return {'pageview':'doesnotexist'}
+                return {'view':'doesnotexist'}
 
             # Get players in user is club admin
             players = []
@@ -200,7 +200,7 @@ class FixturesView(GenericViewMixin, TemplateView):
                 rubber_number = 2
 
             context.update({
-                'pageview': 'view',
+                'view': 'view',
                 'fixture': fixture,
                 'game_results': batched_games,
                 'players': players,
@@ -287,7 +287,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         # Result submitted by home team
         elif pagename == "submit":
 
-            context = self._process_result(fixture)
+            context = self._process_result(context, fixture)
 
         return self.render_to_response(context)
 
@@ -329,7 +329,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
         email_notification(pagename, fixture)
 
-    def _process_result(self, fixture):
+    def _process_result(self, context, fixture):
 
         # Get relevant results form for fixture type
         if fixture.division.type == "Mixed":
@@ -422,7 +422,7 @@ class ClubsView(GenericViewMixin, TemplateView):
         if pagename == 'home':
 
             context.update({
-                'status': 'home',
+                'view': 'home',
                 'clubs': Club.objects.filter(active=True).order_by("name"),
                 'old_clubs': Club.objects.filter(active=False).order_by("name"),
             })
@@ -434,7 +434,7 @@ class ClubsView(GenericViewMixin, TemplateView):
             try:
                 club = Club.objects.get(name=urllib.parse.unquote(pagename))
             except ObjectDoesNotExist:
-                return {'status':'doesnotexist'}
+                return {'view':'doesnotexist'}
 
             # Get teams and fixtures
             teams = Team.objects.filter(active=True).filter(club=club).order_by("type", "number")
@@ -450,7 +450,7 @@ class ClubsView(GenericViewMixin, TemplateView):
             public_info = bool(club.public_contact_name or club.public_email or club.public_num)
 
             context.update({
-                'status': 'view',
+                'view': 'view',
                 'club': club,
                 'teams': teams,
                 'ex_teams': ex_teams,
@@ -486,50 +486,50 @@ class TeamsView(GenericViewMixin, TemplateView):
         if pagename == 'home':
 
             context.update({
-                'status': 'home',
+                'view': 'home',
                 'teams': Team.objects.filter(active=True).order_by("club__name", "type", "number"),
                 'old_teams': Team.objects.filter(active=False).order_by("club__name", "type", "number"),
             })
 
         # If 'select' in pagename, set up club team selection
-        elif 'select' in pagename:
+        elif 'select' in pagename or 'venue' in pagename:
             
-            # Check club exists
-            try:
-                club = Club.objects.get(name=urllib.parse.unquote(pagename.replace('select','')))
-            except ObjectDoesNotExist:
-                return {'status':'clubdoesnotexist'}
-            
-            # Create form for team selection
-            team_select_form = TeamSelectForm(None)
-
-            # Update context
-            context.update({'status': 'select',
-                            'team_select_form': team_select_form, 
-                            'club': club})
-
-        elif 'venue' in pagename:
+            # Check team selection window open
+            if not context['settings'].team_selection_window_open:
+                return {'view': 'windowclosed'}
 
             # Check club exists
             try:
-                club = Club.objects.get(name=urllib.parse.unquote(pagename.replace('venue','')))
+                club = Club.objects.get(name=urllib.parse.unquote(pagename.replace('select','').replace('venue','')))
             except ObjectDoesNotExist:
-                return {'status':'clubdoesnotexist'}
-
-            # Get all teams
-            teams = Team.objects.filter(club=club, active=True)
+                return {'view':'clubdoesnotexist'}
             
-            # Get forms for each team
-            forms = [
-                TeamForm(instance=team, prefix=f'team_{team.pk}', variant='venue')
-                for team in teams
-            ]
+            if 'select' in pagename:
 
-            # Update context
-            context.update({'status': 'venue',
-                            'club': club,
-                            'teams': teams,
-                            'forms': forms,})
+                # Create form for team selection
+                team_select_form = TeamSelectForm(None)
+
+                # Update context
+                context.update({'view': 'select',
+                                'team_select_form': team_select_form, 
+                                'club': club})
+
+            elif 'venue' in pagename:
+
+                # Get all teams
+                teams = Team.objects.filter(club=club, active=True)
+                
+                # Get forms for each team
+                forms = [
+                    TeamForm(instance=team, prefix=f'team_{team.pk}', variant='venue')
+                    for team in teams
+                ]
+
+                # Update context
+                context.update({'view': 'venue',
+                                'club': club,
+                                'teams': teams,
+                                'forms': forms,})
 
         # Otherwise return team requested
         else:
@@ -538,7 +538,7 @@ class TeamsView(GenericViewMixin, TemplateView):
             try:
                 team = Team.objects.get(id=urllib.parse.unquote(pagename))
             except ObjectDoesNotExist:
-                return {'status':'doesnotexist'}
+                return {'view':'doesnotexist'}
 
             # Create form for captain details
             form = TeamForm(None, instance=team)
@@ -554,7 +554,7 @@ class TeamsView(GenericViewMixin, TemplateView):
             updateable = context['admin'] is not None and context['admin'].club == team.club
 
             context.update({
-                'status': 'view',
+                'view': 'view',
                 'team': team,
                 'updateable': updateable,
                 'form': form,
@@ -570,6 +570,7 @@ class TeamsView(GenericViewMixin, TemplateView):
         
         context = self.get_context_data(**kwargs)
 
+        # Team selection updated
         if 'select' in pagename:
 
             form = TeamSelectForm(self.request.POST)
@@ -583,7 +584,8 @@ class TeamsView(GenericViewMixin, TemplateView):
                 context['club'].save()
                 
                 return redirect(f"{self.request.path}?updated=true")
-            
+
+        # Match information updated 
         elif 'venue' in pagename:
 
             forms = [
@@ -598,6 +600,7 @@ class TeamsView(GenericViewMixin, TemplateView):
 
                 return redirect(f"{self.request.path}?updated=true")
 
+        # Captain's details updated
         else:
 
             team = Team.objects.get(id=urllib.parse.unquote(pagename))
@@ -643,7 +646,7 @@ class VenuesView(GenericViewMixin, TemplateView):
         # If home page requested, return all venues
         if pagename == 'home':
             context.update({
-                'status': 'home',
+                'view': 'home',
                 'venues': Venue.objects.all().order_by("name"),
             })
 
@@ -654,7 +657,7 @@ class VenuesView(GenericViewMixin, TemplateView):
             try:
                 venue = Venue.objects.get(name=urllib.parse.unquote(pagename))
             except ObjectDoesNotExist:
-                return {'status':'doesnotexist'}
+                return {'view':'doesnotexist'}
 
             # Create venue form
             form = VenueForm(None,instance=venue)
@@ -671,7 +674,7 @@ class VenuesView(GenericViewMixin, TemplateView):
             updateable = context['admin'] is not None and context['admin'].club in clubs
 
             context.update({
-                'status': 'view',
+                'view': 'view',
                 'venue': venue,
                 'form': form,
                 'clubs': clubs,
@@ -779,7 +782,7 @@ class ArchivesView(GenericViewMixin, TemplateView):
 
     def post(self, request, **kwargs):
 
-        pagename = self.kwargs('pagename','')
+        pagename = self.kwargs.get('pagename','')
 
         user = self.request.user if self.request.user.is_authenticated else None
 
@@ -1052,7 +1055,7 @@ class NominationsView(GenericViewMixin, TemplateView):
     def get_context_data(self, **kwargs):
 
         context = super().get_context_data(**kwargs)
-        pagename = context.get('pagename','')
+        pagename = kwargs.get('pagename','')
 
         # If 'update' page requested and nomination window open, return team forms
         if pagename == 'teamupdate':
@@ -1143,7 +1146,7 @@ class NominationsView(GenericViewMixin, TemplateView):
         return (
             team,
             FormSet(data, queryset=existing_noms,
-                    form_kwargs={'players': players}, prefix=f'team_{team.id}'),
+                    form_kwargs={'players': players, 'team': team}, prefix=f'team_{team.id}'),
         )
 
     def _admin_context(self, kwargs):
@@ -1176,17 +1179,17 @@ class NominationsView(GenericViewMixin, TemplateView):
 
     def post(self, request, **kwargs):
 
-        context = super().get_context_data(**kwargs)
+        context = self.get_context_data(**kwargs)
         
         pagename = context.get('pagename', '')
 
         if pagename == 'teamupdate':
             return self._handle_teamupdate_post(request, context)
-        elif context['view'] == 'admin_approved':
+        elif pagename == 'admin_approved':
             return self._handle_admin_approved(context)
-        elif context['view'] == 'admin_rejected':
+        elif pagename == 'admin_rejected':
             return self._handle_admin_rejected(context)
-        else:
+        elif pagename == 'indiupdate':
             return self._handle_indiupdate_post(request, context)
 
     def _handle_teamupdate_post(self, request, context):
@@ -1251,7 +1254,9 @@ class NominationsView(GenericViewMixin, TemplateView):
             date_from=date.today(),
             notes=request.POST.get('notes'),
         )
-        return redirect('nomination_change_success')
+        context.update({'view': 'nom_submitted'})
+        
+        return self.render_to_response(context)
 
     def _save_nominations(self, formset, team, positions):
         for position, form in zip(positions, formset):
