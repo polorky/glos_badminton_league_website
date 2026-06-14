@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib import messages
+from django.views.decorators.csrf import requires_csrf_token
 
 from .models import *
 from .forms import *
@@ -23,6 +24,15 @@ from datetime import date
 
 import urllib
 import pandas as pd
+
+##############################################################################################################################################
+##### Utility views #####
+##############################################################################################################################################
+
+@requires_csrf_token
+def csrf_failure(request, reason=""):
+    messages.error(request, "Your session has expired, please try again.")
+    return redirect(request.path)
 
 ##############################################################################################################################################
 ##### Main website page views #####

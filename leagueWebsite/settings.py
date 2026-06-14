@@ -60,6 +60,8 @@ LOGOUT_REDIRECT_URL = "/"
 LOGIN_REDIRECT_URL = "/"
 LOGIN_URL = "/login"
 
+CSRF_FAILURE_VIEW = 'league.views.csrf_failure'
+
 # Database
 if config('USE_SQLITE', default=False, cast=bool):
     DATABASES = {
