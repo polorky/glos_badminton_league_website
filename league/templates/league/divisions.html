@@ -12,7 +12,7 @@
         <table id="table" style="float: left;">
           <tr><th>Mixed League</th></tr>
           {% for division in mixed_divs %}
-            <tr><td><a href="{{ division.get_division_url }}">{{ division }}</a></td></tr>
+            <tr><td><a href="/divisions/{{ division.get_division_url }}">{{ division }}</a></td></tr>
           {% endfor %}
         </table>
       </div>
@@ -20,7 +20,7 @@
         <table id="table" style="float: left;">
           <tr><th>Women's League</th></tr>
           {% for division in womens_divs %}
-            <tr><td><a href="{{ division.get_division_url }}">{{ division }}</a></td></tr>
+            <tr><td><a href="/divisions/{{ division.get_division_url }}">{{ division }}</a></td></tr>
           {% endfor %}
         </table>
       </div>
@@ -28,7 +28,7 @@
         <table id="table" style="float: left;">
           <tr><th>Men's League</th></tr>
           {% for division in mens_divs %}
-            <tr><td><a href="{{ division.get_division_url }}">{{ division }}</a></td></tr>
+            <tr><td><a href="/divisions/{{ division.get_division_url }}">{{ division }}</a></td></tr>
           {% endfor %}
         </table>
       </div>

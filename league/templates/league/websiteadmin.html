@@ -33,31 +33,31 @@
     <h3>Single Games to 30</h3>
     <ul>
         {% for fix in s30 %}
-            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+            <li><a href="/fixtures/{{ fix.id }}/fix">{{ fix }}</a></li>
         {% endfor %}
     </ul>
     <h3>Single Games to Other</h3>
     <ul>
         {% for fix in sother %}
-            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+            <li><a href="/fixtures/{{ fix.id }}/fix">{{ fix }}</a></li>
         {% endfor %}
     </ul>
     <h3>Other Games to Other</h3>
     <ul>
         {% for fix in oother %}
-            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+            <li><a href="/fixtures/{{ fix.id }}/fix">{{ fix }}</a></li>
         {% endfor %}
     </ul>
     <h3>Forfeited Games</h3>
     <ul>
         {% for fix in forfeits %}
-            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+            <li><a href="/fixtures/{{ fix.id }}/fix">{{ fix }}</a></li>
         {% endfor %}
     </ul>
     <h3>Errors</h3>
     <ul>
         {% for fix in errors %}
-            <li><a href="fixtures/{{ fix.id }}">{{ fix }}</a></li>
+            <li><a href="/fixtures/{{ fix.id }}/fix">{{ fix }}</a></li>
         {% endfor %}
     </ul>
 

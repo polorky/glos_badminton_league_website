@@ -17,7 +17,7 @@
   <div>
     <ul class="col-list">
       {% for club in clubs %}
-        <li><a href="{{ club.get_club_url }}">{{ club.name }}</a></li>
+        <li><a href="/clubs/{{ club.get_club_url }}">{{ club.name }}</a></li>
       {% endfor %}
     </ul>
   </div>
@@ -27,7 +27,7 @@
   <div>
     <ul class="col-list">
       {% for club in old_clubs %}
-        <li><a href="{{ club.get_club_url }}">{{ club.name }}</a></li>
+        <li><a href="/clubs/{{ club.get_club_url }}">{{ club.name }}</a></li>
       {% endfor %}
     </ul>
   </div>
@@ -81,7 +81,7 @@
       <table id="table" class="table">
         <tr><th>Venue</th><th>Timings</th></tr>
         {% for clubnight in clubnights %}
-          <tr><td><a href="\venues\{{ clubnight.venue.get_venue_url }}">{{ clubnight.venue }}</a></td><td>{{ clubnight.timings }}</td></tr>
+          <tr><td><a href="/venues/{{ clubnight.venue.get_venue_url }}">{{ clubnight.venue }}</a></td><td>{{ clubnight.timings }}</td></tr>
         {% endfor %}
       </table>
     </div>
@@ -93,7 +93,7 @@
   <p>This is a list of venues that the club currently has league matches scheduled for:</p>
   <ul>
   {% for venue in venues %}
-    <li><a href="\venues\{{ venue.get_venue_url }}">{{ venue.name }}</a></li>
+    <li><a href="/venues/{{ venue.get_venue_url }}">{{ venue.name }}</a></li>
   {% endfor %}
   </ul>
   {% if teams %}
@@ -101,7 +101,7 @@
     <h3>Current Teams</h3>
     <br>
     {% for team in teams %}
-        <p><a href="\teams\{{ team.get_team_url }}">{{ team }}</a></p>
+        <p><a href="/teams/{{ team.get_team_url }}">{{ team }}</a></p>
     {% endfor %}
   {% endif %}
   {% if ex_teams %}
@@ -109,7 +109,7 @@
     <h3>Historic Teams</h3>
     <br>
     {% for team in ex_teams %}
-        <p><a href="\teams\{{ team.get_team_url }}">{{ team }}</a></p>
+        <p><a href="/teams/{{ team.get_team_url }}">{{ team }}</a></p>
     {% endfor %}
   {% endif %}
   <br>

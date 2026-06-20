@@ -586,29 +586,33 @@ class TeamsView(GenericViewMixin, TemplateView):
             form = TeamSelectForm(self.request.POST)
 
             if form.is_valid():
-                
+
                 self.update_club_teams(context['club'], 'Mixed', form.cleaned_data['mixed_teams'])
                 self.update_club_teams(context['club'], 'Womens', form.cleaned_data['womens_teams'])
-                self.update_club_teams(context['club'], 'Mens', form.cleaned_data['mens_teams'])              
+                self.update_club_teams(context['club'], 'Mens', form.cleaned_data['mens_teams'])
                 context['club'].teams_confirmed = True
                 context['club'].save()
-                
+
                 return redirect(f"{self.request.path}?updated=true")
 
-        # Match information updated 
+            context['team_select_form'] = form
+
+        # Venue/match information updated
         elif 'venue' in pagename:
 
             forms = [
                 TeamForm(request.POST, instance=team, prefix=f'team_{team.pk}', variant='venue')
                 for team in context['teams']
             ]
-            
+
             if all(form.is_valid() for form in forms):
-                
+
                 for form in forms:
                     form.save()
 
                 return redirect(f"{self.request.path}?updated=true")
+
+            context['forms'] = forms
 
         # Captain's details updated
         else:
@@ -620,7 +624,11 @@ class TeamsView(GenericViewMixin, TemplateView):
             if form.is_valid():
                 form.save()
                 return redirect(f"{self.request.path}?updated=true")
-            
+
+            context['form'] = form
+
+        return self.render_to_response(context)
+
     def update_club_teams(self, club, type, num):
 
         current_teams = Team.objects.filter(club=club, type=type, active=True)

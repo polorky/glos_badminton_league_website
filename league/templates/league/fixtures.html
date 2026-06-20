@@ -9,8 +9,8 @@
     <h1>All Fixtures - {{ current_season }}</h1>
     <br>
     <p>This is the full list of fixtures for the entire league. If you are looking for the fixtures for a particular team,
-    it is probably easier just to navigate to the relevant <a href="\divisions\home">division</a> or find it in the
-    <a href="\teams\home">team list</a>.</p>
+    it is probably easier just to navigate to the relevant <a href="/divisions/home">division</a> or find it in the
+    <a href="/teams/home">team list</a>.</p>
     <br>
     <p>You can filter this table by team name:    <input type="text" class="search-input" id="teamQuery" onkeyup="searchTeam()" placeholder="Search for teams.." title="Type in a team name"></p>
     <br>
@@ -48,18 +48,18 @@
             {% else %}
                 <tr class="unplayed">
             {% endif %}
-                <td><a href="\divisions\{{ fix.0.division.get_division_url }}">{{ fix.0.division.get_short_name }}</a></td>
+                <td><a href="/divisions/{{ fix.0.division.get_division_url }}">{{ fix.0.division.get_short_name }}</a></td>
                 <td>{{ fix.0.date_time|date:'Y-m-d' }}</td>
                 <td>{{ fix.0.date_time|date:'D' }}</td>
                 <td>{{ fix.0.date_time|date:'H:i' }}</td>
                 <td>{{ fix.0.end_time|date:'H:i' }}</td>
-                <td><a href="\teams\{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team.get_short_name }}</a></td>
+                <td><a href="/teams/{{ fix.0.home_team.get_team_url }}">{{ fix.0.home_team.get_short_name }}</a></td>
                 <td>{{ fix.0.home_points }}</td>
                 <td>{{ fix.0.away_points }}</td>
-                <td><a href="\teams\{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team.get_short_name }}</a></td>
+                <td><a href="/teams/{{ fix.0.away_team.get_team_url }}">{{ fix.0.away_team.get_short_name }}</a></td>
                 <!-- <td><a href="\venues\{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td> -->
                 <td>{{ fix.0.get_status_display }}</td>
-                <td><a href="{{ fix.0.id }}/fix">View</a></td>
+                <td><a href="/fixtures/{{ fix.0.id }}/fix">View</a></td>
                 {% if fix.1 %}
                     <td><a href="/fixtures/update/{{ fix.0.id }}/options/fix">Update</a></td>
                 {% else %}
