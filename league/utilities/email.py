@@ -1,12 +1,12 @@
 from django.core.mail import send_mail
+from django.conf import settings
 import league.constants as constants
-from decouple import config
 
 BASE_URL = 'https://gloubadleague.pythonanywhere.com'
 SENDER = 'GlosBadWebsite@gmail.com'
 ADMIN_EMAIL = 'schofieldmark@gmail.com'
 FIXTURES_EMAIL = 'GlosBadFixtures@outlook.com'
-TESTING_ENV = config('DEBUG')
+TESTING_ENV = settings.DEBUG
 
 class LeagueEmail:
     def __init__(self, fix, **kwargs):
