@@ -53,7 +53,7 @@ class NominationAdmin(admin.ModelAdmin):
     list_filter = ['team__club']
 
 class SettingsAdmin(admin.ModelAdmin):
-    list_display = ('nomination_window_open','team_selection_window_open')
+    list_display = ('league_status',)
 
 admin.site.register(models.Administrator, AdministratorAdmin)
 admin.site.register(models.Member, MemberAdmin)

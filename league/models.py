@@ -7,8 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 
 class LeagueSettings(models.Model):
     '''Holds league settings that need changing by league admins mid-sesason'''
-    nomination_window_open = models.BooleanField(default=False)
-    team_selection_window_open = models.BooleanField(default=False)
+    league_status = models.CharField(max_length=10, choices=constants.SEASON_STATUSES, default="entry")
 
     class Meta:
         verbose_name_plural = 'League settings'

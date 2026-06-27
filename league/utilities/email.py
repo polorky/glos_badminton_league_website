@@ -1,11 +1,12 @@
 from django.core.mail import send_mail
 import league.constants as constants
+from decouple import config
 
 BASE_URL = 'https://gloubadleague.pythonanywhere.com'
 SENDER = 'GlosBadWebsite@gmail.com'
 ADMIN_EMAIL = 'schofieldmark@gmail.com'
 FIXTURES_EMAIL = 'GlosBadFixtures@outlook.com'
-TESTING_ENV = True
+TESTING_ENV = config('DEBUG')
 
 class LeagueEmail:
     def __init__(self, fix, **kwargs):
@@ -225,16 +226,36 @@ class EligibilityPenEmail(LeagueEmail):
 class NominationApprovedEmail(LeagueEmail):
     def __init__(self, fix, **kwargs):
         super().__init__(fix, **kwargs)
+        nom = kwargs['nom']
+        cur_nom = kwargs['cur_nom']
+        self.kwargs['team'] = nom.team
         self.subject = 'Nomination Change Approved'
-        team = kwargs['nom'].team
-        kwargs['team'] = team
-        cur_player = kwargs['cur_nom'].player
-        new_player = kwargs['nom'].player
-        self.recipients = self.get_recipients('', kwargs, non_fix=True)
+        self.recipients = self.get_recipients('', non_fix=True)
+        cur_player = cur_nom.player
+        new_player = nom.player
         self.body = (f"Hi,\n\nThe nomination change request to replace {cur_player} with "
-                     f"{new_player} for {team} has been approved.")
+                     f"{new_player} for {nom.team} has been approved.")
         self.html = (f"Hi,<br><br>The nomination change request to replace {cur_player} with "
-                     f"{new_player} for {team} has been approved.")
+                     f"{new_player} for {nom.team} has been approved.")
+
+
+class NominationRejectedEmail(LeagueEmail):
+    def __init__(self, fix, **kwargs):
+        super().__init__(fix, **kwargs)
+        nom = kwargs['nom']
+        cur_nom = kwargs['cur_nom']
+        reason = kwargs.get('reason', '')
+        self.kwargs['team'] = nom.team
+        self.subject = 'Nomination Change Request Rejected'
+        self.recipients = self.get_recipients('', non_fix=True)
+        reason_text = f'\n\nReason: {reason}' if reason else ''
+        reason_html = f'<br><br>Reason: {reason}' if reason else ''
+        self.body = (f"Hi,\n\nThe league committee has rejected the nomination change request "
+                     f"to replace {cur_nom.player} with {nom.player} for {nom.team}.{reason_text}\n\n"
+                     f"Please contact the league committee if you would like to discuss this.")
+        self.html = (f"Hi,<br><br>The league committee has rejected the nomination change request "
+                     f"to replace {cur_nom.player} with {nom.player} for {nom.team}.{reason_html}<br><br>"
+                     f"Please contact the league committee if you would like to discuss this.")
 
 
 EMAIL_CLASSES = {
@@ -247,6 +268,7 @@ EMAIL_CLASSES = {
     'nomination_penalty': NominationPenEmail,
     'eligibility_penalty': EligibilityPenEmail,
     'nomination_approved': NominationApprovedEmail,
+    'nomination_rejected': NominationRejectedEmail,
 }
 
 

@@ -21,6 +21,7 @@ from .utilities.roster import build_roster, get_clubs_teams
 from .utilities.stats import get_league_stats
 import league.constants as constants
 from datetime import date
+from datetime import datetime
 
 import urllib
 import pandas as pd
@@ -505,7 +506,7 @@ class TeamsView(GenericViewMixin, TemplateView):
         elif 'select' in pagename or 'venue' in pagename:
             
             # Check team selection window open
-            if not context['settings'].team_selection_window_open:
+            if not context['settings'].league_status == 'entry':
                 return {'view': 'windowclosed'}
 
             # Check club exists
@@ -977,13 +978,16 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
         nom_teams = [team for team in active_teams if not team.last_team()]
         nom_stats = [(team, team.check_nominations()) for team in nom_teams]
 
+        active_clubs = Club.objects.filter(active=True).order_by('name')
+
         # Update context
         context.update({
             'status': 'leagueAdmin',
             'penalties': Penalty.objects.filter(season=current_season),
             'nom_teams': nom_stats,
             'last_teams': last_teams,
-            'club_contacts': get_all_club_contacts()
+            'club_contacts': get_all_club_contacts(),
+            'clubs': active_clubs,
         })
 
         return context
@@ -998,17 +1002,11 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             penalty.delete()
             context.update({'status':'penaltydeleted'})
 
-        if 'noms' in update:
+        if 'leaguestatus' in update:
             settings = LeagueSettings.get()
-            settings.nomination_window_open = 'nomination_window_open' in request.POST
+            settings.league_status = request.POST.get('league_status', settings.league_status)
             settings.save()
-            return redirect(f"{self.request.path}?noms_updated=true")
-
-        if 'teamsel' in update:
-            settings = LeagueSettings.get()
-            settings.team_selection_window_open = 'team_selection_window_open' in request.POST
-            settings.save()
-            return redirect(f"{self.request.path}?teamsel_updated=true")
+            return redirect(f"{self.request.path}?leaguestatus_updated=true")
 
         return self.render_to_response(context)
 
@@ -1068,30 +1066,27 @@ class WebsiteAdminView(GenericViewMixin, TemplateView):
 
 class NominationsView(GenericViewMixin, TemplateView):
     template_name = "league/nominations.html"
-    active_tab = 'clubadmin'
 
     def get_context_data(self, **kwargs):
 
         context = super().get_context_data(**kwargs)
         pagename = kwargs.get('pagename','')
 
-        # If 'update' page requested and nomination window open, return team forms
-        if pagename == 'teamupdate':
-            if context['settings'].nomination_window_open:
-                context.update(self._teamupdate_context(context, data=None))
-            # If 'update' page requested but nomination window closed, return 'unavailable'
-            else:
-                context.update({'view':'unavailable'})
-
         # If admin view requested return current and requested nominations and player stats
-        elif pagename == 'admin':
+        if pagename == 'admin':
             context.update(self._admin_context(kwargs))
-
-        # Otherwise return specific individual nomination form
-        elif pagename == 'indiupdate':
-            if context['settings'].nomination_window_open:
-                context.update({'view':'indiunavailable'})
-            else:
+        
+        # If nomination window open, return team forms even if individual nom requested
+        elif context['settings'].league_status == 'fixtures':
+            context.update(self._teamupdate_context(context, data=None))
+            
+        # If season live...
+        elif context['settings'].league_status == 'live':
+            # If team update request, return unavailable
+            if pagename == 'teamupdate':   
+                context.update({'view':'unavailable'})
+            # Otherwise return specific individual nomination form
+            elif pagename == 'indiupdate':
                 context.update(self._indiupdate_context(context))
 
         return context
@@ -1169,7 +1164,7 @@ class NominationsView(GenericViewMixin, TemplateView):
 
     def _admin_context(self, kwargs):
         """Build context for the admin approval page."""
-        nom = TeamNomination.objects.get(id=kwargs['type'])
+        nom = TeamNomination.objects.get(id=kwargs['id'])
         current_nom = TeamNomination.objects.get(
             team=nom.team, position=nom.position, date_to=None, approved=True
         )
@@ -1179,6 +1174,7 @@ class NominationsView(GenericViewMixin, TemplateView):
             'current_nom': current_nom,
             'new_player_stats': get_player_appearances(nom.player),
             'cur_player_stats': get_player_appearances(current_nom.player),
+            'teams': get_clubs_teams(nom.player.club),
         }
 
     def _indiupdate_context(self, context):
@@ -1204,9 +1200,9 @@ class NominationsView(GenericViewMixin, TemplateView):
         if pagename == 'teamupdate':
             return self._handle_teamupdate_post(request, context)
         elif pagename == 'admin_approved':
-            return self._handle_admin_approved(context)
+            return self._handle_admin_approved()
         elif pagename == 'admin_rejected':
-            return self._handle_admin_rejected(context)
+            return self._handle_admin_rejected()
         elif pagename == 'indiupdate':
             return self._handle_indiupdate_post(request, context)
 
@@ -1253,14 +1249,26 @@ class NominationsView(GenericViewMixin, TemplateView):
         
         return self.render_to_response(context)
 
-    def _handle_admin_approved(self, context):
-        context['current_nom'].approved = True
-        context['current_nom'].save()
-        email_notification('nomination_approved', None, {'nom': context['current_nom']})
+    def _handle_admin_approved(self):
+        nom = TeamNomination.objects.get(id=self.kwargs['id'])
+        current_nom = TeamNomination.objects.get(
+            team=nom.team, position=nom.position, date_to=None, approved=True
+        )
+        current_nom.date_to = datetime.now()
+        current_nom.save()
+        nom.approved = True
+        nom.save()
+        email_notification('nomination_approved', None, nom=nom, cur_nom=current_nom)
         return redirect('nominations')
 
-    def _handle_admin_rejected(self, context):
-        context['current_nom'].delete()
+    def _handle_admin_rejected(self):
+        nom = TeamNomination.objects.get(id=self.kwargs['id'])
+        current_nom = TeamNomination.objects.get(
+            team=nom.team, position=nom.position, date_to=None, approved=True
+        )
+        reason = self.request.POST.get('reason', '')
+        email_notification('nomination_rejected', None, nom=nom, cur_nom=current_nom, reason=reason)
+        nom.delete()
         return redirect('nominations')
 
     def _handle_indiupdate_post(self, request, context):

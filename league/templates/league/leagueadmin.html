@@ -13,6 +13,21 @@
     <h1>League Admin Page</h1>
     <br>
     
+    {# ---- League Status ---- #}
+    <form action="/clubadmin/league/leaguestatus" method="post" style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
+        {% csrf_token %}
+        <label for="league_status"><b>League Status:</b></label>
+        <select name="league_status" id="league_status">
+            <option value="entry" {% if settings.league_status == "entry" %}selected{% endif %}>Team Entry</option>
+            <option value="fixtures" {% if settings.league_status == "fixtures" %}selected{% endif %}>Fixtures and Nominations</option>
+            <option value="live" {% if settings.league_status == "live" %}selected{% endif %}>Season Live</option>
+        </select>
+        <button type="submit" class="button">Save</button>
+        {% if request.GET.leaguestatus_updated == "true" %}
+        <span style="color:green;">&#10003; Status updated</span>
+        {% endif %}
+    </form>
+
     {# ---- Tab navigation ---- #}
     <div class="tab-bar">
         <button class="tab-btn active" data-tab="info">Information</button>
@@ -21,6 +36,22 @@
 
     {# ======== INFO TAB ======== #}
     <div id="tab-info" class="tab-content active">
+
+        <h2>Club Entry Status</h2>
+        <br>
+        <div class="table-wrap">
+            <table id="table" class="table">
+                <tr><th>Club</th><th>Teams Confirmed</th><th>Venues Confirmed</th></tr>
+                {% for club in clubs %}
+                <tr>
+                    <td>{{ club.name }}</td>
+                    <td>{% if club.teams_confirmed %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</td>
+                    <td>{% if club.venues_confirmed %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <br>
 
         <h2>Penalties for current season</h2>
         <br>
@@ -60,42 +91,7 @@
     {# ======== ACTIONS TAB ======== #}
     <div id="tab-actions" class="tab-content">
 
-        <h2>Nomination Window</h2>
-        <br>
-        <p>Check or uncheck the box below and click save to toggle the nomination window prior to the season starting.</p>
-        <br>
-        <form action="/clubadmin/league/noms" method="post">
-        {% csrf_token %}
-        <label>
-            <input type="checkbox" 
-                name="nomination_window_open" 
-                {% if settings.nomination_window_open %}checked{% endif %}>
-            Nomination Window Open
-        </label>  
-        <button type="submit">Save</button>  
-        {% if request.GET.noms_updated == "true" %}
-        <p style="color:red;">Setting updated!</p>
-        {% endif %}
-        </form>
-        <br>
-        <h2>Team Selection Window</h2>
-        <br>
-        <p>Check or uncheck the box below and click save to toggle the team selection window prior to the season starting.</p>
-        <br>
-        <form action="/clubadmin/league/teamsel" method="post">
-        {% csrf_token %}
-        <label>
-            <input type="checkbox" 
-                name="team_selection_window_open" 
-                {% if settings.team_selection_window_open %}checked{% endif %}>
-            Team Selection Window Open
-        </label>  
-        <button type="submit">Save</button>  
-        {% if request.GET.teamsel_updated == "true" %}
-        <p style="color:red;">Setting updated!</p>
-        {% endif %}
-        </form>
-        <br>
+
     </div>
 
 

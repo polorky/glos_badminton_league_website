@@ -1,3 +1,8 @@
+# Statuses the league can be in throughout the year
+SEASON_STATUSES = (("entry","Team Entry"),
+                   ("fixtures","Fixtures and Nominations"),
+                   ("live","Season Live"))
+
 # League defined parameters
 MIXED_PLAYERS = 6
 LEVEL_PLAYERS = 4

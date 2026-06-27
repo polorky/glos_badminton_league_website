@@ -32,349 +32,343 @@
 
 {% else %}
 
-<h1>{{ admin.club }}</h1>
-<br>
-
-{% if not member %}
-
-  {# ---- Deadline banners (shown when windows are open) ---- #}
-  {% if settings.team_selection_window_open %}
-    {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
-        <div class="banner banner-success">
-            <i class="ti ti-circle-check" aria-hidden="true"></i>
-            <span><strong>Team Entries submitted.</strong> You can still make changes before the end of July deadline. <a href="/teams/select{{ admin.club.get_club_url }}">Edit submission</a></span>
-        </div>
-    {% else %}
-        <div class="banner banner-warning">
-        ⚠️ <b>Team Entry deadline: end of July.</b>
-        <a href="/teams/select{{ admin.club.get_club_url }}">Submit teams</a> |
-        <a href="/teams/venue{{ admin.club.get_club_url }}">Submit venues &amp; timings</a>
-        </div>
-    {% endif %}
-  {% endif %}
-  {% if settings.nomination_window_open and admin.club.requires_noms %}
-    {% if admin.club.nominations_submitted %}
-        <div class="banner banner-success">
-            <i class="ti ti-circle-check" aria-hidden="true"></i>
-            <span><strong>Nominations submitted.</strong> You can still make changes before the deadline. <a href="/nominations/teamupdate">Edit nominations</a></span>
-        </div>
-    {% else %}
-        <div class="banner banner-warning">
-            ⚠️ <b>Nomination deadline: end of September or first match.</b>
-            <a href="/nominations/teamupdate">Make nominations</a>
-        </div>
-    {% endif %}
+    <h1>{{ admin.club }}</h1>
     <br>
-  {% endif %}
 
-{% endif %}
-
-{# ---- Tab navigation ---- #}
-<div class="tab-bar">
-    <button class="tab-btn active" data-tab="roster">Player Roster</button>
     {% if not member %}
-        <button class="tab-btn" data-tab="nominations">
-            Nominations
-            {% if settings.nomination_window_open and admin.club.requires_noms %}
-                {% if admin.club.nominations_submitted %}
-                    <span class="badge badge-done">Done</span>
-                {% else %}
-                    <span class="badge badge-pending">Pending</span>
-                {% endif %}
+
+        {# ---- Deadline banners (shown when windows are open) ---- #}
+        {% if settings.league_status == 'entry' %}
+            {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
+                <div class="banner banner-success">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i>
+                    <span><strong>Team Entries submitted.</strong> You can still make changes before the end of July deadline. <a href="/teams/select{{ admin.club.get_club_url }}">Edit submission</a></span>
+                </div>
+            {% else %}
+                <div class="banner banner-warning">
+                ⚠️ <b>Team Entry deadline: end of July.</b>
+                <a href="/teams/select{{ admin.club.get_club_url }}">Submit teams</a> |
+                <a href="/teams/venue{{ admin.club.get_club_url }}">Submit venues &amp; timings</a>
+                </div>
             {% endif %}
-        </button>
-        {% if settings.team_selection_window_open %}
-            <button class="tab-btn" data-tab="teamselection">
-                Team Entries
-                {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
-                    <span class="badge badge-done">Done</span>
-                {% else %}
-                    <span class="badge badge-pending">Pending</span>
-                {% endif %}
-            </button>
         {% endif %}
-        <button class="tab-btn" data-tab="other">Other</button>
-    {% endif %}
-</div>
 
-{# ======== ROSTER TAB ======== #}
-<div id="tab-roster" class="tab-content active">
-    <br>
-    {% if member %}
-        <p>This page is mostly for club admins. You are logged in as a club member so the admin functions are unavailable.</p>
-    {% else %}
-        <p>Below is the list of players at your club. Players can also be created when a result is submitted. You can add new players in the form below the table.
-        Players with an 'X' against a team are not eligible to play for that team.</p>
-        <br>
-        <p><b style="color:red;">Note: </b>Eligibility shown here is based on team type and nominations only. Players restricted due to playing four or more matches
-        for higher teams will NOT be shown as ineligible here but will still incur an automatic penalty.</p>
+        {% if settings.league_status == "fixtures" and admin.club.requires_noms %}
+            {% if admin.club.nominations_submitted %}
+                <div class="banner banner-success">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i>
+                    <span><strong>Nominations submitted.</strong> You can still make changes before the deadline. <a href="/nominations/teamupdate">Edit nominations</a></span>
+                </div>
+            {% else %}
+                <div class="banner banner-warning">
+                    ⚠️ <b>Nomination deadline: end of September or first match.</b>
+                    <a href="/nominations/teamupdate">Make nominations</a>
+                </div>
+            {% endif %}
+            <br>
+        {% endif %}
+
     {% endif %}
-    <br>
-    <div class="table-wrap">
-        <table id="table" class="table">
-            <tr>
-                <th rowspan="3">Name</th><th rowspan="3">Level</th>
-                <th colspan="2">Nominations</th>
-                <th colspan="{{ teams.Lengths.All }}">Teams Played For</th>
-                {% if not member %}<th rowspan="3">Amend</th>{% endif %}
-            </tr>
-            <tr>
-                <th rowspan="2">Mixed</th><th rowspan="2">Level</th>
-                {% if teams.Lengths.Mixed > 0 %}<th colspan="{{ teams.Lengths.Mixed }}">Mixed</th>{% endif %}
-                {% if teams.Lengths.Womens > 0 %}<th colspan="{{ teams.Lengths.Womens }}">Women's</th>{% endif %}
-                {% if teams.Lengths.Mens > 0 %}<th colspan="{{ teams.Lengths.Mens }}">Men's</th>{% endif %}
-            </tr>
-            <tr>
-                {% for team in teams.Mixed %}<th>{{ team.number }}</th>{% endfor %}
-                {% for team in teams.Womens %}<th>{{ team.number }}</th>{% endfor %}
-                {% for team in teams.Mens %}<th>{{ team.number }}</th>{% endfor %}
-            </tr>
-            {% for player, stats in playerstats.items %}
-            <tr>
-                <td><a href="/player/{{ player.id }}/clubadmin">{{ player.name }}</a></td>
-                <td>{{ player.level }}</td>
-                <td {% if 'P' in stats.noms.mixed %}id="yellowcell"
-                    {% elif 'R' in stats.noms.mixed %}id="greycell"
-                    {% elif stats.noms.mixed %}id="greencell"
-                    {% endif %}
-                >
-                    {% if 'P' not in stats.noms.mixed and 'R' not in stats.noms.mixed %}
-                        <a href="/nominations/indiupdate/{{ player.id }}X">{{ stats.noms.mixed }}</a>
+
+    {# ---- Tab navigation ---- #}
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="roster">Player Roster</button>
+        {% if not member %}
+            {% if settings.league_status == "fixtures" and admin.club.requires_noms %}
+                <button class="tab-btn" data-tab="nominations">
+                    Nominations
+                    {% if admin.club.nominations_submitted %}
+                        <span class="badge badge-done">Done</span>
                     {% else %}
-                        {{ stats.noms.mixed }}
+                        <span class="badge badge-pending">Pending</span>
                     {% endif %}
-                </td>
-                <td {% if 'P' in stats.noms.level %}id="yellowcell"
-                    {% elif 'R' in stats.noms.level %}id="greycell"
-                    {% elif stats.noms.level %}id="greencell"
-                    {% endif %}
-                >
-                    {% if 'P' not in stats.noms.level and 'R' not in stats.noms.level %}    
-                        <a href="/nominations/indiupdate/{{ player.id }}L">{{ stats.noms.level }}</a>
+                </button>
+            {% endif %}
+            {% if settings.league_status == "entry" %}
+                <button class="tab-btn" data-tab="teamselection">
+                    Team Entries
+                    {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
+                        <span class="badge badge-done">Done</span>
                     {% else %}
-                        {{ stats.noms.level }}
+                        <span class="badge badge-pending">Pending</span>
                     {% endif %}
-                </td>
-                {% for stat in stats.appearances.Mixed.values %}
-                    <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>
-                {% endfor %}
-                {% for stat in stats.appearances.Womens.values %}
-                    <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>
-                {% endfor %}
-                {% for stat in stats.appearances.Mens.values %}
-                    <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>
-                {% endfor %}
-                {% if not member %}
-                <td>
-                    {% if player.deletable %}
-                        <form action="/clubadmin/club/deleteplayer{{ player.id }}" method="post">{% csrf_token %}
-                            <input class="buttonred" type="submit" value="Delete">
-                        </form>
-                    {% elif player.possible_duplicate %}
-                        <form action="/clubadmin/club/duplicateplayer{{ player.id }}" method="post">{% csrf_token %}
-                            <input class="buttonorange" type="submit" value="Mark as duplicate">
-                        </form>
-                    {% endif %}
-                </td>
-                {% endif %}
-            </tr>
-            {% endfor %}
-        </table>
+                </button>
+            {% endif %}
+            <button class="tab-btn" data-tab="other">Other</button>
+        {% endif %}
     </div>
-    <br>
-    <p>For a list of your club's teams, see your <a href="/clubs/{{ admin.club.get_club_url }}">club's page</a>.</p>
 
-    {% if not member %}
-    <br>
-    <section id="newplayer">
-        <h3>Add a New Player</h3>
+    {# ======== ROSTER TAB ======== #}
+    <div id="tab-roster" class="tab-content active">
         <br>
-        <p>Enter the <u>full</u> name of new players and their level doubles type.</p>
-        <p><b style="color:red;">Please ensure the name format used here is also used on match scorecards.</b></p>
+        {% if member %}
+            <p>This page is mostly for club admins. You are logged in as a club member so the admin functions are unavailable.</p>
+        {% else %}
+            <p>Below is the list of players at your club. Players can also be created when a result is submitted. You can add new players in the form below the table.
+            Players with an 'X' against a team are not eligible to play for that team.</p>
+            <br>
+            <p><b style="color:red;">Note: </b>Eligibility shown here is based on team type and nominations only. Players restricted due to playing four or more matches
+            for higher teams will NOT be shown as ineligible here but will still incur an automatic penalty.</p>
+        {% endif %}
         <br>
-        <form action="/clubadmin/club/players" method="post">
-            {% csrf_token %}
-            <table>
-                {% for field in playerform %}
-                    <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
+        <div class="table-wrap">
+            <table id="table" class="table">
+                <tr>
+                    <th rowspan="3">Name</th><th rowspan="3">Level</th>
+                    <th colspan="2">Nominations</th>
+                    <th colspan="{{ teams.Lengths.All }}">Teams Played For</th>
+                    {% if not member %}<th rowspan="3">Amend</th>{% endif %}
+                </tr>
+                <tr>
+                    <th rowspan="2">Mixed</th><th rowspan="2">Level</th>
+                    {% if teams.Lengths.Mixed > 0 %}<th colspan="{{ teams.Lengths.Mixed }}">Mixed</th>{% endif %}
+                    {% if teams.Lengths.Womens > 0 %}<th colspan="{{ teams.Lengths.Womens }}">Women's</th>{% endif %}
+                    {% if teams.Lengths.Mens > 0 %}<th colspan="{{ teams.Lengths.Mens }}">Men's</th>{% endif %}
+                </tr>
+                <tr>
+                    {% for team in teams.Mixed %}<th>{{ team.number }}</th>{% endfor %}
+                    {% for team in teams.Womens %}<th>{{ team.number }}</th>{% endfor %}
+                    {% for team in teams.Mens %}<th>{{ team.number }}</th>{% endfor %}
+                </tr>
+                {% for player, stats in playerstats.items %}
+                <tr>
+                    <td><a href="/player/{{ player.id }}/clubadmin">{{ player.name }}</a></td>
+                    <td>{{ player.level }}</td>
+                    <td {% if 'P' in stats.noms.mixed %}id="yellowcell"
+                        {% elif 'R' in stats.noms.mixed %}id="greycell"
+                        {% elif stats.noms.mixed %}id="greencell"
+                        {% endif %}
+                    >
+                        {% if 'P' not in stats.noms.mixed and 'R' not in stats.noms.mixed %}
+                            <a href="/nominations/indiupdate/{{ player.id }}X">{{ stats.noms.mixed }}</a>
+                        {% else %}
+                            {{ stats.noms.mixed }}
+                        {% endif %}
+                    </td>
+                    <td {% if 'P' in stats.noms.level %}id="yellowcell"
+                        {% elif 'R' in stats.noms.level %}id="greycell"
+                        {% elif stats.noms.level %}id="greencell"
+                        {% endif %}
+                    >
+                        {% if 'P' not in stats.noms.level and 'R' not in stats.noms.level %}    
+                            <a href="/nominations/indiupdate/{{ player.id }}L">{{ stats.noms.level }}</a>
+                        {% else %}
+                            {{ stats.noms.level }}
+                        {% endif %}
+                    </td>
+                    {% for stat in stats.appearances.Mixed.values %}
+                        <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>
+                    {% endfor %}
+                    {% for stat in stats.appearances.Womens.values %}
+                        <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>
+                    {% endfor %}
+                    {% for stat in stats.appearances.Mens.values %}
+                        <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>
+                    {% endfor %}
+                    {% if not member %}
+                    <td>
+                        {% if player.deletable %}
+                            <form action="/clubadmin/club/deleteplayer{{ player.id }}" method="post">{% csrf_token %}
+                                <input class="buttonred" type="submit" value="Delete">
+                            </form>
+                        {% elif player.possible_duplicate %}
+                            <form action="/clubadmin/club/duplicateplayer{{ player.id }}" method="post">{% csrf_token %}
+                                <input class="buttonorange" type="submit" value="Mark as duplicate">
+                            </form>
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
                 {% endfor %}
             </table>
-            <br>
-            <input class="button" type="submit" value="Add Player">
-        </form>
-        {% if status == "playeradded" %}
-            <p style="color:green;">Player added!</p>
-        {% elif status == "playerduplicated" %}
-            <p style="color:red;">A player of that name already exists.</p>
-        {% endif %}
-    </section>
-    {% endif %}
-</div>
+        </div>
+        <br>
+        <p>For a list of your club's teams, see your <a href="/clubs/{{ admin.club.get_club_url }}">club's page</a>.</p>
 
-{# ======== NOMINATIONS TAB ======== #}
-{% if not member %}
-<div id="tab-nominations" class="tab-content">
-    <br>
-    {% if settings.nomination_window_open and not admin.club.requires_noms %}
-        <p>Your club has no teams that require nominations (you don't have multiple teams in any league).</p>
-    {% elif settings.nomination_window_open %}
+        {% if not member %}
+        <br>
+        <section id="newplayer">
+            <h3>Add a New Player</h3>
+            <br>
+            <p>Enter the <u>full</u> name of new players and their level doubles type.</p>
+            <p><b style="color:red;">Please ensure the name format used here is also used on match scorecards.</b></p>
+            <br>
+            <form action="/clubadmin/club/players" method="post">
+                {% csrf_token %}
+                <table>
+                    {% for field in playerform %}
+                        <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
+                    {% endfor %}
+                </table>
+                <br>
+                <input class="button" type="submit" value="Add Player">
+            </form>
+            {% if status == "playeradded" %}
+                <p style="color:green;">Player added!</p>
+            {% elif status == "playerduplicated" %}
+                <p style="color:red;">A player of that name already exists.</p>
+            {% endif %}
+        </section>
+        {% endif %}
+    </div>
+
+    {# ======== NOMINATIONS TAB ======== #}
+    {% if not member and settings.league_status == "fixtures" %}
+    <div id="tab-nominations" class="tab-content">
+        <br>
         <p>You can now make nominations for your club's teams:</p>
         <br>
         <p><a href="/nominations/teamupdate" class="button">Go to Nomination Page</a></p>
-    {% elif admin.club.requires_noms %}
-        <p>To request a change to a team nomination, click on the relevant link in the Nominations columns of the Player Roster.</p>
-    {% else %}
-        <p>The nomination window is not currently open.</p>
+    </div>
     {% endif %}
-</div>
 
-{# ======== TEAM ENTRY TAB ======== #}
-{% if settings.team_selection_window_open %}
-<div id="tab-teamselection" class="tab-content">
-    <br>
-    {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
-        <p>These are the teams you have confirmed previously. You have until the end of July to make any changes.</p>
+    {# ======== TEAM ENTRY TAB ======== #}
+    {% if settings.league_status == "entry" %}
+    <div id="tab-teamselection" class="tab-content">
         <br>
-        <div class="table-wrap" style="width:auto; display:inline-table;">
-            <table>
-                <tr><th>Mixed</th><th>Women's</th><th>Men's</th><th><b>Total</b></th></tr>
-                <tr>
-                    <td>{{ teams.Lengths.Mixed }}</td>
-                    <td>{{ teams.Lengths.Womens }}</td>
-                    <td>{{ teams.Lengths.Mens }}</td>
-                    <td><b>{{ teams.Lengths.All }}</b></td>
-                </tr>
-            </table>
-        </div>
-        <br><br>
-        <p>Your club has entered {{ teams.Lengths.All }} teams. The cost of entering a team is £{{ entry_fee }} so your total is £{{ total_fee }}.</p>
-    {% else %}
-        <p>Please <a href="/teams/select{{ admin.club.get_club_url }}">click here</a> to select the teams you plan to entry next season.</p>
-        <br>
-        <p>Please also <a href="/teams/venue{{ admin.club.get_club_url }}">click here</a> to select normal venues and timings for each team.</p>
-        <br>
-        <p style="color:red;">Teams must be submitted with venue and timings by the end of July.</p>
+        {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
+            <p>These are the teams you have confirmed previously. You have until the end of July to make any changes.</p>
+            <br>
+            <div class="table-wrap" style="width:auto; display:inline-table;">
+                <table>
+                    <tr><th>Mixed</th><th>Women's</th><th>Men's</th><th><b>Total</b></th></tr>
+                    <tr>
+                        <td>{{ teams.Lengths.Mixed }}</td>
+                        <td>{{ teams.Lengths.Womens }}</td>
+                        <td>{{ teams.Lengths.Mens }}</td>
+                        <td><b>{{ teams.Lengths.All }}</b></td>
+                    </tr>
+                </table>
+            </div>
+            <br><br>
+            <p>Your club has entered {{ teams.Lengths.All }} teams. The cost of entering a team is £{{ entry_fee }} so your total is £{{ total_fee }}.</p>
+        {% else %}
+            <p>Please <a href="/teams/select{{ admin.club.get_club_url }}">click here</a> to select the teams you plan to entry next season.</p>
+            <br>
+            <p>Please also <a href="/teams/venue{{ admin.club.get_club_url }}">click here</a> to select normal venues and timings for each team.</p>
+            <br>
+            <p style="color:red;">Teams must be submitted with venue and timings by the end of July.</p>
+        {% endif %}
+    </div>
     {% endif %}
-</div>
-{% endif %}
 
-{# ======== OTHER TAB (accordion) ======== #}
-<div id="tab-other" class="tab-content">
-    <br>
-
-    <details id="penalties">
-        <summary><h3>Club Penalties</h3></summary>
-        <div class="detail-body">
+    {# ======== OTHER TAB (accordion) ======== #}
+    <div id="tab-other" class="tab-content">
         <br>
-        {% if penalties %}
-            <p>Penalties incurred this season:</p>
+
+        <details id="penalties">
+            <summary><h3>Club Penalties</h3></summary>
+            <div class="detail-body">
+            <br>
+            {% if penalties %}
+                <p>Penalties incurred this season:</p>
+                <div class="table-wrap">
+                    <table class="table">
+                        <tr><th>Type</th><th>Points</th><th>Team</th><th>Fixture</th><th>Player</th></tr>
+                        {% for penalty in penalties %}
+                            <tr><td>{{ penalty.penalty_type }}</td><td>{{ penalty.penalty_value }}</td>
+                                <td>{{ penalty.team }}</td><td>{{ penalty.fixture }}</td><td>{{ penalty.player }}</td></tr>
+                        {% endfor %}
+                    </table>
+                </div>
+            {% else %}
+                <p>No penalties incurred this season.</p>
+            {% endif %}
+            <br>
+            </div>
+        </details>
+
+        <details id="contacts">
+            <summary><h3>Club Contacts</h3></summary>
+            <div class="detail-body">
+            <br>
+            <p><b style="color:red;">Please Note: </b>The first five fields are visible to all website visitors. League contacts are only visible to logged-in users.</p>
+            <br>
+            <form action="/clubadmin/club/contacts" method="post">
+                {% csrf_token %}
+                <table>
+                    {% for field in clubform %}
+                        <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
+                    {% endfor %}
+                </table>
+                <br>
+                <input class="button" type="submit" value="Update Contact Details">
+                {% if status == "contactupdated" %}<p style="color:green;">Contacts updated!</p>{% endif %}
+            </form>
+            <br>
+            </div>
+        </details>
+
+        <details id="clubnights">
+            <summary><h3>Club Nights</h3></summary>
+            <div class="detail-body">
+            <br>
+            <p>Add your club nights here — these will be displayed on your club's public page.</p>
+            <p>If your venue is not in the list, add it in the Venues section below first.</p>
+            <br>
+            <form action="/clubadmin/club/clubnight" method="post">
+                {% csrf_token %}
+                <table>
+                    {% for field in clubnightform %}
+                        <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
+                    {% endfor %}
+                </table>
+                <br>
+                <input class="button" type="submit" value="Add Club Night">
+            </form>
+            {% if request.GET.updated == 'clubnightadded' %}<p style="color:green;">Club night added!</p>{% endif %}
+            {% if request.GET.updated == 'clubnightdeleted' %}<p style="color:green;">Club night deleted!</p>{% endif %}
+            <br>
             <div class="table-wrap">
                 <table class="table">
-                    <tr><th>Type</th><th>Points</th><th>Team</th><th>Fixture</th><th>Player</th></tr>
-                    {% for penalty in penalties %}
-                        <tr><td>{{ penalty.penalty_type }}</td><td>{{ penalty.penalty_value }}</td>
-                            <td>{{ penalty.team }}</td><td>{{ penalty.fixture }}</td><td>{{ penalty.player }}</td></tr>
+                    <tr><th>Venue</th><th>Timings</th><th>Delete</th></tr>
+                    {% for clubnight in clubnights %}
+                        <tr>
+                            <td>{{ clubnight.venue }}</td><td>{{ clubnight.timings }}</td>
+                            <td><form action="/clubadmin/club/deletecn{{ clubnight.id }}" method="post">
+                                {% csrf_token %}<input class="buttonred" type="submit" value="Delete">
+                            </form></td>
+                        </tr>
                     {% endfor %}
                 </table>
             </div>
-        {% else %}
-            <p>No penalties incurred this season.</p>
-        {% endif %}
-        <br>
-        </div>
-    </details>
-
-    <details id="contacts">
-        <summary><h3>Club Contacts</h3></summary>
-        <div class="detail-body">
-        <br>
-        <p><b style="color:red;">Please Note: </b>The first five fields are visible to all website visitors. League contacts are only visible to logged-in users.</p>
-        <br>
-        <form action="/clubadmin/club/contacts" method="post">
-            {% csrf_token %}
-            <table>
-                {% for field in clubform %}
-                    <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
-                {% endfor %}
-            </table>
             <br>
-            <input class="button" type="submit" value="Update Contact Details">
-            {% if status == "contactupdated" %}<p style="color:green;">Contacts updated!</p>{% endif %}
-        </form>
-        <br>
-        </div>
-    </details>
+            </div>
+        </details>
 
-    <details id="clubnights">
-        <summary><h3>Club Nights</h3></summary>
-        <div class="detail-body">
-        <br>
-        <p>Add your club nights here — these will be displayed on your club's public page.</p>
-        <p>If your venue is not in the list, add it in the Venues section below first.</p>
-        <br>
-        <form action="/clubadmin/club/clubnight" method="post">
-            {% csrf_token %}
-            <table>
-                {% for field in clubnightform %}
-                    <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
-                {% endfor %}
-            </table>
+        <details id="newvenue">
+            <summary><h3>Add a New Venue</h3></summary>
+            <div class="detail-body">
             <br>
-            <input class="button" type="submit" value="Add Club Night">
-        </form>
-        {% if request.GET.updated == 'clubnightadded' %}<p style="color:green;">Club night added!</p>{% endif %}
-        {% if request.GET.updated == 'clubnightdeleted' %}<p style="color:green;">Club night deleted!</p>{% endif %}
-        <br>
-        <div class="table-wrap">
-            <table class="table">
-                <tr><th>Venue</th><th>Timings</th><th>Delete</th></tr>
-                {% for clubnight in clubnights %}
-                    <tr>
-                        <td>{{ clubnight.venue }}</td><td>{{ clubnight.timings }}</td>
-                        <td><form action="/clubadmin/club/deletecn{{ clubnight.id }}" method="post">
-                            {% csrf_token %}<input class="buttonred" type="submit" value="Delete">
-                        </form></td>
-                    </tr>
+            <p>Add a new match venue here. League admins will be notified to add the Google Map view.</p>
+            <br>
+            <form action="/clubadmin/club/venue" method="post">
+                {% csrf_token %}
+                {% for field in venueform %}
+                    <p><b style="vertical-align:top;">{{ field.label_tag }} </b>{{ field }}</p>
                 {% endfor %}
-            </table>
-        </div>
-        <br>
-        </div>
-    </details>
+                <input class="button" type="submit" value="Add Venue">
+            </form>
+            {% if request.GET.updated == 'newvenue' %}<p style="color:green;">Venue added!</p>{% endif %}
+            {% if request.GET.updated == 'venueduplicated' %}<p style="color:red;">A venue of that name already exists.</p>{% endif %}
+            <br>
+            </div>
+        </details>
 
-    <details id="newvenue">
-        <summary><h3>Add a New Venue</h3></summary>
-        <div class="detail-body">
-        <br>
-        <p>Add a new match venue here. League admins will be notified to add the Google Map view.</p>
-        <br>
-        <form action="/clubadmin/club/venue" method="post">
-            {% csrf_token %}
-            {% for field in venueform %}
-                <p><b style="vertical-align:top;">{{ field.label_tag }} </b>{{ field }}</p>
-            {% endfor %}
-            <input class="button" type="submit" value="Add Venue">
-        </form>
-        {% if request.GET.updated == 'newvenue' %}<p style="color:green;">Venue added!</p>{% endif %}
-        {% if request.GET.updated == 'venueduplicated' %}<p style="color:red;">A venue of that name already exists.</p>{% endif %}
-        <br>
-        </div>
-    </details>
+        <details id="password">
+            <summary><h3>Change Club Password</h3></summary>
+            <div class="detail-body">
+            <br>
+            <p>Click <a href="{% url 'change-password' %}">here</a> to change the password for your club account.
+            Please ensure any club members who need it are aware of the new password.</p>
+            <br>
+            </div>
+        </details>
 
-    <details id="password">
-        <summary><h3>Change Club Password</h3></summary>
-        <div class="detail-body">
-        <br>
-        <p>Click <a href="{% url 'change-password' %}">here</a> to change the password for your club account.
-        Please ensure any club members who need it are aware of the new password.</p>
-        <br>
-        </div>
-    </details>
+    </div>
 
-</div>
 {% endif %}
 
-{% endif %}
 {% endblock content %}
 
 {% block extra_scripts %}
