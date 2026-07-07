@@ -140,6 +140,11 @@ class DivisionsView(GenericViewMixin, TemplateView):
             # If concessions exist a note will be added next to table
             concessions = any(fix.status in ["Conceded (H)", "Conceded (A)"] for fix in fixtures)
 
+            if len(fixtures) == 0:
+                offseason = True
+            else:
+                offseason = False
+            
             context.update({
                 'view': 'view',
                 'division': division,
@@ -151,6 +156,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
                 'prev_div': prev_div,
                 'next_div': next_div,
                 'exist': exist,
+                'offseason': offseason,
             })
 
         return context
