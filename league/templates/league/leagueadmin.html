@@ -57,12 +57,12 @@
         <div class="table-wrap">
             <table id="table" class="table">
                 <tr><th>Club</th><th>Mixed</th><th>Men's</th><th>Women's</th></tr>
-                {% for club in teams_compared %}
+                {% for club, values in teams_compared.items %}
                 <tr>
                     <td>{{ club.name }}</td>
-                    <td>{{ teams_compared.club.mixed }}</td>
-                    <td>{{ teams_compared.club.mens }}</td>
-                    <td>{{ teams_compared.club.womens }}</td>
+                    <td>{{ values.mixed }}</td>
+                    <td>{{ values.mens }}</td>
+                    <td>{{ values.womens }}</td>
                 </tr>
                 {% endfor %}
             </table>
