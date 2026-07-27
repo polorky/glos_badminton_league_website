@@ -13,15 +13,14 @@ from .forms import *
 from .utilities.player import verify_away_players, correct_duplicate_player, get_player_stats, get_player_appearances
 from .utilities.download import download_fixtures, parse_fixtures
 from .utilities.team import get_performances
-from .utilities.fixture import get_fixture_stats, get_scores
+from .utilities.fixture import get_fixture_stats, get_scores, create_season_fixtures
 from .utilities.email import email_notification, email_admin, get_all_club_contacts
 from .utilities.table import build_table
 from .utilities.season import get_adj_seasons
 from .utilities.roster import build_roster, get_clubs_teams
 from .utilities.stats import get_league_stats
 import league.constants as constants
-from datetime import date
-from datetime import datetime
+from datetime import date, datetime, time
 
 import urllib
 import pandas as pd
@@ -964,6 +963,76 @@ class ClubAdminView(GenericViewMixin, TemplateView):
         return self.render_to_response(context)
 
 @method_decorator(login_required, name='dispatch')
+class FixtureDatesView(GenericViewMixin, TemplateView):
+    template_name = "league/fixture_dates.html"
+    active_tab = 'clubadmin'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f'/login/?next={request.path}')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        if not context['admin'] or context['member']:
+            return context
+
+        club = context['admin'].club
+        current_season = context['current_season']
+
+        home_fixtures = (Fixture.objects
+            .filter(season=current_season, home_team__club=club)
+            .select_related('home_team', 'away_team', 'division')
+            .order_by('division__type', 'division__number', 'home_team__number', 'away_team__number'))
+
+        grouped = {}
+        for fix in home_fixtures:
+            div = fix.division
+            team = fix.home_team
+            if div not in grouped:
+                grouped[div] = {}
+            if team not in grouped[div]:
+                grouped[div][team] = {
+                    'fixtures': [],
+                    'form': TeamForm(instance=team, variant='Venue'),
+                }
+            grouped[div][team]['fixtures'].append(fix)
+
+        context.update({'grouped_fixtures': grouped})
+        return context
+
+    def post(self, request, **kwargs):
+        context = self.get_context_data(**kwargs)
+        team_id = self.kwargs.get('team_id')
+        club = context['admin'].club
+
+        try:
+            team = Team.objects.get(id=team_id, club=club)
+        except Team.DoesNotExist:
+            return redirect('fixture_dates')
+
+        if request.POST.get('action') == 'update_team':
+            form = TeamForm(request.POST, instance=team, variant='Venue')
+            if form.is_valid():
+                form.save()
+            return redirect(f'/fixtures/dates?team_saved={team_id}#{team_id}')
+
+        for key, value in request.POST.items():
+            if key.startswith('date_') and value:
+                try:
+                    fixture_id = int(key[5:])
+                    fixture = Fixture.objects.get(id=fixture_id, home_team=team)
+                    date_val = datetime.strptime(value, '%Y-%m-%d').date()
+                    start = team.start_time if team.start_time else time(0, 0)
+                    fixture.date_time = datetime.combine(date_val, start)
+                    fixture.save()
+                except (Fixture.DoesNotExist, ValueError):
+                    pass
+
+        return redirect(f'/fixtures/dates?saved={team_id}#{team_id}')
+
+@method_decorator(login_required, name='dispatch')
 class LeagueAdminView(GenericViewMixin, TemplateView):
     template_name = "league/leagueadmin.html"
     active_tab = 'clubadmin'
@@ -977,6 +1046,10 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
         context = super().get_context_data(**kwargs)
 
         current_season = Season.objects.get(current=True)
+        prev_season, _ = get_adj_seasons(current_season)
+
+        prev_season = Season.objects.filter(current=False).order_by('-year').first()
+        prev_teams = Team.objects.filter(Q(home__season=prev_season) | Q(away__season=prev_season)).distinct()
 
         # Get nomination stats
         active_teams = Team.objects.filter(active=True).order_by("club","type","number")
@@ -986,6 +1059,24 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
 
         active_clubs = Club.objects.filter(active=True).order_by('name')
 
+        teams_compared = {}
+        for club in active_clubs:
+            if not club.teams_confirmed:
+                continue
+            teams_compared[club] = {}
+            league_types = ("mixed","mens","womens")
+            for lt in league_types:
+                new_teams = active_teams.filter(club=club, type=lt).count()
+                old_teams = prev_teams.filter(club=club, type=lt).count()
+                diff = new_teams - old_teams
+                if diff > 0:
+                    team_str = f'{new_teams} (+{diff})' 
+                elif diff == 0:
+                    team_str = f'{new_teams} (same)'
+                elif diff < 0:
+                    team_str = f'{new_teams} ({diff})'
+                teams_compared[club][lt] = team_str
+
         # Update context
         context.update({
             'status': 'leagueAdmin',
@@ -994,6 +1085,7 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             'last_teams': last_teams,
             'club_contacts': get_all_club_contacts(),
             'clubs': active_clubs,
+            'teams_compared': teams_compared,
         })
 
         return context
@@ -1013,6 +1105,10 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             settings.league_status = request.POST.get('league_status', settings.league_status)
             settings.save()
             return redirect(f"{self.request.path}?leaguestatus_updated=true")
+
+        if 'createfixtures' in update:
+            create_season_fixtures()
+            return redirect(f"{self.request.path}?fixtures_created=true")
 
         return self.render_to_response(context)
 

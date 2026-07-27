@@ -68,11 +68,27 @@
             <br>
         {% endif %}
 
+        {% if settings.league_status == "fixtures" %}
+            {% if admin.club.fixtures_confirmed %}
+                <div class="banner banner-success">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i>
+                    <span><strong>Fixtures arranged.</strong> You can still make changes before the deadline. <a href="/fixtures/dates">Edit fixtures</a></span>
+                </div>
+            {% else %}
+                <div class="banner banner-warning">
+                    ⚠️ <b>Fixture deadline: end of September or first match.</b>
+                    <a href="/fixtures/dates">Submit fixture dates</a>
+                </div>
+            {% endif %}
+            <br>
+        {% endif %}
+
     {% endif %}
 
     {# ---- Tab navigation ---- #}
     <div class="tab-bar">
         <button class="tab-btn active" data-tab="roster">Player Roster</button>
+        
         {% if not member %}
             {% if settings.league_status == "fixtures" and admin.club.requires_noms %}
                 <button class="tab-btn" data-tab="nominations">
@@ -84,6 +100,7 @@
                     {% endif %}
                 </button>
             {% endif %}
+            
             {% if settings.league_status == "entry" %}
                 <button class="tab-btn" data-tab="teamselection">
                     Team Entries
@@ -94,6 +111,18 @@
                     {% endif %}
                 </button>
             {% endif %}
+
+            {% if settings.league_status == "fixtures" %}
+                <button class="tab-btn" data-tab="fixturedates">
+                    Fixtures
+                    {% if admin.club.fixtures_confirmed %}
+                        <span class="badge badge-done">Done</span>
+                    {% else %}
+                        <span class="badge badge-pending">Pending</span>
+                    {% endif %}
+                </button>
+            {% endif %}
+
             <button class="tab-btn" data-tab="other">Other</button>
         {% endif %}
     </div>
@@ -223,7 +252,7 @@
     {% endif %}
 
     {# ======== TEAM ENTRY TAB ======== #}
-    {% if settings.league_status == "entry" %}
+    {% if not member and settings.league_status == "entry" %}
     <div id="tab-teamselection" class="tab-content">
         <br>
         {% if admin.club.teams_confirmed and admin.club.venues_confirmed %}
@@ -250,6 +279,13 @@
             <p style="color:red;">Teams must be submitted with venue and timings by the end of July.</p>
         {% endif %}
     </div>
+    {% endif %}
+
+    {# ======== FIXTURE DATES TAB ======== #}
+    {% if not member and settings.league_status == "fixtures" %}
+        <div id="tab-fixturedates" class="tab-content">
+            <p>Click <a href="/fixtures/dates">here</a> to enter or update the dates for all your teams' fixtures.</p>
+        </div>
     {% endif %}
 
     {# ======== OTHER TAB (accordion) ======== #}

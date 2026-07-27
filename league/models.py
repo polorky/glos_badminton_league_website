@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
+from datetime import datetime
 import urllib
 import league.constants as constants
 from django.core.exceptions import ObjectDoesNotExist
@@ -114,6 +115,13 @@ class Club(models.Model):
             if not team.home_venue or not team.start_time or not team.end_time:
                 return False
         return True
+    
+    def fixtures_confirmed(self):
+        current_season = Season.objects.get(current=True)
+        return Fixture.objects.filter(
+            season=current_season, 
+            home_team__club=self, 
+            date_time__isnull=False).exists()
 
     def requires_noms(self):
         '''Checks whether club needs to submit nominations'''
@@ -289,7 +297,7 @@ class Team(models.Model):
         else:
             all_fix = list(Fixture.objects.filter(season=current_season).filter(home_filter|away_filter).filter(status=status))
 
-        all_fix.sort(key=lambda x: x.date_time)
+        all_fix.sort(key=lambda x: x.date_time or datetime.max)
 
         return all_fix
 

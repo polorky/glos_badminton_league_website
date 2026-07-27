@@ -43,6 +43,7 @@ ALTERNATE_NAMES = (('David','Dave'),('Stuart','Stu'),('Richard','Rich'),('Alexan
 # Download full results for previous season
 # Get perfomances for teams (on league admin Club Admin page)
 # Create new clubs/teams
+# Remove teams_confirmed check on clubs
 # Update teams with new divisions and 'active' flag
 # Upload fixtures
 # Open nominations

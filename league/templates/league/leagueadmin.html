@@ -52,6 +52,22 @@
             </table>
         </div>
         <br>
+        <h2>Team changes</h2>
+        <br>
+        <div class="table-wrap">
+            <table id="table" class="table">
+                <tr><th>Club</th><th>Mixed</th><th>Men's</th><th>Women's</th></tr>
+                {% for club in teams_compared %}
+                <tr>
+                    <td>{{ club.name }}</td>
+                    <td>{{ teams_compared.club.mixed }}</td>
+                    <td>{{ teams_compared.club.mens }}</td>
+                    <td>{{ teams_compared.club.womens }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <br>
 
         <h2>Penalties for current season</h2>
         <br>
@@ -91,6 +107,18 @@
     {# ======== ACTIONS TAB ======== #}
     <div id="tab-actions" class="tab-content">
 
+        <h2>Generate Season Fixtures</h2>
+        <br>
+        <p>Creates home and away fixtures for every team pairing in each active division. Has no effect if fixtures already exist for the current season.</p>
+        <br>
+        <form action="/clubadmin/league/createfixtures" method="post">
+            {% csrf_token %}
+            <button class="buttongreen" type="submit">Create Season Fixtures</button>
+            {% if request.GET.fixtures_created == "true" %}
+            <span style="color:green; margin-left:12px;">&#10003; Done — fixtures generated (or already existed)</span>
+            {% endif %}
+        </form>
+        <br>
 
     </div>
 

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule Fixture Dates{% endblock title %}
+
+{% block content %}
+
+<h1>Schedule Home Fixture Dates</h1>
+<br>
+<p>Set the date for each of your club's home fixtures. Save each team's section independently — you don't need to fill in all dates at once.</p>
+<br>
+
+{% if not grouped_fixtures %}
+    <p>No home fixtures found for the current season.</p>
+{% endif %}
+
+{% for division, teams in grouped_fixtures.items %}
+
+<h2><u>{{ division }}</u></h2>
+<br>
+
+{% for team, team_data in teams.items %}
+<section id="{{ team.id }}">
+    <h3>{{ team }}</h3>
+    <br>
+
+    {# ---- Venue / timing accordion ---- #}
+    <details id="details-{{ team.id }}">
+        <summary><b>Venue &amp; Match Timings</b>-<i>Only required if you want to change the team's home venue, start or finish times</i></summary>
+        <div class="detail-body">
+        <br>
+        <form method="post" action="{% url 'fixture_dates_team' team.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="update_team">
+            <table>
+                {% for field in team_data.form %}
+                <tr><td>{{ field.label_tag }}</td><td>{{ field }}</td></tr>
+                {% endfor %}
+            </table>
+            <br>
+            <button class="button" type="submit">Save Venue &amp; Timings</button>
+            {% if request.GET.team_saved == team.id|stringformat:"s" %}
+                <span style="color:green; margin-left:12px;">&#10003; Saved</span>
+            {% endif %}
+        </form>
+        <br>
+        </div>
+    </details>
+    <br>
+
+    {# ---- Fixture dates ---- #}
+    {% if team_data.form.instance.start_time %}
+        <p><b>Match start time:</b> {{ team_data.form.instance.start_time|time:'H:i' }} — this will be combined with the date you enter below.</p>
+    {% else %}
+        <p style="color:orange;"><b>Warning:</b> no start time is recorded for {{ team }}. Dates will be saved at midnight until a start time is set above.</p>
+    {% endif %}
+    <br>
+    <form method="post" action="{% url 'fixture_dates_team' team.id %}">
+        {% csrf_token %}
+        <div class="table-wrap">
+            <table id="table" class="table">
+                <tr>
+                    <th>Away Team</th>
+                    <th>Current Date</th>
+                    <th>Set Date</th>
+                </tr>
+                {% for fix in team_data.fixtures %}
+                <tr>
+                    <td>{{ fix.away_team }}</td>
+                    <td>
+                        {% if fix.date_time %}
+                            {{ fix.date_time|date:'D j M Y, H:i' }}
+                        {% else %}
+                            <span style="color:#999;">TBC</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <input type="date"
+                               name="date_{{ fix.id }}"
+                               value="{% if fix.date_time %}{{ fix.date_time|date:'Y-m-d' }}{% endif %}">
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <br>
+        <button class="buttongreen" type="submit">Save {{ team }} Dates</button>
+        {% if request.GET.saved == team.id|stringformat:"s" %}
+            <span style="color:green; margin-left:12px;">&#10003; Dates saved</span>
+        {% endif %}
+    </form>
+    <br>
+</section>
+{% endfor %}
+
+{% endfor %}
+
+{% endblock content %}
+
+{% block extra_scripts %}
+<script>
+    // Re-open the venue accordion after a team save so the confirmation is visible
+    const teamSaved = new URLSearchParams(window.location.search).get('team_saved');
+    if (teamSaved) {
+        const details = document.getElementById('details-' + teamSaved);
+        if (details) details.open = true;
+    }
+</script>
+{% endblock %}

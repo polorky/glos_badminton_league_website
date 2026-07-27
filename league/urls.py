@@ -16,6 +16,8 @@ urlpatterns = [
     path('stats', views.StatsView.as_view(), name='stats'),
 
     path('fixtures/update/<str:fixid>/<str:pagename>/<str:source>', views.FixUpdateView.as_view(), name='fixture_update'),
+    path('fixtures/dates', views.FixtureDatesView.as_view(), name='fixture_dates'),
+    path('fixtures/dates/<int:team_id>', views.FixtureDatesView.as_view(), name='fixture_dates_team'),
     path('fixtures/<str:pagename>/<str:source>', views.FixturesView.as_view(), name='fixtures'),
     path('fixtures/<str:pagename>', views.FixturesView.as_view(), name='fixtures'),
 
