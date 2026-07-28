@@ -56,13 +56,14 @@
         <br>
         <div class="table-wrap">
             <table id="table" class="table">
-                <tr><th>Club</th><th>Mixed</th><th>Men's</th><th>Women's</th></tr>
+                <tr><th>Club</th><th>Mixed</th><th>Men's</th><th>Women's</th><th>Total</th></tr>
                 {% for club, values in teams_compared.items %}
                 <tr>
                     <td>{{ club.name }}</td>
                     <td>{{ values.mixed }}</td>
                     <td>{{ values.mens }}</td>
                     <td>{{ values.womens }}</td>
+                    <td>{{ values.total }}</td>
                 </tr>
                 {% endfor %}
             </table>

@@ -1063,7 +1063,7 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
         for club in active_clubs:
             if not club.teams_confirmed:
                 continue
-            teams_compared[club] = {}
+            teams_compared[club] = {"total": active_teams.filter(club=club).count()}
             league_types = ("mixed","mens","womens")
             for lt in league_types:
                 new_teams = active_teams.filter(club=club, type=lt).count()
