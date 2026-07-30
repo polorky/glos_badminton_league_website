@@ -271,6 +271,10 @@
             </div>
             <br><br>
             <p>Your club has entered {{ teams.Lengths.All }} teams. The cost of entering a team is £{{ entry_fee }} so your total is £{{ total_fee }}.</p>
+            <br>
+            <p>You can adjust the number of teams entered <a href="/teams/select{{ admin.club.get_club_url }}">here</a>.</p>
+            <br>
+            <p>You can adjust your venues and timings <a href="/teams/venue{{ admin.club.get_club_url }}">here</a>.</p>
         {% else %}
             <p>Please <a href="/teams/select{{ admin.club.get_club_url }}">click here</a> to select the teams you plan to entry next season.</p>
             <br>
