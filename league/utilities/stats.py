@@ -111,12 +111,12 @@ def get_league_stats(season='current'):
         'Teams with perfect records': [],
         'Mixed Team with most points per match': None,
         "Women's Team with most points per match": None,
-        "Men's Team with most points per match": None,
+        "Open Team with most points per match": None,
         'Most games won on setting': set_string,
         'Most matches whitewashed': ww_string,
         'Biggest Average Game Winning Margin (Mixed)': None,
         "Biggest Average Game Winning Margin (Women's)": None,
-        "Biggest Average Game Winning Margin (Men's)": None,
+        "Biggest Average Game Winning Margin (Open)": None,
     }
 
     for team, team_stats in team_dict.items():
@@ -152,18 +152,18 @@ def get_league_stats(season='current'):
                 current = float(stats["Biggest Average Game Winning Margin (Women's)"].split('(')[1].replace(')',''))
                 if avemgn > current:
                     stats["Biggest Average Game Winning Margin (Women's)"] = f'{team} ({avemgn})'
-        elif team_type == 'Mens':
-            if not stats["Men's Team with most points per match"]:
-                stats["Men's Team with most points per match"] = f'{team} ({ppm})'
+        elif team_type == 'Open':
+            if not stats["Open Team with most points per match"]:
+                stats["Open Team with most points per match"] = f'{team} ({ppm})'
             else:
-                current = float(stats["Men's Team with most points per match"].split('(')[1].replace(')',''))
+                current = float(stats["Open Team with most points per match"].split('(')[1].replace(')',''))
                 if ppm > current:
-                    stats["Men's Team with most points per match"] = f'{team} ({ppm})'
-            if not stats["Biggest Average Game Winning Margin (Men's)"]:
-                stats["Biggest Average Game Winning Margin (Men's)"] = f'{team} ({avemgn})'
+                    stats["Open Team with most points per match"] = f'{team} ({ppm})'
+            if not stats["Biggest Average Game Winning Margin (Open)"]:
+                stats["Biggest Average Game Winning Margin (Open)"] = f'{team} ({avemgn})'
             else:
-                current = float(stats["Biggest Average Game Winning Margin (Men's)"].split('(')[1].replace(')',''))
+                current = float(stats["Biggest Average Game Winning Margin (Open)"].split('(')[1].replace(')',''))
                 if avemgn > current:
-                    stats["Biggest Average Game Winning Margin (Men's)"] = f'{team} ({avemgn})'
+                    stats["Biggest Average Game Winning Margin (Open)"] = f'{team} ({avemgn})'
 
     return stats

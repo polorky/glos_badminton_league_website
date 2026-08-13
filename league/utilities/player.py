@@ -58,7 +58,7 @@ def find_away_players(data, fixture):
         if player in [d['player'] for d in players_found.values()]:
             player_errors.append("There are duplicated away players")
         # If mixed match and player male in female position, report error
-        elif match_type == "Mixed" and player_title[-1] in ['1','2','3'] and player.level == "Mens":
+        elif match_type == "Mixed" and player_title[-1] in ['1','2','3'] and player.level == "Open":
             player_errors.append("Away Player " + player_title[-1] + " found but is recorded as a man, please check you have entered \
                                  them in the correct position")
         # If mixed match and player female in male position, report error
@@ -66,10 +66,10 @@ def find_away_players(data, fixture):
             player_errors.append("Away Player " + player_title[-1] + " found but is recorded as a lady, please check you have entered \
                                  them in the correct position")
         # If ladies match but player is male, report error
-        elif match_type == "Ladies" and player.level == "Mens":
+        elif match_type == "Ladies" and player.level == "Open":
             player_errors.append("Away Player " + player_title[-1] + " found but is recorded as playing in mens league")
         # If mens match but player is female, report error
-        elif match_type == "Mens" and player.level == "Ladies":
+        elif match_type == "Open" and player.level == "Ladies":
             player_errors.append("Away Player " + player_title[-1] + " found but is recorded as playing in ladies league")
         # Otherwise add player to players found dictionary
         else:

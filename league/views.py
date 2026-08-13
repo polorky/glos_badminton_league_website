@@ -39,7 +39,7 @@ def csrf_failure(request, reason=""):
 ##############################################################################################################################################
 
 class GenericViewMixin:
-    type_dict = {'X':'Mixed','W':'Womens','L':'Womens','M':'Mens'}
+    type_dict = {'X':'Mixed','W':'Womens','L':'Womens','M':'Open'}
 
     def get_context_data(self, **kwargs):
         '''Checks the user level, gets current season and league settings'''
@@ -108,7 +108,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
                 'view': 'home',
                 **{f"{'old_' if not a else ''}{t.lower()}_divs":
                    [d for d in all_divs if d.type == t and d.active == a]
-                   for t in ["Mixed", "Womens", "Mens"] for a in [True, False]}
+                   for t in ["Mixed", "Womens", "Open"] for a in [True, False]}
             })
 
         else:
@@ -595,7 +595,7 @@ class TeamsView(GenericViewMixin, TemplateView):
 
                 self.update_club_teams(context['club'], 'Mixed', form.cleaned_data['mixed_teams'])
                 self.update_club_teams(context['club'], 'Womens', form.cleaned_data['womens_teams'])
-                self.update_club_teams(context['club'], 'Mens', form.cleaned_data['mens_teams'])
+                self.update_club_teams(context['club'], 'Open', form.cleaned_data['mens_teams'])
                 context['club'].teams_confirmed = True
                 context['club'].save()
 
@@ -759,9 +759,24 @@ class PlayerView(GenericViewMixin, TemplateView):
             'matches': player.get_own_fixtures(),
             'teams': get_clubs_teams(player.club),
             'test': player_id,
+            'level_form': PlayerLevelForm(instance=player),
             })
-        
+
         return context
+
+    def post(self, request, **kwargs):
+
+        player_id = int(kwargs['playerid'])
+        player = Player.objects.get(id=player_id)
+
+        form = PlayerLevelForm(request.POST, instance=player)
+        if form.is_valid():
+            form.save()
+            return redirect(request.path)
+
+        context = self.get_context_data(**kwargs)
+        context['level_form'] = form
+        return self.render_to_response(context)
 
 class ArchivesView(GenericViewMixin, TemplateView):
     template_name = "league/archive.html"
@@ -1207,7 +1222,7 @@ class NominationsView(GenericViewMixin, TemplateView):
     def _build_form_list(self, data, club, club_teams):
 
         women = Player.objects.filter(club=club).filter(level="Womens").order_by("name")
-        men = Player.objects.filter(club=club).filter(level="Mens").order_by("name")
+        men = Player.objects.filter(club=club).filter(level="Open").order_by("name")
         form_list = []
 
         for team in club_teams:
@@ -1229,7 +1244,7 @@ class NominationsView(GenericViewMixin, TemplateView):
     def _mixed_formsets(self, data, team, existing_noms, women, men):
         # Get existing noms
         women_existing = existing_noms.filter(player__level='Womens')
-        men_existing   = existing_noms.filter(player__level='Mens')
+        men_existing   = existing_noms.filter(player__level='Open')
 
         # Build formsets - 'extra' adds blank forms where there are no current noms
         WomensFormSet = modelformset_factory(
@@ -1325,7 +1340,7 @@ class NominationsView(GenericViewMixin, TemplateView):
 
         # Get male and female players for club
         women = Player.objects.filter(club=club, level='Womens').order_by('name')
-        men   = Player.objects.filter(club=club, level='Mens').order_by('name')
+        men   = Player.objects.filter(club=club, level='Open').order_by('name')
 
         if team.type == 'Mixed':
             current = self._mixed_formsets(request.POST, team, existing_noms, women, men)

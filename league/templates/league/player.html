@@ -18,8 +18,8 @@
             {% if teams.Lengths.Womens > 0 %}
             <th colspan="{{ teams.Lengths.Womens }}">Women's</th>
             {% endif %}
-            {% if teams.Lengths.Mens > 0 %}
-            <th colspan="{{ teams.Lengths.Mens }}">Men's</th>
+            {% if teams.Lengths.Open > 0 %}
+            <th colspan="{{ teams.Lengths.Open }}">Open</th>
             {% endif %}
         </tr>
         <tr>
@@ -33,8 +33,8 @@
                 <th>{{ team.number }}</th>
             {% endfor %}
             {% endif %}
-            {% if teams.Lengths.Mens > 0 %}
-            {% for team in teams.Mens %}
+            {% if teams.Lengths.Open > 0 %}
+            {% for team in teams.Open %}
                 <th>{{ team.number }}</th>
             {% endfor %}
             {% endif %}
@@ -60,7 +60,7 @@
                 <td>{{ stat }}</td>
             {% endif %}
             {% endfor %}
-            {% for stat in stats.teams.Mens.values %}
+            {% for stat in stats.teams.Open.values %}
             {% if 'X' in stat %}
                 <td id="redcell">{{ stat }}</td>
             {% elif stat > 0 %}
@@ -80,6 +80,17 @@
             <li><a href="/fixtures/{{ match.id }}">{{ match }}</a></li>
         {% endfor %}
     </ul>
+
+{% if settings.league_status == 'fixtures' %}
+<br>
+<h3>Change League</h3>
+<br>
+<form method="post">
+    {% csrf_token %}
+    <p>{{ level_form.level.label }}: <span style="display:inline-block">{{ level_form.level }}</span></p>
+    <button type="submit">Save</button>
+</form>
+{% endif %}
 
 <br>
 <a href="/clubadmin">Return to Club Admin Page</a>

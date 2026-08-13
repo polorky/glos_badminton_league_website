@@ -39,7 +39,7 @@ class Division(models.Model):
     # In some seasons there were A and B divisions on the same level
     # the 'historic' attribute gives the actual name of the division in this instance and 'number' becomes irrelevant
     historic = models.CharField(max_length=3,blank=True,null=True,default=None)
-    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Mens","Men's")))
+    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Open","Open")))
     active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -54,7 +54,7 @@ class Division(models.Model):
         return f'{self.get_type_display()} {self.number}'
 
     def get_division_url(self):
-        type_dict = {'Mixed':'X', 'Womens':'W', 'Mens':'M'}
+        type_dict = {'Mixed':'X', 'Womens':'W', 'Open':'M'}
         return f"{type_dict[self.type]}{self.number}"
 
 class Club(models.Model):
@@ -93,7 +93,7 @@ class Club(models.Model):
         teams = Team.objects.filter(club=self).filter(active=True)
         mixed = sorted([team.number for team in teams.filter(type="Mixed")])
         womens = sorted([team.number for team in teams.filter(type="Womens")])
-        mens = sorted([team.number for team in teams.filter(type="Mens")])
+        mens = sorted([team.number for team in teams.filter(type="Open")])
 
         # Used in player model method get_team_dict
         # This counts the time a player has played for each team
@@ -101,11 +101,11 @@ class Club(models.Model):
             team_dict = {
                          "Mixed":{team:0 for team in mixed},
                          "Womens":{team:0 for team in womens},
-                         "Mens":{team:0 for team in mens},
+                         "Open":{team:0 for team in mens},
                          }
         # Otherwise just return the lists of teams
         else:
-            team_dict = {"Mixed":mixed, "Womens":womens, "Mens":mens}
+            team_dict = {"Mixed":mixed, "Womens":womens, "Open":mens}
 
         return team_dict
     
@@ -163,7 +163,7 @@ class Member(models.Model):
 
 class Player(models.Model):
     name = models.CharField(max_length=50)
-    level = models.CharField(max_length=10,choices=(("Womens","Women's"),("Mens","Men's")))
+    level = models.CharField(max_length=10,choices=(("Womens","Women's"),("Open","Open")))
     club = models.ForeignKey(Club,on_delete=models.CASCADE)
 
     def __str__(self):
@@ -267,7 +267,7 @@ class Player(models.Model):
 class Team(models.Model):
     division = models.ForeignKey(Division,on_delete=models.SET_NULL,blank=True,null=True)
     club = models.ForeignKey(Club,on_delete=models.CASCADE)
-    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Mens","Men's")))
+    type = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Open","Open")))
     number = models.IntegerField(default=1)
     captain = models.CharField(max_length=30,blank=True,null=True)
     captain_num = models.CharField(max_length=15,blank=True,null=True)
@@ -504,13 +504,13 @@ class Fixture(models.Model):
         '''
 
         home_women = Player.objects.filter(club=self.home_team.club).filter(level="Womens")
-        home_men = Player.objects.filter(club=self.home_team.club).filter(level="Mens")
+        home_men = Player.objects.filter(club=self.home_team.club).filter(level="Open")
         home_noms = TeamNomination.objects.filter(team=self.home_team, date_to=None, approved=True)
 
         if self.division.type == "Mixed":
 
-            nom_women = [tn.player for tn in home_noms if tn.player.level != 'Mens']
-            nom_men = [tn.player for tn in home_noms if tn.player.level == 'Mens']
+            nom_women = [tn.player for tn in home_noms if tn.player.level != 'Open']
+            nom_men = [tn.player for tn in home_noms if tn.player.level == 'Open']
 
             all_women = nom_women + [woman for woman in home_women if woman not in nom_women]
             all_men = nom_men + [man for man in home_men if man not in nom_men]
@@ -559,7 +559,7 @@ class Performance(models.Model):
 class PendingPlayerVerification(models.Model):
     fixture = models.ForeignKey(Fixture, on_delete=models.CASCADE)
     submitted_name = models.CharField(max_length=50)
-    level = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Mens","Men's")))
+    level = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Open","Open")))
     suggested_player = models.ForeignKey(Player, null=True, blank=True, on_delete=models.SET_NULL)
     token = models.CharField(max_length=64, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)

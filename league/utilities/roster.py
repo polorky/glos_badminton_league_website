@@ -9,12 +9,12 @@ def get_clubs_teams(club):
     # Split out teams
     team_dict = {"Mixed":teams.filter(type="Mixed"),
             "Womens":teams.filter(type="Womens"),
-            "Mens":teams.filter(type="Mens"),
+            "Open":teams.filter(type="Open"),
             "All":teams} 
     # Get length of team lists for formatting size of table
     team_dict.update({"Lengths":{"Mixed":len(team_dict["Mixed"]),
                             "Womens":len(team_dict["Womens"]),
-                            "Mens": len(team_dict["Mens"]),
+                            "Open": len(team_dict["Open"]),
                             "All": len(team_dict["All"]),
                             }})  
     
@@ -65,7 +65,7 @@ def _initialise_player_dict(players, teams):
             "appearances": {
                 "Mixed": {team: TeamAppearances(eligible=player.check_eligibility(team)) for team in teams if team.type == 'Mixed'},
                 "Womens": {team: TeamAppearances(eligible=player.check_eligibility(team)) for team in teams if team.type == 'Womens'},
-                "Mens": {team: TeamAppearances(eligible=player.check_eligibility(team)) for team in teams if team.type == 'Mens'}
+                "Open": {team: TeamAppearances(eligible=player.check_eligibility(team)) for team in teams if team.type == 'Open'}
             },
             "noms": {"mixed": noms_strings[0], "level": noms_strings[1]}
         }

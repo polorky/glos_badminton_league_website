@@ -152,12 +152,12 @@
                     <th rowspan="2">Mixed</th><th rowspan="2">Level</th>
                     {% if teams.Lengths.Mixed > 0 %}<th colspan="{{ teams.Lengths.Mixed }}">Mixed</th>{% endif %}
                     {% if teams.Lengths.Womens > 0 %}<th colspan="{{ teams.Lengths.Womens }}">Women's</th>{% endif %}
-                    {% if teams.Lengths.Mens > 0 %}<th colspan="{{ teams.Lengths.Mens }}">Men's</th>{% endif %}
+                    {% if teams.Lengths.Open > 0 %}<th colspan="{{ teams.Lengths.Open }}">Open</th>{% endif %}
                 </tr>
                 <tr>
                     {% for team in teams.Mixed %}<th>{{ team.number }}</th>{% endfor %}
                     {% for team in teams.Womens %}<th>{{ team.number }}</th>{% endfor %}
-                    {% for team in teams.Mens %}<th>{{ team.number }}</th>{% endfor %}
+                    {% for team in teams.Open %}<th>{{ team.number }}</th>{% endfor %}
                 </tr>
                 {% for player, stats in playerstats.items %}
                 <tr>
@@ -191,7 +191,7 @@
                     {% for stat in stats.appearances.Womens.values %}
                         <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>
                     {% endfor %}
-                    {% for stat in stats.appearances.Mens.values %}
+                    {% for stat in stats.appearances.Open.values %}
                         <td {% if 'X' in stat.display %}id="redcell"{% elif stat.display != '0' %}id="greencell"{% endif %}>{{ stat.display }}</td>
                     {% endfor %}
                     {% if not member %}
@@ -260,11 +260,11 @@
             <br>
             <div class="table-wrap" style="width:auto; display:inline-table;">
                 <table>
-                    <tr><th>Mixed</th><th>Women's</th><th>Men's</th><th><b>Total</b></th></tr>
+                    <tr><th>Mixed</th><th>Women's</th><th>Open</th><th><b>Total</b></th></tr>
                     <tr>
                         <td>{{ teams.Lengths.Mixed }}</td>
                         <td>{{ teams.Lengths.Womens }}</td>
-                        <td>{{ teams.Lengths.Mens }}</td>
+                        <td>{{ teams.Lengths.Open }}</td>
                         <td><b>{{ teams.Lengths.All }}</b></td>
                     </tr>
                 </table>

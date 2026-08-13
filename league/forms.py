@@ -65,6 +65,13 @@ class PlayerForm(ModelForm):
         model = Player
         fields = ['name','level']
 
+class PlayerLevelForm(ModelForm):
+
+    class Meta:
+        model = Player
+        fields = ['level']
+        labels = {'level': 'League'}
+
 class NominationForm(ModelForm):
 
     class Meta:

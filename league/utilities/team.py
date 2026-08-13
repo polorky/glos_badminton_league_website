@@ -38,9 +38,9 @@ def check_team_entries():
         all_teams = Team.objects.filter(active=True, club=club)
         mixed_teams = Team.objects.filter(active=True, club=club, type='Mixed')
         womens_teams = Team.objects.filter(active=True, club=club, type='Womens')
-        mens_teams = Team.objects.filter(active=True, club=club, type='Mens')
+        mens_teams = Team.objects.filter(active=True, club=club, type='Open')
 
-        results_dict[club] = {'Mixed': mixed_teams, 'Womens': womens_teams, 'Mens': mens_teams}
+        results_dict[club] = {'Mixed': mixed_teams, 'Womens': womens_teams, 'Open': mens_teams}
 
         for team in all_teams:
             if not team.home_venue or not team.start_time or not team.end_time:

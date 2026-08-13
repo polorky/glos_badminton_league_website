@@ -108,8 +108,8 @@
         {% if teams.Lengths.Womens > 0 %}
           <th colspan="{{ teams.Lengths.Womens }}">Women's</th>
         {% endif %}
-        {% if teams.Lengths.Mens > 0 %}
-          <th colspan="{{ teams.Lengths.Mens }}">Men's</th>
+        {% if teams.Lengths.Open > 0 %}
+          <th colspan="{{ teams.Lengths.Open }}">Open</th>
         {% endif %}
       </tr>
       <tr>
@@ -123,8 +123,8 @@
             <th>{{ team.number }}</th>
           {% endfor %}
         {% endif %}
-        {% if teams.Lengths.Mens > 0 %}
-          {% for team in teams.Mens %}
+        {% if teams.Lengths.Open > 0 %}
+          {% for team in teams.Open %}
             <th>{{ team.number }}</th>
           {% endfor %}
         {% endif %}
@@ -159,7 +159,7 @@
               <td>{{ stat.display }}</td>
           {% endif %}
         {% endfor %}
-        {% for stat in stats.appearances.Mens.values %}
+        {% for stat in stats.appearances.Open.values %}
           {% if 'X' in stat.display %}
               <td id="redcell">{{ stat.display }}</td>
           {% elif stat.display != '0' %}
