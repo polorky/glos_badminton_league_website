@@ -125,7 +125,7 @@ class Club(models.Model):
 
     def requires_noms(self):
         '''Checks whether club needs to submit nominations'''
-        teams = Team.objects.filter(club=self)
+        teams = Team.objects.filter(club=self, active=True)
         return any([team.number > 1 for team in teams])
     
     def nominations_submitted(self):

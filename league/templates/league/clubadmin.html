@@ -53,8 +53,13 @@
             {% endif %}
         {% endif %}
 
-        {% if settings.league_status == "fixtures" and admin.club.requires_noms %}
-            {% if admin.club.nominations_submitted %}
+        {% if settings.league_status == "fixtures" %}
+            {% if not admin.club.requires_noms %}
+                <div class="banner banner-success">
+                    <i class="ti ti-circle-check" aria-hidden="true"></i>
+                    <span><strong>Nominations not required for your club.</strong></span>
+                </div>            
+            {% elif admin.club.nominations_submitted %}
                 <div class="banner banner-success">
                     <i class="ti ti-circle-check" aria-hidden="true"></i>
                     <span><strong>Nominations submitted.</strong> You can still make changes before the deadline. <a href="/nominations/teamupdate">Edit nominations</a></span>
@@ -243,12 +248,12 @@
 
     {# ======== NOMINATIONS TAB ======== #}
     {% if not member and settings.league_status == "fixtures" %}
-    <div id="tab-nominations" class="tab-content">
-        <br>
-        <p>You can now make nominations for your club's teams:</p>
-        <br>
-        <p><a href="/nominations/teamupdate" class="button">Go to Nomination Page</a></p>
-    </div>
+        <div id="tab-nominations" class="tab-content">
+            <br>
+            <p>You can now make nominations for your club's teams:</p>
+            <br>
+            <p><a href="/nominations/teamupdate" class="button">Go to Nomination Page</a></p>
+        </div>
     {% endif %}
 
     {# ======== TEAM ENTRY TAB ======== #}
