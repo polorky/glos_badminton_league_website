@@ -157,11 +157,12 @@ class FixtureForm(ModelForm):
         player_errors = []
 
         # Check all home players are entered and different - CAN BE BLANK BUT NOT DUPLICATED
-        hps = [k for k in cd.keys() if 'home' in k]
+        hps = [v for k, v in cd.items() if 'home_player' in k]
         for hp in hps:
-            if not cd[hp] and not cd['player_name_check']:
+            if not hp and not cd['player_name_check']:
                 player_errors.append('You have not entered all home players')
         valid_hps = [player for player in hps if player]
+
         if len(valid_hps) != len(list(set(valid_hps))):
             raise ValidationError(['player','You have duplicated home player(s)'])
         
@@ -200,7 +201,7 @@ class BaseScoreFormSet(BaseFormSet):
         for form in self.forms:
             cd = form.cleaned_data
             if not cd:
-                raise ValidationError(['game','Some games scores (or forfeits) are missing.'])
+                raise ValidationError(['Some games scores (or forfeits) are missing.',])
             if cd['forfeit']:
                 all_scores.append([cd['forfeit'], cd['forfeit']])
             else:
@@ -211,7 +212,7 @@ class BaseScoreFormSet(BaseFormSet):
 
         # If game errors and game override not checked, raise error
         if game_errors and not cd['score_check']:
-            raise ValidationError(['game',game_errors])
+            raise ValidationError([game_errors])
         
     def check_game_results(self, game_results):
         '''

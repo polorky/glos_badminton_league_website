@@ -30,15 +30,25 @@
     <br>
     <h3>Submit Match Result</h3>
     <br>
+    {% if errors %}
+        <div class="banner banner-warning"  style="background-color: rgb(230, 176, 176);">
+            ⚠️ <b>There are errors on the form</b> — please scroll down for further details.
+        </div>
+        <br>
+    {% endif %}
+
     <form action="/fixtures/update/{{ fixture.id }}/submit/{{ source }}" method="post">
     {% csrf_token %}
     <table>
         <tr><td><label style="margin-right:16px;">{{ fixture.home_team }}</label></td><td>{{ resform.home_points }}</td></tr>
         <tr><td><label style="margin-right:16px;">{{ fixture.away_team }}</label></td><td>{{ resform.away_points }}</td></tr>
     </table>
-    {% if resform.non_field_errors and pagename == "errors" %}
+    {% if resform.non_field_errors %}
       {% if resform.non_field_errors.0 == "points" %}
-        <p style="color:red;">{{ resform.non_field_errors.1 }}</p>
+        <br>
+        <div class="banner banner-warning" style="background-color: rgb(230, 176, 176);">
+            ⚠️ <b>{{ resform.non_field_errors.1 }}</b>
+        </div>
       {% endif %}
     {% endif %}
     <br>
@@ -80,41 +90,36 @@
 
     {% endif %}
 
-    {% if resform.non_field_errors and "errors" %}
-      {% if resform.non_field_errors.0 == "player" %}
+    {% if resform.non_field_errors and resform.non_field_errors.0 == "player" %}
+        <br>
+        <div class="banner banner-warning" style="background-color: rgb(230, 176, 176);">
         {% for error in resform.non_field_errors %}
-          {% if error != "player" %}
-            <p style="color:red;">{{ error }}</p>
-          {% endif %}
+            {% if error != "player" %}
+                ⚠️ <b>{{ error }}</b>
+            {% endif %}
         {% endfor %}
-        <p>I confirm the away player names have been entered as provided by the away team and any missing players are correct: {{ resform.player_name_check }}</p>
-      {% elif resform.non_field_errors.0 == "player_and_game" %}
-        {% for error in resform.non_field_errors %}
-          {% if error != "player_and_game" and error.0 == "A" %}
-            <p style="color:red;">{{ error }}</p>
-          {% endif %}
-        {% endfor %}
-        <p>I confirm the away player names have been entered as provided by the away team and any missing players are correct: {{ detform.player_name_check }}</p>
-      {% endif %}
+        </div>
+        <p><b>{{ resform.player_name_check }} Confirm players as entered</b> - you have double checked the names provided by the away team or some players were missing</p>
     {% endif %}
     <br>
     <br>
+    
     <h3>Individual Game Scores</h3>
     <p>TIP: use the Tab key to move between fields</p>
     <div class="table-wrap">
     <table style="max-width:54em;">
-        <tr><th rowspan="2">Game</th><th colspan="2">R1</th><th colspan="2">R2</th><th colspan="2">Forfeits</th></tr>
+        <tr><th rowspan="2">Game</th><th colspan="2">Rubber 1 (R1)</th><th colspan="2">Rubber 2 (R2)</th><th colspan="2">Forfeits</th></tr>
         <tr><th>H</th><th>A</th><th>H</th><th>A</th><th>R1 Forfeit</th><th>R2 Forfeit</th></tr>
         {{ resformset.management_form }}
         {% for game in games_fields %}
             <tr>
                 <td style="max-width:10em">{{ game.0 }}</td>
-                <td style="width:6em">{% for hidden in game.1.0.hidden_fields %}{{ hidden }}{% endfor %}
+                <td style="width:7em">{% for hidden in game.1.0.hidden_fields %}{{ hidden }}{% endfor %}
                     {{ game.1.0.home_score }}</td>
-                <td style="width:6em">{{ game.1.0.away_score }}</td>
-                <td style="width:6em">{% for hidden in game.1.1.hidden_fields %}{{ hidden }}{% endfor %}
+                <td style="width:7em">{{ game.1.0.away_score }}</td>
+                <td style="width:7em">{% for hidden in game.1.1.hidden_fields %}{{ hidden }}{% endfor %}
                     {{ game.1.1.home_score }}</td>
-                <td style="width:6em">{{ game.1.1.away_score }}</td>
+                <td style="width:7em">{{ game.1.1.away_score }}</td>
                 <td  style="max-width:10em">{{ game.1.0.forfeit }}</td>
                 <td  style="max-width:10em">{{ game.1.1.forfeit }}</td>
             </tr>
@@ -123,27 +128,13 @@
     </div>
 
     {% if resformset.non_form_errors %}
-        {% for error in resformset.non_form_errors %}
-            <li>{{ error }}</li>
-        {% endfor %}
-    {% endif %}
-    {% if resformset.non_field_errors and "errors" %}
-      {% if resformset.non_field_errors.0 == "game" %}
-        {% for error in resformset.non_field_errors %}
-          {% if error != "game" %}
-            <p style="color:red;">{{ error }}</p>
-          {% endif %}
-        {% endfor %}
-        <p>Override score validation - if a game was shortened, please tick this box (please double check that all the other scores are correct): {{ resform.score_check }}</p>
-      {% endif %}
-      {% if resformset.non_field_errors.0 == "away_and_game" %}
-        {% for error in resformset.non_field_errors %}
-          {% if error != "away_and_game" and error.0 == "G" %}
-            <p style="color:red;">{{ error }}</p>
-          {% endif %}
-        {% endfor %}
-        <p>Override score validation - if a game was shortened, please tick this box (please double check that all the other scores are correct): {{ resform.score_check }}</p>
-      {% endif %}
+        <br>
+        <div class="banner banner-warning" style="background-color: rgb(230, 176, 176);">
+            {% for error in resformset.non_form_errors %}
+                ⚠️ <b>{{ error }}</b>
+            {% endfor %}
+        </div>
+        <p><b>{{ resform.score_check }}  Override score validation</b> - if a game was shortened, please tick this box (please double check that all the other scores are correct)</p>
     {% endif %}
     <br>
     <input class="button" type="submit" value="Submit Result">

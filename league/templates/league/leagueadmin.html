@@ -37,65 +37,77 @@
     {# ======== INFO TAB ======== #}
     <div id="tab-info" class="tab-content active">
 
-        <h2>Club Entry Status</h2>
-        <br>
-        <div class="table-wrap">
-            <table id="table" class="table">
-                <tr><th>Club</th><th>Teams Confirmed</th><th>Venues Confirmed</th></tr>
-                {% for club in clubs %}
-                <tr>
-                    <td>{{ club.name }}</td>
-                    <td>{% if club.teams_confirmed %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</td>
-                    <td>{% if club.venues_confirmed %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-        <br>
-        <h2>Team changes</h2>
-        <br>
-        <div class="table-wrap">
-            <table id="table" class="table">
-                <tr><th>Club</th><th>Mixed</th><th>Open</th><th>Women's</th><th>Total</th></tr>
-                {% for club, values in teams_compared.items %}
-                <tr>
-                    <td>{{ club.name }}</td>
-                    <td>{{ values.mixed }}</td>
-                    <td>{{ values.mens }}</td>
-                    <td>{{ values.womens }}</td>
-                    <td>{{ values.total }}</td>
-                </tr>
-                {% endfor %}
-            </table>
-        </div>
-        <br>
+        {% if settings.league_status == "entry" %}
 
-        <h2>Penalties for current season</h2>
-        <br>
-        <table id="table" class="table-wrap">
-        <tr><th>Team</th><th>Penalty Type</th><th>Player Name</th><th>Fixture</th><th>Remove</th></tr>
-        {% for penalty in penalties %}
-            <tr>
-                <td>{{ penalty.team }}</td><td>{{ penalty.penalty_type }}</td><td>{{ penalty.player }}</td><td>{{ penalty.fixture }}</td>
-                <td><form action="/leagueadmin/delpen{{ penalty.id }}" method="post">
-                    {% csrf_token %}
-                    <input class="buttonred" type="submit" value="Remove Penalty">
-                </form></td>
-            </tr>
-        {% endfor %}
-        </table>
-        <br>
+            <h2>Club Entry Status</h2>
+            <br>
+            <div class="table-wrap">
+                <table id="table" class="table">
+                    <tr><th>Club</th><th>Teams Confirmed</th><th>Venues Confirmed</th></tr>
+                    {% for club in clubs %}
+                    <tr>
+                        <td>{{ club.name }}</td>
+                        <td>{% if club.teams_confirmed %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</td>
+                        <td>{% if club.venues_confirmed %}<span style="color:green;">&#10003;</span>{% else %}<span style="color:red;">&#10007;</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <br>
+            <h2>Team changes</h2>
+            <br>
+            <div class="table-wrap">
+                <table id="table" class="table">
+                    <tr><th>Club</th><th>Mixed</th><th>Open</th><th>Women's</th><th>Total</th></tr>
+                    {% for club, values in teams_compared.items %}
+                    <tr>
+                        <td>{{ club.name }}</td>
+                        <td>{{ values.mixed }}</td>
+                        <td>{{ values.mens }}</td>
+                        <td>{{ values.womens }}</td>
+                        <td>{{ values.total }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <br>
+
+        {% endif %}
+
+        {% if settings.league_status == "live" %}
+
+            <h2>Penalties for current season</h2>
+            <br>
+            <table id="table" class="table-wrap">
+            <tr><th>Team</th><th>Penalty Type</th><th>Player Name</th><th>Fixture</th><th>Remove</th></tr>
+            {% for penalty in penalties %}
+                <tr>
+                    <td>{{ penalty.team }}</td><td>{{ penalty.penalty_type }}</td><td>{{ penalty.player }}</td><td>{{ penalty.fixture }}</td>
+                    <td><form action="/leagueadmin/delpen{{ penalty.id }}" method="post">
+                        {% csrf_token %}
+                        <input class="buttonred" type="submit" value="Remove Penalty">
+                    </form></td>
+                </tr>
+            {% endfor %}
+            </table>
+            <br>
             
-        <h2>Nominations</h2>
-        <p>Teams which require nominations</p>
-        <br>
-        <table id="table" class="table-wrap">
-        <tr><th>Team</th><th>Num of Nominations</th><th>Status</th></tr>
-        {% for team in nom_teams %}
-        <tr><td>{{ team.0 }}</td><td>{{ team.0.count_nominations }}{% if team.0.type == "Mixed" %}/6{% else %}/4{% endif %}</td><td>{{ team.1 }}</td></tr>
-        {% endfor %}
-        </table>
-        <br>
+        {% endif %}
+
+        {% if settings.league_status != "entry" %}
+
+            <h2>Nominations</h2>
+            <p>Teams which require nominations</p>
+            <br>
+            <table id="table" class="table-wrap">
+            <tr><th>Team</th><th>Num of Nominations</th><th>Status</th></tr>
+            {% for team in nom_teams %}
+            <tr><td>{{ team.0 }}</td><td>{{ team.0.count_nominations }}{% if team.0.type == "Mixed" %}/6{% else %}/4{% endif %}</td><td>{{ team.1 }}</td></tr>
+            {% endfor %}
+            </table>
+            <br>
+
+        {% endif %}
 
         <h2>League Contacts</h2>
         <ul>
@@ -103,10 +115,18 @@
                 <li>{{ contact }} - {{ email }}</li>
             {% endfor %}
         </ul>
+
     </div>
 
     {# ======== ACTIONS TAB ======== #}
     <div id="tab-actions" class="tab-content">
+
+        <h2>Email All Club Contacts</h2>
+        <br>
+        <p>Opens a new email addressed to first and second contacts for all active clubs.</p>
+        <br>
+        <a class="button" href="mailto:{{ contact_emails }}">Open Email</a>
+        <br><br>
 
         <h2>Generate Season Fixtures</h2>
         <br>

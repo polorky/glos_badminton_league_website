@@ -304,7 +304,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         elif pagename == "submit":
 
             context = self._process_result(context, fixture)
-
+        
         return self.render_to_response(context)
 
     def _reschedule_match(self, fixture):
@@ -421,7 +421,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
         context.update({'resform':resform,
                         'resformset':resformset,
-                        'games_fields': games_fields,})
+                        'games_fields': games_fields})
 
         return context
 
@@ -644,6 +644,8 @@ class TeamsView(GenericViewMixin, TemplateView):
             for i in range(current_count, num, -1):
                 team = current_teams.get(number=i)
                 team.active = False
+                # Blank division so fixtures are generated for them
+                team.division = None
                 team.save()
         elif current_count < num:
             all_club_teams = Team.objects.filter(club=club, type=type)
@@ -1092,6 +1094,13 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
                     team_str = f'{new_teams} ({diff})'
                 teams_compared[club][lt] = team_str
 
+        contact_emails = [
+            email
+            for club in active_clubs
+            for email in (club.contact1_email, club.contact2_email)
+            if email
+        ]
+
         # Update context
         context.update({
             'status': 'leagueAdmin',
@@ -1101,6 +1110,7 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             'club_contacts': get_all_club_contacts(),
             'clubs': active_clubs,
             'teams_compared': teams_compared,
+            'contact_emails': ','.join(contact_emails),
         })
 
         return context
