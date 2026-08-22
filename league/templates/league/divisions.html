@@ -177,7 +177,7 @@
             <td><a href="/venues/{{ fix.0.venue.get_venue_url }}">{{ fix.0.venue }}</a></td>
             <td>{{ fix.0.get_status_display }}</td>
             <td><a href="/fixtures/{{ fix.0.id }}/div">View</a></td>
-            {% if fix.1 %}
+            {% if fix.1 and settings.league_status == "live" %}
               <td><a href="/fixtures/update/{{ fix.0.id }}/options/div">Update</a></td>
             {% else %}
               <td></td>
