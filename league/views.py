@@ -425,6 +425,78 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
         return context
 
+@method_decorator(login_required, name='dispatch')
+class FixtureDatesView(GenericViewMixin, TemplateView):
+    template_name = "league/fixture_dates.html"
+    active_tab = 'clubadmin'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect(f'/login/?next={request.path}')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        if not context['admin'] or context['member']:
+            return context
+
+        club = context['admin'].club
+        current_season = context['current_season']
+
+        home_fixtures = (Fixture.objects
+            .filter(season=current_season, home_team__club=club)
+            .select_related('home_team', 'away_team', 'division')
+            .order_by('division__type', 'division__number', 'home_team__number', 'away_team__number'))
+
+        grouped = {}
+        for fix in home_fixtures:
+            div = fix.division
+            team = fix.home_team
+            if div not in grouped:
+                grouped[div] = {}
+            if team not in grouped[div]:
+                grouped[div][team] = {
+                    'fixtures': [],
+                    'form': TeamForm(instance=team, variant='Venue'),
+                }
+            grouped[div][team]['fixtures'].append(fix)
+
+        context.update({'grouped_fixtures': grouped})
+        return context
+
+    def post(self, request, **kwargs):
+        context = self.get_context_data(**kwargs)
+        team_id = self.kwargs.get('team_id')
+        club = context['admin'].club
+
+        try:
+            team = Team.objects.get(id=team_id, club=club)
+        except Team.DoesNotExist:
+            return redirect('fixture_dates')
+
+        if request.POST.get('action') == 'update_team':
+            form = TeamForm(request.POST, instance=team, variant='Venue')
+            if form.is_valid():
+                form.save()
+            return redirect(f'/fixtures/dates?team_saved={team_id}#{team_id}')
+
+        for key, value in request.POST.items():
+            if key.startswith('date_') and value:
+                try:
+                    fixture_id = int(key[5:])
+                    fixture = Fixture.objects.get(id=fixture_id, home_team=team)
+                    date_val = datetime.strptime(value, '%Y-%m-%d').date()
+                    start = team.start_time if team.start_time else time(0, 0)
+                    fixture.date_time = datetime.combine(date_val, start)
+                    fixture.end_time = team.end_time if team.end_time else time(0, 0)
+                    fixture.venue = team.home_venue
+                    fixture.save()
+                except (Fixture.DoesNotExist, ValueError):
+                    pass
+
+        return redirect(f'/fixtures/dates?saved={team_id}#{team_id}')
+
 class ClubsView(GenericViewMixin, TemplateView):
     template_name = "league/clubs.html"
 
@@ -978,76 +1050,6 @@ class ClubAdminView(GenericViewMixin, TemplateView):
                     context.update({'status':'duplicateerror'})
 
         return self.render_to_response(context)
-
-@method_decorator(login_required, name='dispatch')
-class FixtureDatesView(GenericViewMixin, TemplateView):
-    template_name = "league/fixture_dates.html"
-    active_tab = 'clubadmin'
-
-    def dispatch(self, request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return redirect(f'/login/?next={request.path}')
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        if not context['admin'] or context['member']:
-            return context
-
-        club = context['admin'].club
-        current_season = context['current_season']
-
-        home_fixtures = (Fixture.objects
-            .filter(season=current_season, home_team__club=club)
-            .select_related('home_team', 'away_team', 'division')
-            .order_by('division__type', 'division__number', 'home_team__number', 'away_team__number'))
-
-        grouped = {}
-        for fix in home_fixtures:
-            div = fix.division
-            team = fix.home_team
-            if div not in grouped:
-                grouped[div] = {}
-            if team not in grouped[div]:
-                grouped[div][team] = {
-                    'fixtures': [],
-                    'form': TeamForm(instance=team, variant='Venue'),
-                }
-            grouped[div][team]['fixtures'].append(fix)
-
-        context.update({'grouped_fixtures': grouped})
-        return context
-
-    def post(self, request, **kwargs):
-        context = self.get_context_data(**kwargs)
-        team_id = self.kwargs.get('team_id')
-        club = context['admin'].club
-
-        try:
-            team = Team.objects.get(id=team_id, club=club)
-        except Team.DoesNotExist:
-            return redirect('fixture_dates')
-
-        if request.POST.get('action') == 'update_team':
-            form = TeamForm(request.POST, instance=team, variant='Venue')
-            if form.is_valid():
-                form.save()
-            return redirect(f'/fixtures/dates?team_saved={team_id}#{team_id}')
-
-        for key, value in request.POST.items():
-            if key.startswith('date_') and value:
-                try:
-                    fixture_id = int(key[5:])
-                    fixture = Fixture.objects.get(id=fixture_id, home_team=team)
-                    date_val = datetime.strptime(value, '%Y-%m-%d').date()
-                    start = team.start_time if team.start_time else time(0, 0)
-                    fixture.date_time = datetime.combine(date_val, start)
-                    fixture.save()
-                except (Fixture.DoesNotExist, ValueError):
-                    pass
-
-        return redirect(f'/fixtures/dates?saved={team_id}#{team_id}')
 
 @method_decorator(login_required, name='dispatch')
 class LeagueAdminView(GenericViewMixin, TemplateView):
