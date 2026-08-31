@@ -118,10 +118,10 @@ class Club(models.Model):
     
     def fixtures_confirmed(self):
         current_season = Season.objects.get(current=True)
-        return Fixture.objects.filter(
+        return not Fixture.objects.filter(
             season=current_season, 
             home_team__club=self, 
-            date_time__isnull=False).exists()
+            date_time__isnull=True).exists()
 
     def requires_noms(self):
         '''Checks whether club needs to submit nominations'''
