@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
-from datetime import datetime
+from datetime import datetime, timezone
 import urllib
 import league.constants as constants
 from django.core.exceptions import ObjectDoesNotExist
@@ -9,6 +9,8 @@ from django.core.exceptions import ObjectDoesNotExist
 class LeagueSettings(models.Model):
     '''Holds league settings that need changing by league admins mid-sesason'''
     league_status = models.CharField(max_length=10, choices=constants.SEASON_STATUSES, default="entry")
+    earliest_fixture_date = models.DateField(blank=True, null=True)
+    latest_fixture_date = models.DateField(blank=True, null=True)
 
     class Meta:
         verbose_name_plural = 'League settings'
@@ -297,7 +299,7 @@ class Team(models.Model):
         else:
             all_fix = list(Fixture.objects.filter(season=current_season).filter(home_filter|away_filter).filter(status=status))
 
-        all_fix.sort(key=lambda x: x.date_time or datetime.max)
+        all_fix.sort(key=lambda x: x.date_time or datetime.max.replace(tzinfo=timezone.utc))
 
         return all_fix
 
