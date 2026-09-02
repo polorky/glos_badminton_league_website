@@ -164,6 +164,11 @@
 
     <!-- ── Page content ── -->
     <main class="flex-1 max-w-6xl mx-auto w-full px-4 py-6">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="banner banner-{{ message.tags }} mb-4">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
         {% block content %}{% endblock %}
     </main>
 

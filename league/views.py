@@ -488,6 +488,12 @@ class FixtureDatesView(GenericViewMixin, TemplateView):
                     fixture = Fixture.objects.get(id=fixture_id, home_team=team)
                     date_val = datetime.strptime(value, '%Y-%m-%d').date()
                     start = team.start_time if team.start_time else time(0, 0)
+                    #if date_val < context['settings'].earliest_fixture_date:
+                        #messages.error(request, f"Fixture date {date_val} is scheduled before the season starts.")
+                        #continue
+                    #elif date_val > context['settings'].latest_fixture_date:
+                        #messages.error(request, f"Fixture date {date_val} is after the latest allowed date for the season.")
+                        #continue
                     fixture.date_time = datetime.combine(date_val, start)
                     fixture.end_time = team.end_time if team.end_time else time(0, 0)
                     fixture.venue = team.home_venue
@@ -1103,6 +1109,15 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             if email
         ]
 
+        # Fixture date completion per club
+        fixture_date_stats = []
+        for club in active_clubs:
+            home_fix = Fixture.objects.filter(season=current_season, home_team__club=club)
+            total = home_fix.count()
+            with_date = home_fix.filter(date_time__isnull=False).count()
+            pct = round(with_date / total * 100) if total else 0
+            fixture_date_stats.append((club, with_date, total, pct))
+
         # Update context
         context.update({
             'status': 'leagueAdmin',
@@ -1113,6 +1128,7 @@ class LeagueAdminView(GenericViewMixin, TemplateView):
             'clubs': active_clubs,
             'teams_compared': teams_compared,
             'contact_emails': ','.join(contact_emails),
+            'fixture_date_stats': fixture_date_stats,
         })
 
         return context

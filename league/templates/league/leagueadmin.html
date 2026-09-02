@@ -96,6 +96,24 @@
 
         {% if settings.league_status != "entry" %}
 
+            <h2>Fixture Dates</h2>
+            <p>Home fixtures with a date entered, per club.</p>
+            <br>
+            <div class="table-wrap">
+                <table id="table" class="table">
+                    <tr><th>Club</th><th>Dates entered</th><th>Total fixtures</th><th>% complete</th></tr>
+                    {% for club, with_date, total, pct in fixture_date_stats %}
+                    <tr>
+                        <td>{{ club.name }}</td>
+                        <td>{{ with_date }}</td>
+                        <td>{{ total }}</td>
+                        <td>{{ pct }}%</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            <br>
+
             <h2>Nominations</h2>
             <p>Teams which require nominations</p>
             <br>
