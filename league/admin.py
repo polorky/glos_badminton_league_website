@@ -55,6 +55,11 @@ class NominationAdmin(admin.ModelAdmin):
 class SettingsAdmin(admin.ModelAdmin):
     list_display = ('league_status',)
 
+class PendingPlayerVerificationAdmin(admin.ModelAdmin):
+    list_display = ('fixture','submitted_name','level','suggested_player')
+    list_filter = ['fixture__season','level']
+    search_fields = ['submitted_name']
+
 admin.site.register(models.Administrator, AdministratorAdmin)
 admin.site.register(models.Member, MemberAdmin)
 admin.site.register(models.Club, ClubAdmin)
@@ -69,3 +74,4 @@ admin.site.register(models.ClubNight, ClubNightAdmin)
 admin.site.register(models.Performance, PerformanceAdmin)
 admin.site.register(models.TeamNomination, NominationAdmin)
 admin.site.register(models.LeagueSettings, SettingsAdmin)
+admin.site.register(models.PendingPlayerVerification, PendingPlayerVerificationAdmin)

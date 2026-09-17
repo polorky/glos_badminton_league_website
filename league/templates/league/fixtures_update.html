@@ -7,6 +7,12 @@
 {% if pagename == "options" %}
 
     <h1>{{ fixture }}</h1>
+    {% if settings.league_status != "live" %}
+        <br>
+        <p style="color:red;"><b>Do not use this page to add initial dates to fixtures, please use the link provided 
+            on the Club Admin page. This page should only be used to submit results or change the date previously 
+            agreed upon.</b></p>
+    {% endif %}
     <br>
     <p><b>PLEASE NOTE</b>: if you are intending to record a postponement or rearragement, please ensure that
     you have contacted the other club BEFORE updating the website to ensure they are happy with the action. The club
@@ -67,12 +73,12 @@
         <div class="table-wrap">
         <table id="table" class="table">
             <tr><th>Player</th><th>Home</th><th>Away</th></tr>
-            <tr><td><label style="margin-right:16px;">Lady 1</label></td><td>{{ resform.home_player1 }}</td><td>{{ resform.away_player1 }}</td></tr>
-            <tr><td><label style="margin-right:16px;">Lady 2</label></td><td>{{ resform.home_player2 }}</td><td>{{ resform.away_player2 }}</td></tr>
-            <tr><td><label style="margin-right:16px;">Lady 3</label></td><td>{{ resform.home_player3 }}</td><td>{{ resform.away_player3 }}</td></tr>
-            <tr><td><label style="margin-right:16px;">Man 1</label></td><td>{{ resform.home_player4 }}</td><td>{{ resform.away_player4 }}</td></tr>
-            <tr><td><label style="margin-right:16px;">Man 2</label></td><td>{{ resform.home_player5 }}</td><td>{{ resform.away_player5 }}</td></tr>
-            <tr><td><label style="margin-right:16px;">Man 3</label></td><td>{{ resform.home_player6 }}</td><td>{{ resform.away_player6 }}</td></tr>
+            <tr><td><label style="margin-right:16px;">Woman 1</label></td><td>{{ resform.home_player1 }}</td><td>{{ resform.away_player1 }}</td></tr>
+            <tr><td><label style="margin-right:16px;">Woman 2</label></td><td>{{ resform.home_player2 }}</td><td>{{ resform.away_player2 }}</td></tr>
+            <tr><td><label style="margin-right:16px;">Woman 3</label></td><td>{{ resform.home_player3 }}</td><td>{{ resform.away_player3 }}</td></tr>
+            <tr><td><label style="margin-right:16px;">Open 1</label></td><td>{{ resform.home_player4 }}</td><td>{{ resform.away_player4 }}</td></tr>
+            <tr><td><label style="margin-right:16px;">Open 2</label></td><td>{{ resform.home_player5 }}</td><td>{{ resform.away_player5 }}</td></tr>
+            <tr><td><label style="margin-right:16px;">Open 3</label></td><td>{{ resform.home_player6 }}</td><td>{{ resform.away_player6 }}</td></tr>
         </table>
         </div>
 

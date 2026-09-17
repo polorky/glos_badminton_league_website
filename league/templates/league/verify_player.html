@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Verify Player{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-10">
+
+{% if view == 'expired' %}
+    <h2 class="text-2xl font-semibold mb-3">Link Expired</h2>
+    <p class="text-slate-600">This verification link has expired — links are valid for 7 days. Please contact the league administrator if action is still required.</p>
+
+{% elif view == 'invalid' %}
+    <h2 class="text-2xl font-semibold mb-3">Invalid Link</h2>
+    <p class="text-slate-600">This verification link is not valid. Please check the email or contact the league administrator.</p>
+
+{% elif view == 'already_resolved' %}
+    <h2 class="text-2xl font-semibold mb-3">Already Verified</h2>
+    <p class="text-slate-600">
+        This player has already been verified{% if player %} as <strong>{{ player.name }}</strong>{% endif %}. No further action is needed.
+    </p>
+
+{% elif view == 'confirmed' %}
+    <h2 class="text-2xl font-semibold mb-3">Player Verified</h2>
+    <p class="text-slate-600"><strong>{{ player.name }}</strong> has been recorded for the match. Thank you.</p>
+
+{% elif view == 'select' %}
+    <h2 class="text-2xl font-semibold mb-1">Verify Away Player</h2>
+    <p class="text-slate-500 text-sm mb-6">{{ verification.fixture }}</p>
+
+    {% if wrong_suggestion %}
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5 text-sm">
+        <p>The name <strong>"{{ verification.submitted_name }}"</strong> was entered by the home team and the system suggested <strong>{{ wrong_suggestion.name }}</strong>, but you indicated that is not the correct player. Please select the correct player below.</p>
+    </div>
+    {% else %}
+    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-5 text-sm">
+        <p>The name <strong>"{{ verification.submitted_name }}"</strong> could not be matched to a player in your roster. Please select the correct player or create a new record.</p>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-5 text-sm text-red-800">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/verify-player/{{ token }}/">
+        {% csrf_token %}
+        <input type="hidden" name="player_name" id="player-name-hidden" value="{{ verification.submitted_name }}">
+
+        <fieldset class="mb-6">
+            <legend class="font-semibold text-sm text-slate-700 mb-3">
+                Select from {{ verification.fixture.away_team.club }}
+                {% if verification.level == 'Womens' %}Women's{% elif verification.level == 'Open' %}Open{% else %}{{ verification.level }}{% endif %}
+                roster:
+            </legend>
+            <div class="space-y-1.5">
+                {% for player in roster %}
+                <label class="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer text-sm">
+                    <input type="radio" name="choice" value="existing_{{ player.id }}" class="accent-navy-700">
+                    <span>{{ player.name }}</span>
+                </label>
+                {% empty %}
+                <p class="text-slate-400 italic text-sm">No players found in roster for this division type.</p>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <div class="border-t border-slate-200 pt-5 mb-6">
+            <p class="font-semibold text-sm text-slate-700 mb-3">Or create a new player record:</p>
+            <label class="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer text-sm" id="create-label">
+                <input type="radio" name="choice" value="new" id="create-radio" class="mt-0.5 accent-navy-700">
+                <div class="flex-1">
+                    <span class="font-medium">Create new player</span>
+                    <div id="name-field" class="mt-2 hidden">
+                        <label class="block text-slate-500 mb-1" for="player-name-input">Player name:</label>
+                        <input type="text" id="player-name-input" value="{{ verification.submitted_name }}"
+                               class="border border-slate-300 rounded px-3 py-1.5 text-sm w-full max-w-xs"
+                               oninput="document.getElementById('player-name-hidden').value=this.value">
+                    </div>
+                </div>
+            </label>
+        </div>
+
+        <button type="submit"
+                class="bg-navy-800 text-white px-6 py-2 rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium">
+            Confirm
+        </button>
+    </form>
+
+    <script>
+        document.getElementById('create-radio').addEventListener('change', function () {
+            document.getElementById('name-field').classList.toggle('hidden', !this.checked);
+        });
+        document.querySelectorAll('input[name="choice"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                if (this.value !== 'new') {
+                    document.getElementById('name-field').classList.add('hidden');
+                }
+            });
+        });
+    </script>
+
+{% endif %}
+
+</div>
+{% endblock %}

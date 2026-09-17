@@ -17,7 +17,6 @@ def find_away_players(data, fixture):
     club = fixture.away_team.club
 
     player_errors = []
-    
 
     bypass_validation = data['player_name_check']
 
@@ -35,8 +34,7 @@ def find_away_players(data, fixture):
         player_name = data.get(player_title)
         if not player_name:
             if not bypass_validation:
-                player_errors.append("Away Player " + player_title[-1] + " has not been entered, please tick the box below to confirm \
-                                     this is correct")
+                player_errors.append(f"Away Player {player_title[-1]} has not been entered, please tick the box below to confirm this is correct")
             continue
 
         try:
@@ -50,8 +48,8 @@ def find_away_players(data, fixture):
 
             # If player still not found - add error unless validation is being bypassed
             if not bypass_validation and (not player or suggest_only):
-                player_errors.append("Away Player " + player_title[-1] + " has not been recognised, please double check. \
-                If you are sure that you have entered the name correctly please tick the box below")
+                player_errors.append((f"Away Player {player_title[-1]} has not been recognised, please double check. "
+                f"If you are sure that you have entered the name correctly please tick the box below"))
                 continue
 
         # If player already found, report duplicate
@@ -59,18 +57,18 @@ def find_away_players(data, fixture):
             player_errors.append("There are duplicated away players")
         # If mixed match and player male in female position, report error
         elif match_type == "Mixed" and player_title[-1] in ['1','2','3'] and player.level == "Open":
-            player_errors.append("Away Player " + player_title[-1] + " found but is recorded as a man, please check you have entered \
-                                 them in the correct position")
+            player_errors.append((f"Away Player {player_title[-1]} found but is recorded as an open player, please check "
+                                  f"you have entered them in the correct position"))
         # If mixed match and player female in male position, report error
-        elif match_type == "Mixed" and player_title[-1] in ['4','5','6'] and player.level == "Ladies":
-            player_errors.append("Away Player " + player_title[-1] + " found but is recorded as a lady, please check you have entered \
-                                 them in the correct position")
+        elif match_type == "Mixed" and player_title[-1] in ['4','5','6'] and player.level == "Womens":
+            player_errors.append((f"Away Player {player_title[-1]} found but is recorded as playing in the women's league, "
+                                  f"please check you have entered them in the correct position"))
         # If ladies match but player is male, report error
-        elif match_type == "Ladies" and player.level == "Open":
-            player_errors.append("Away Player " + player_title[-1] + " found but is recorded as playing in mens league")
+        elif match_type == "Womens" and player.level == "Open":
+            player_errors.append(f"Away Player {player_title[-1]} found but is recorded as playing in the open league")
         # If mens match but player is female, report error
-        elif match_type == "Open" and player.level == "Ladies":
-            player_errors.append("Away Player " + player_title[-1] + " found but is recorded as playing in ladies league")
+        elif match_type == "Open" and player.level == "Womens":
+            player_errors.append(f"Away Player {player_title[-1]} found but is recorded as playing in the women's league")
         # Otherwise add player to players found dictionary
         else:
             players_found[player_title]['player'] = player
@@ -86,7 +84,7 @@ def verify_away_players(fixture, players_found):
     '''
     
     div_type = fixture.division.type
-    mixed_player_type = ['Ladies','Ladies','Ladies','Men','Men','Men']
+    mixed_player_type = ['Womens','Womens','Womens','Open','Open','Open']
     verifications = []
 
     for player_title, player_dict in players_found.items():
@@ -97,6 +95,7 @@ def verify_away_players(fixture, players_found):
             level = div_type if div_type != 'Mixed' else mixed_player_type[int(player_title[-1])]
             verification = PendingPlayerVerification.objects.create(
                 fixture=fixture,
+                player_field=player_title,
                 submitted_name=player_dict['name'],
                 level=level,
                 token=''
@@ -109,18 +108,96 @@ def verify_away_players(fixture, players_found):
             verifications.append(verification)
     
     if verifications:
-        email_notification('playernotfound', fixture, verifications=verifications)
+        email_notification('playernotfound', fixture=fixture, verifications=verifications)
 
-def verify_player(request, token):
+def VerifyPlayerView(request, token, action=''):
+    from django.shortcuts import render
+    from league.models import Player
+
     try:
-        data = signing.loads(token, max_age=86400 * 7)  # 7 day expiry
-        verification = PendingPlayerVerification.objects.get(
-            id=data['verification_id'],
-            resolved=False
-        )
+        data = signing.loads(token, max_age=86400 * 7)
+        verification = PendingPlayerVerification.objects.select_related(
+            'fixture__away_team__club', 'fixture__home_team__club',
+            'fixture__division', 'suggested_player'
+        ).get(id=data['verification_id'])
+    except signing.SignatureExpired:
+        return render(request, 'league/verify_player.html', {'view': 'expired'})
+    except (signing.BadSignature, PendingPlayerVerification.DoesNotExist):
+        return render(request, 'league/verify_player.html', {'view': 'invalid'})
 
-    except (signing.BadSignature, signing.SignatureExpired, PendingPlayerVerification.DoesNotExist):
-        pass
+    if verification.resolved:
+        return render(request, 'league/verify_player.html', {
+            'view': 'already_resolved',
+            'player': verification.resolved_player,
+        })
+
+    club = verification.fixture.away_team.club
+
+    if request.method == 'POST':
+        choice = request.POST.get('choice', '')
+        player_name = request.POST.get('player_name', '').strip()
+        error = None
+
+        if choice == 'new':
+            if not player_name:
+                error = 'Please enter a name for the new player.'
+            else:
+                player = Player.objects.create(
+                    club=club,
+                    name=player_name,
+                    level=verification.level
+                )
+        elif choice.startswith('existing_'):
+            try:
+                player = Player.objects.get(id=choice[9:], club=club)
+            except (Player.DoesNotExist, ValueError):
+                error = 'Invalid player selected.'
+        else:
+            error = 'Please select a player or choose to create a new one.'
+
+        if not error:
+            verification.resolved_player = player
+            verification.resolved = True
+            verification.save()
+            setattr(verification.fixture, verification.player_field, player)
+            verification.fixture.save()
+            return render(request, 'league/verify_player.html', {
+                'view': 'confirmed',
+                'player': player,
+                'fixture': verification.fixture,
+            })
+
+        roster = Player.objects.filter(club=club, level=verification.level).order_by('name')
+        return render(request, 'league/verify_player.html', {
+            'view': 'select',
+            'verification': verification,
+            'token': token,
+            'roster': roster,
+            'error': error,
+        })
+
+    # GET — handle actions from email link
+    if action == 'correct' and verification.suggested_player:
+        player = verification.suggested_player
+        verification.resolved_player = player
+        verification.resolved = True
+        verification.save()
+        setattr(verification.fixture, verification.player_field, player)
+        verification.fixture.save()
+        return render(request, 'league/verify_player.html', {
+            'view': 'confirmed',
+            'player': player,
+            'fixture': verification.fixture,
+        })
+
+    roster = Player.objects.filter(club=club, level=verification.level).order_by('name')
+    return render(request, 'league/verify_player.html', {
+        'view': 'select',
+        'verification': verification,
+        'token': token,
+        'roster': roster,
+        'wrong_suggestion': verification.suggested_player if action == 'incorrect' else None,
+    })
 
 def check_player_eligibility(fixture):
     '''
@@ -130,7 +207,7 @@ def check_player_eligibility(fixture):
 
     for player in fixture.get_players('home'):
         if not player.check_eligibility(fixture.home_team):
-            email_notification('eligibility_penalty', fixture, team=fixture.home_team, player_name=player.name)
+            email_notification('eligibility_penalty', fixture=fixture, team=fixture.home_team, player_name=player.name)
             Penalty.objects.create(season=fixture.season, 
                                    team=fixture.home_team, 
                                    penalty_value=constants.PENALTY_INELIGIBLE_PLAYER, 
@@ -140,7 +217,7 @@ def check_player_eligibility(fixture):
 
     for player in fixture.get_players('away'):
         if not player.check_eligibility(fixture.away_team):
-            email_notification('eligibility_penalty', fixture, team=fixture.away_team, player_name=player.name)
+            email_notification('eligibility_penalty', fixture=fixture, team=fixture.away_team, player_name=player.name)
             Penalty.objects.create(season=fixture.season, 
                                    team=fixture.away_team,
                                    penalty_value=constants.PENALTY_INELIGIBLE_PLAYER, 
@@ -231,7 +308,7 @@ def get_player_stats(club, fixtures):
             club_away = True
 
         if fixture.division.type == "Mixed":
-            #mixed_games = ["Mixed 3v2","Mixed 2v3","Mixed 1v1","Mixed 2v2","Mixed 3v3","Mens 1&2","Ladies 1&2","Mens 1&3","Ladies 1&3"]
+            #mixed_games = ["Mixed 2v1","Mixed 3v2","Mixed 1v3","Mixed 3v1","Mixed 1v2","Mixed 2v3","Mixed 1v1","Mixed 2v2","Mixed 3v3"]
             mixed_games = [[[3,6],[2,5]],[[2,5],[3,6]],[[1,4],[1,4]],[[2,5],[2,5]],[[3,6],[3,6]],[[4,5],[4,5]],[[1,2],[1,2]],[[4,6],[4,6]],[[1,3],[1,3]]]
             batched_games = [game_split[i:i + 6] for i in range(0, len(game_split), 6)]
         else:

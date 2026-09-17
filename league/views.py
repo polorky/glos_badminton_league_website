@@ -1,6 +1,7 @@
 from django.shortcuts import redirect
 from django.db.models import Q
 from django.core.mail import send_mail
+from django.template import context
 from django.views.generic import TemplateView
 from django.contrib.auth.decorators import login_required
 from django.utils.decorators import method_decorator
@@ -288,7 +289,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         if pagename in status_dict:
             fixture.status = status_dict[pagename]
             fixture.save()
-            email_notification(pagename, fixture)
+            email_notification(pagename, fixture=fixture)
 
         # Proposed reschedule date and location by home team
         elif pagename == "rescheduled":
@@ -319,7 +320,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             rform.save()
             fixture.status = 'Proposed'
             fixture.save()
-            email_notification('reschedule', fixture)
+            email_notification('reschedule', fixture=fixture)
 
     def _conceded_match(self, pagename, fixture):
 
@@ -343,7 +344,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
                                penalty_type='Match Conceded',
                                fixture=fixture)
 
-        email_notification(pagename, fixture)
+        email_notification(pagename, fixture=fixture)
 
     def _process_result(self, context, fixture):
 
@@ -374,7 +375,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
             # Check for illegal players and apply any penalties
             fixture.check_player_eligibility()
-            email_notification('result', fixture)
+            email_notification('result', fixture=fixture)
 
             context['pagename'] = 'submitted'
 
@@ -409,15 +410,16 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             rubbers = [resformset.forms[2*i], resformset.forms[2*i+1]]
             games_fields.append((game_name, rubbers))
 
+        blank = [('', '---------')]
         if fixture.division.type == "Mixed":
             home_women, home_men = fixture.get_eligible_players()
             for i in range(1,4):
-                resform.fields['home_player'+str(i)].choices = home_women
-                resform.fields['home_player'+str(i+3)].choices = home_men
+                resform.fields['home_player'+str(i)].choices = blank + list(home_women)
+                resform.fields['home_player'+str(i+3)].choices = blank + list(home_men)
         else:
             home_players = fixture.get_eligible_players()
             for field in ['home_player1','home_player2','home_player3','home_player4']:
-                resform.fields[field].choices = home_players
+                resform.fields[field].choices = blank + list(home_players)
 
         context.update({'resform':resform,
                         'resformset':resformset,
@@ -1212,6 +1214,11 @@ class WebsiteAdminView(GenericViewMixin, TemplateView):
 class NominationsView(GenericViewMixin, TemplateView):
     template_name = "league/nominations.html"
 
+    def dispatch(self, request, *args, **kwargs):
+        if kwargs.get('pagename') == 'admin' and request.user.username != 'leagueAdmin':
+            return redirect('home')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
 
         context = super().get_context_data(**kwargs)
@@ -1309,10 +1316,15 @@ class NominationsView(GenericViewMixin, TemplateView):
 
     def _admin_context(self, kwargs):
         """Build context for the admin approval page."""
-        nom = TeamNomination.objects.get(id=kwargs['id'])
+        try:
+            nom = TeamNomination.objects.get(id=kwargs['id'])
+        except ObjectDoesNotExist:
+            return {'view': 'doesnotexist'}
+        
         current_nom = TeamNomination.objects.get(
             team=nom.team, position=nom.position, date_to=None, approved=True
         )
+
         return {
             'view': 'admin',
             'nom': nom,
@@ -1339,14 +1351,16 @@ class NominationsView(GenericViewMixin, TemplateView):
     def post(self, request, **kwargs):
 
         context = self.get_context_data(**kwargs)
-        
+
         pagename = context.get('pagename', '')
 
         if pagename == 'teamupdate':
             return self._handle_teamupdate_post(request, context)
-        elif pagename == 'admin_approved':
-            return self._handle_admin_approved()
-        elif pagename == 'admin_rejected':
+        elif pagename in ('admin_approved', 'admin_rejected'):
+            if request.user.username != 'leagueAdmin':
+                return redirect('home')
+            if pagename == 'admin_approved':
+                return self._handle_admin_approved()
             return self._handle_admin_rejected()
         elif pagename == 'indiupdate':
             return self._handle_indiupdate_post(request, context)
@@ -1403,8 +1417,8 @@ class NominationsView(GenericViewMixin, TemplateView):
         current_nom.save()
         nom.approved = True
         nom.save()
-        email_notification('nomination_approved', None, nom=nom, cur_nom=current_nom)
-        return redirect('nominations')
+        email_notification('nomination_approved', nom, current_nom)
+        return redirect('/clubadmin/league/')
 
     def _handle_admin_rejected(self):
         nom = TeamNomination.objects.get(id=self.kwargs['id'])
@@ -1412,19 +1426,21 @@ class NominationsView(GenericViewMixin, TemplateView):
             team=nom.team, position=nom.position, date_to=None, approved=True
         )
         reason = self.request.POST.get('reason', '')
-        email_notification('nomination_rejected', None, nom=nom, cur_nom=current_nom, reason=reason)
+        email_notification('nomination_rejected', nom, current_nom, reason=reason)
         nom.delete()
-        return redirect('nominations')
+        return redirect('/clubadmin/league/')
 
     def _handle_indiupdate_post(self, request, context):
         player_in = Player.objects.get(id=request.POST.get('player'))
-        TeamNomination.objects.create(
+        nom = TeamNomination.objects.create(
             team=context['current_nom'].team,
             player=player_in,
             position=context['current_nom'].position,
             date_from=date.today(),
             notes=request.POST.get('notes'),
         )
+        email_notification('nomination_submitted', nom)
+
         context.update({'view': 'nom_submitted'})
         
         return self.render_to_response(context)

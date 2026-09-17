@@ -5,50 +5,62 @@ import league.constants as constants
 BASE_URL = 'https://gloubadleague.pythonanywhere.com'
 SENDER = 'GlosBadWebsite@gmail.com'
 ADMIN_EMAIL = 'schofieldmark@gmail.com'
-FIXTURES_EMAIL = 'GlosBadFixtures@outlook.com'
+FIXTURES_EMAIL = 'GlosBadCorrespondence@outlook.com'
+COMMITTEE_EMAILS = [
+    'martin.godwin@btinternet.com',
+    'johnsexton1955@yahoo.co.uk',
+    'peter.sexton@bt.com',
+    'schofieldmark@gmail.com'
+]
 TESTING_ENV = settings.DEBUG
 
 class LeagueEmail:
-    def __init__(self, fix, **kwargs):
-        self.fix = fix
+    def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.subject = ''
         self.body = ''
         self.html = ''
         self.recipients = []
 
-    def get_recipients(self, team, non_fix=False):
+    def get_admin_recipients(self):
         if TESTING_ENV:
-            return ['schofieldmark@gmail.com',]
-        fix = self.fix
-        if non_fix:
-            team_obj = self.kwargs.get('team')
+            return [ADMIN_EMAIL]
+        else:
+            return COMMITTEE_EMAILS
+
+    def get_recipients(self, obj, obj_type='team'):
+        if TESTING_ENV:
+            return [ADMIN_EMAIL,]
+        if obj_type == 'team':
             return self._filter_emails([
-                team_obj.club.contact1_email,
-                team_obj.club.contact2_email,
-                team_obj.captain_email
+                obj.club.contact1_email,
+                obj.club.contact2_email,
+                obj.captain_email
             ])
-        elif team == 'home':
+        elif obj_type == 'club':
             return self._filter_emails([
+                obj.contact1_email,
+                obj.contact2_email
+            ])
+        
+    def get_team_recipients(self, team):
+        if TESTING_ENV:
+            return [ADMIN_EMAIL,]
+        fix = self.kwargs['fixture']
+        emails = []
+        if team == 'home' or team == 'both':
+            emails.extend([
                 fix.home_team.club.contact1_email,
                 fix.home_team.club.contact2_email,
                 fix.home_team.captain_email
             ])
-        elif team == 'away':
-            return self._filter_emails([
+        elif team == 'away' or team == 'both':
+            emails.extend([
                 fix.away_team.club.contact1_email,
                 fix.away_team.club.contact2_email,
                 fix.away_team.captain_email
             ])
-        else:  # both
-            return self._filter_emails([
-                fix.home_team.club.contact1_email,
-                fix.home_team.club.contact2_email,
-                fix.home_team.captain_email,
-                fix.away_team.club.contact1_email,
-                fix.away_team.club.contact2_email,
-                fix.away_team.captain_email
-            ])
+        return self._filter_emails(emails)
     
     def _filter_emails(self, emails):
         return [e for e in emails if e]
@@ -76,10 +88,11 @@ class LeagueEmail:
 
 
 class ResultEmail(LeagueEmail):
-    def __init__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
         self.subject = f'{fix} - Result Submitted'
-        self.recipients = self.get_recipients('away')
+        self.recipients = self.get_team_recipients('away')
         fix_url = f'{BASE_URL}/fixtures/{fix.id}'
         self.body = (f'Hi,\n\nThe home team have submitted the results for the match {fix} '
                      f'played on {fix.date_time.strftime("%d/%m/%Y, %H:%M:%S")}. '
@@ -94,10 +107,11 @@ class ResultEmail(LeagueEmail):
 
 
 class RescheduleEmail(LeagueEmail):
-    def __init__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
         self.subject = f'{fix} - New Date Proposed'
-        self.recipients = self.get_recipients('away')
+        self.recipients = self.get_team_recipients('away')
         fix_url = f'{BASE_URL}/fixtures/{fix.id}/update/div'
         self.body = (f'Hi,\n\nThe home team have proposed a new date/venue for the match {fix} '
                      f'originally scheduled for {fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S")}. '
@@ -112,10 +126,11 @@ class RescheduleEmail(LeagueEmail):
 
 
 class RearrangedEmail(LeagueEmail):
-    def __int__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
+    def __int__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
         self.subject = f'{fix} - Rearrangement Confirmed'
-        self.recipients = self.get_recipients('home')
+        self.recipients = self.get_team_recipients('home')
         self.body = (f'Hi,\n\nThe away team have confirmed the rearrangement of the match {fix} '
                      f'originally scheduled for {fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S")} '
                      f'and now scheduled for {fix.date_time.strftime("%d/%m/%Y, %H:%M:%S")} at '
@@ -123,10 +138,11 @@ class RearrangedEmail(LeagueEmail):
 
 
 class RejectedEmail(LeagueEmail):
-    def __int__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
+    def __int__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
         self.subject = f'{fix} - Rearrangement Rejected'
-        self.recipients = self.get_recipients('home')
+        self.recipients = self.get_team_recipients('home')
         self.body = (f'Hi,\n\nThe away team have REJECTED the proposed rearrangement of the match '
                      f'{fix} originally scheduled for {fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S")} '
                      f'and proposed to be rearranged for {fix.date_time.strftime("%d/%m/%Y, %H:%M:%S")} '
@@ -136,13 +152,14 @@ class RejectedEmail(LeagueEmail):
 
 
 class ConcessionEmail(LeagueEmail):
-    def __init__(self, fix, side, **kwargs):
-        super().__init__(fix, **kwargs)
+    def __init__(self, side, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
         penalty_value = constants.PENALTY_MIXED_CONCEDED if fix.division.type == "Mixed" else constants.PENALTY_LEVEL_CONCEDED
         team = 'home' if side == 'home' else 'away'
         other_team = 'away' if side == 'home' else 'home'
         self.subject = f'{fix} - Match Conceded'
-        self.recipients = self.get_recipients('both')
+        self.recipients = self.get_team_recipients('both')
         self.body = (f'Hi,\n\nThe {team} team have conceded the match {fix} scheduled for '
                      f'{fix.date_time.strftime("%d/%m/%Y, %H:%M:%S")}. '
                      f'The {team} team will be penalised {penalty_value}. '
@@ -151,10 +168,11 @@ class ConcessionEmail(LeagueEmail):
 
 
 class PlayerNotFoundEmail(LeagueEmail):
-    def __init__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
-        self.subject = 'Player Not Confirmed'
-        self.recipients = self.get_recipients('away')
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
+        self.subject = 'Player Not Found - Action Required'
+        self.recipients = self.get_team_recipients('away')
         verifications = kwargs['verifications']
         self.body = f'Hi,\n\nNot all away players for the match {fix} could be identified.'
         self.html = f'Hi,<br><br>Not all away players for the match {fix} could be identified.'
@@ -177,10 +195,11 @@ class PlayerNotFoundEmail(LeagueEmail):
 
 
 class PostponedEmail(LeagueEmail):
-    def __int__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
         self.subject = f'{fix} - Match Postponed'
-        self.recipients = self.get_recipients('away')
+        self.recipients = self.get_team_recipients('away')
         self.body = (f'Hi,\n\nThe home team have postponed the match {fix} originally scheduled '
                      f'for {fix.date_time.strftime("%d/%m/%Y, %H:%M:%S")}. Hopefully, they have '
                      f'been in touch to explain why and to initiate the process of finding a new '
@@ -188,10 +207,11 @@ class PostponedEmail(LeagueEmail):
 
 
 class NominationPenEmail(LeagueEmail):
-    def __init__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
         self.subject = 'Nomination Penalty Applied'
-        self.recipients = self.get_recipients(kwargs['team'], non_fix=True)
+        self.recipients = self.get_recipients(kwargs['team'])
         self.body = (f'Hi,\n\nFollowing the submission of the result for the match {fix}, your '
                      f"club's team has played their first three matches. However, nominated player "
                      f"{kwargs['player_name']} has not played at least 50% of the team's matches "
@@ -207,10 +227,11 @@ class NominationPenEmail(LeagueEmail):
 
 
 class EligibilityPenEmail(LeagueEmail):
-    def __init__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
         self.subject = 'Eligibility Penalty Applied'
-        self.recipients = self.get_recipients(kwargs['team'], non_fix=True)
+        self.recipients = self.get_recipients(kwargs['team'])
         self.body = (f'Hi,\n\nFollowing the submission of the result for the match {fix}, it has been '
                      f'identified that player {kwargs["player_name"]} was ineligible to play and so your '
                      f"club's team has been penalised {constants.PENALTY_INELIGIBLE_PLAYER} points. Please "
@@ -223,31 +244,121 @@ class EligibilityPenEmail(LeagueEmail):
                      f'extenuating circumstances you would like to raise.')
 
 
+class LateResultPenEmail(LeagueEmail):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = kwargs.get('fixture')
+        self.subject = 'Late Results Submission - Penalty Applied'
+        self.recipients = self.get_team_recipients('home')
+        self.body = (f"Hi,\n\nThe result of the match {fix} has still not been submitted and is now two "
+                     f"weeks late so a penalty has been applied to your team.\nPlease contact the League "
+                     f"Committee at {FIXTURES_EMAIL} if there are extenuating circumstances "
+                     f"you would like to raise.")
+
+
+class OutstandingResultsEmail(LeagueEmail):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = kwargs.get('fixture')
+        self.subject = 'Results Submission Outstanding'
+        self.recipients = self.get_team_recipients('home')
+        self.body = (f"Hi,\n\nThe result of the match {fix} has not been yet been submitted despite it being "
+                     f"scheduled for at least a week ago. If the result is not submitted within 14 days of the "
+                     f"match date, your club's team will get an automatic penalty. If the match has been postponed "
+                     f"or rescheduled, please update it on the league website to avoid a penalty being applied.")
+
+
+class ProposedDatePassedEmail(LeagueEmail):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = kwargs.get('fixture')
+        self.subject = 'Proposed Match Date Passed'
+        self.recipients = self.get_team_recipients('away')
+        self.body = (f"Hi,\n\nThe match {fix} is still in a 'Proposed' state meaning that the home team have proposed "
+                     f"a new date for the fixture but your club have not confirmed it. This date is also now in the "
+                     f"past so please either accept the date if the match was played so that the home team can submit "
+                     f"the result or reject the date if the match was not played so that the home team can submit a new date.")
+
+
+class PostponedFixturesEmail(LeagueEmail):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = kwargs.get('fixture')
+        club = kwargs.get('club')
+        postponed_fixtures = kwargs.get('postponed_fixtures')
+        self.subject = 'Postponed Matches not yet Rescheduled'
+        self.recipients = self.get_recipients(club, obj_type='club')
+        self.body = (f"Hi,\n\nThis is your weekly reminder of postponed home matches that have yet to be rescheduled. Please "
+                     f"ensure a new date is found for these matches as soon as possible noting that the league rules state "
+                     f"that matches must be rearranged within 21 days of the original date.\n\n")
+        for fix in postponed_fixtures:
+            self.body += f'{fix}\n'
+
+
+class ProposedFixturesEmail(LeagueEmail):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = kwargs.get('fixture')
+        self.subject = 'Reschedule Proposals Not Yet Accepted'
+        self.recipients = self.get_team_recipients('away')
+        self.body = (f"Hi,\n\nThe home team for following match have proposed a new date/venue but your team has yet to accept "
+                     f"the new details. Please accept (or reject) the proposed details via the league website (if rejecting, "
+                     f"please also contact the other club to say why).\n\n{fix}")
+        self.html = (f"Hi,<br><br>The home team for the following match have proposed a new date/venue but your team has yet to "
+                     f"accept the new details. Please accept (or reject) the proposed details by clicking on the link below (if "
+                     f"rejecting, please also contact the other club to say why).<br><br>"
+                     f'<a href="https://gloubadleague.pythonanywhere.com/fixtures/{fix.id}/update/div">{fix}</a>')
+
+
+class UpcomingFixturesEmail(LeagueEmail):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fixtures = kwargs.get('fixtures')
+        obj = kwargs.get('obj')
+        obj_type = kwargs.get('obj_type')
+        self.subject = f'Upcoming {obj_type.title()} Fixtures'
+        self.recipients = self.get_recipients(obj, obj_type=obj_type)
+        self.body = f"Hi,\n\nHere are the fixtures for your {obj_type} in the next TWO WEEKS:\n\n"
+        for fix in fixtures:
+            self.body += f'{fix.date_time.strftime("%d/%m/%Y %H:%M")} - {fix}\n'
+        self.html = f"Hi,<br><br>Here are the fixtures for your {obj_type} in the next TWO WEEKS:<br><br>"
+        for fix in fixtures:
+            self.html += f'{fix.date_time.strftime("%d/%m/%Y %H:%M")} - <a href="https://gloubadleague.pythonanywhere.com/fixtures/{fix.id}/fix">{fix}</a><br>'
+
+
+class NominationSubmittedEmail(LeagueEmail):
+    def __init__(self, nom, **kwargs):
+        super().__init__(**kwargs)
+        nom_url = f'{BASE_URL}/nominations/admin/{nom.id}'
+        self.subject = 'Nomination Change Request'
+        self.recipients = self.get_admin_recipients()
+        self.body = (f'Hi,\n\n{nom.team.club} has submitted a request to change a nomination for the team {nom.team}. '
+                     f'Please go to the following page to view the players involved and their current playing stats:'
+                     f'\n\n{nom_url}\n\nPlease approve/reject the request via that page, if rejecting it please contact '
+                     f'the club directly to explain why.')
+        self.html = (f'Hi,<br><br>{nom.team.club} has submitted a request to change a nomination for the team {nom.team}. '
+                     f'Please <a href={nom_url}>click here</a> to view the players involved and their current '
+                     f'playing stats. Please approve/reject the request via that page, if rejecting it please contact '
+                     f'the club directly to explain why.')
+
+
 class NominationApprovedEmail(LeagueEmail):
-    def __init__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
-        nom = kwargs['nom']
-        cur_nom = kwargs['cur_nom']
-        self.kwargs['team'] = nom.team
+    def __init__(self, nom, cur_nom, **kwargs):
+        super().__init__(**kwargs)
         self.subject = 'Nomination Change Approved'
-        self.recipients = self.get_recipients('', non_fix=True)
-        cur_player = cur_nom.player
-        new_player = nom.player
-        self.body = (f"Hi,\n\nThe nomination change request to replace {cur_player} with "
-                     f"{new_player} for {nom.team} has been approved.")
-        self.html = (f"Hi,<br><br>The nomination change request to replace {cur_player} with "
-                     f"{new_player} for {nom.team} has been approved.")
+        self.recipients = self.get_recipients(nom.team)
+        self.body = (f"Hi,\n\nThe nomination change request to replace {cur_nom.player} with "
+                     f"{nom.player} for {nom.team} has been approved.")
+        self.html = (f"Hi,<br><br>The nomination change request to replace {cur_nom.player} with "
+                     f"{nom.player} for {nom.team} has been approved.")
 
 
 class NominationRejectedEmail(LeagueEmail):
-    def __init__(self, fix, **kwargs):
-        super().__init__(fix, **kwargs)
-        nom = kwargs['nom']
-        cur_nom = kwargs['cur_nom']
+    def __init__(self, nom, cur_nom, **kwargs):
+        super().__init__(**kwargs)
         reason = kwargs.get('reason', '')
-        self.kwargs['team'] = nom.team
         self.subject = 'Nomination Change Request Rejected'
-        self.recipients = self.get_recipients('', non_fix=True)
+        self.recipients = self.get_recipients(nom.team)
         reason_text = f'\n\nReason: {reason}' if reason else ''
         reason_html = f'<br><br>Reason: {reason}' if reason else ''
         self.body = (f"Hi,\n\nThe league committee has rejected the nomination change request "
@@ -256,6 +367,8 @@ class NominationRejectedEmail(LeagueEmail):
         self.html = (f"Hi,<br><br>The league committee has rejected the nomination change request "
                      f"to replace {cur_nom.player} with {nom.player} for {nom.team}.{reason_html}<br><br>"
                      f"Please contact the league committee if you would like to discuss this.")
+
+
 
 
 EMAIL_CLASSES = {
@@ -267,63 +380,26 @@ EMAIL_CLASSES = {
     'playernotfound': PlayerNotFoundEmail,
     'nomination_penalty': NominationPenEmail,
     'eligibility_penalty': EligibilityPenEmail,
+    'late_result_penalty': LateResultPenEmail,
+    'outstanding_results': OutstandingResultsEmail,
+    'proposed_date_passed': ProposedDatePassedEmail,
+    'postponed_not_rescheduled': PostponedFixturesEmail,
+    'proposed_not_accepted': ProposedFixturesEmail,
+    'upcoming_fixtures': UpcomingFixturesEmail,
+    'nomination_submitted': NominationSubmittedEmail,
     'nomination_approved': NominationApprovedEmail,
     'nomination_rejected': NominationRejectedEmail,
 }
 
 
-def email_notification(status, fix, **kwargs):
+def email_notification(status, *args, **kwargs):
     if status in ('concededhome', 'concededaway'):
         side = 'home' if status == 'concededhome' else 'away'
-        email = ConcessionEmail(fix, side=side, **kwargs)
+        email = ConcessionEmail(side, *args, **kwargs)
     else:
         email_class = EMAIL_CLASSES[status]
-        email = email_class(fix, **kwargs)
+        email = email_class(*args, **kwargs)
     email.send()
-
-
-class AdminEmail:
-    def __init__(self, all_admin=False, **kwargs):
-        self.kwargs = kwargs
-        self.subject = ''
-        self.body = ''
-        self.html = ''
-        self.recipients = self.get_recipients(all_admin)
-
-    def get_recipients(self, all_admin):
-        if all_admin and not TESTING_ENV:
-            return ['martin.godwin@btinternet.com','johnsexton1955@yahoo.co.uk','peter.sexton@bt.com','schofieldmark@gmail.com']
-        else:
-            return ['schofieldmark@gmail.com',]
-
-    def _footer(self, html=False):
-        if html:
-            return '<br><br>***This is an automated email from the league website***'
-        return '\n\n***This is an automated email from the league website***'
-
-    def send(self):
-        body = self.body + self._footer()
-        if self.html:
-            html = self.html + self._footer(html=True)
-            send_mail(self.subject, body, SENDER, self.recipients, html_message=html)
-        else:
-            send_mail(self.subject, body, SENDER, self.recipients)
-
-
-class NominationChangeEmail(AdminEmail):
-    def __init__(self, all_admin, **kwargs):
-        super().__init__(all_admin, **kwargs)
-        nom = self.kwargs['nom_object']
-        nom_url = f'{BASE_URL}/nominations/admin/{nom.id}'
-        self.subject = 'Nomination Change Request'
-        self.body = (f'Hi,\n\n{nom.team.club} has submitted a request to change a nomination for the team {nom.team}. '
-                     f'Please go to the following page to view the players involved and their current playing stats:'
-                     f'\n\n{nom_url}\n\nPlease approve/reject the request via that page, if rejecting it please contact '
-                     f'the club directly to explain why.')
-        self.html = (f'Hi,<br><br>{nom.team.club} has submitted a request to change a nomination for the team {nom.team}. '
-                     f'Please <a href={nom_url}>click here</a> to view the players involved and their current '
-                     f'playing stats. Please approve/reject the request via that page, if rejecting it please contact '
-                     f'the club directly to explain why.')
 
 
 def email_admin(dup_player, cor_player, fix, code):
@@ -344,6 +420,7 @@ def email_admin(dup_player, cor_player, fix, code):
     send_mail(subject, body, 'GlosBadWebsite@gmail.com', ['schofieldmark@gmail.com'])
 
     return
+
 
 def get_all_club_contacts():
     from league.models import Club

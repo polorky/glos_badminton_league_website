@@ -1,13 +1,6 @@
-from django.core.exceptions import ObjectDoesNotExist
 import sys
-import django
 import os
-from django.core.mail import send_mail
-from datetime import timedelta
-from league.models import Fixture, Penalty, Season, Club
-from django.db.models import Q
-from django.utils import timezone
-from league import constants
+import django
 
 path = '/home/gloubadleague/leagueWebsite'
 if path not in sys.path:
@@ -15,190 +8,112 @@ if path not in sys.path:
 os.environ['DJANGO_SETTINGS_MODULE'] = 'leagueWebsite.settings'
 django.setup()
 
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
+from django.utils import timezone
+from django.conf import settings
+
+from datetime import timedelta
+
+from league import constants
+from league.models import Fixture, Penalty, Season, Club, Team
+from league.utilities.email import email_notification
+
+
 def run(test):
 
-    def get_recipients(fix, team, club=None):
-
-        if club:
-            recipients = [club.contact1_email, club.contact2_email]
-        else:
-            recipients = [team.club.contact1_email, team.club.contact2_email, team.captain_email]
-
-        for i in range(len(recipients),0,-1):
-            if not recipients[i-1]:
-                recipients.pop(i-1)
-
-        return recipients
-
-    sender = 'GlosBadWebsite@gmail.com'
-
-    #right_now = datetime(2022,10,4,9,0,0,0, pytz.UTC)
     right_now = timezone.now()
     current_season = Season.objects.get(current=True)
-    all_fix = list(Fixture.objects.filter(season=current_season))
-    outstanding_fixtures = []
-    overdue_fixtures = []
-    proposed_fixtures = []
-    all_proposed_fixtures = []
-    postponed_fixtures = {}
-    bad_statuses = ['Unplayed','Rearranged']
+    saturday = right_now.weekday() == 5 or test
 
-    if right_now.weekday() == 5 or test:
-        saturday = True
-    else:
-        saturday = False
+    fourteen_ago = right_now - timedelta(14)
+    seven_ago    = right_now - timedelta(7)
+    bad_statuses = ['Unplayed', 'Rearranged']
 
-    for fix in all_fix:
-        if fix.date_time < (right_now - timedelta(14)) and fix.status in bad_statuses:
-            overdue_fixtures.append(fix)
-        elif fix.date_time < (right_now - timedelta(7)) and fix.status in bad_statuses:
-            outstanding_fixtures.append(fix)
-        elif fix.date_time < right_now and fix.status == 'Proposed':
-            proposed_fixtures.append(fix)
-        if (saturday or test) and fix.status == 'Postponed':
-            if fix.home_team.club.name in postponed_fixtures.keys():
-                postponed_fixtures[fix.home_team.club.name].append(fix)
-            else:
-                postponed_fixtures[fix.home_team.club.name] = [fix]
-        if (saturday or test) and fix.status == 'Proposed':
-            all_proposed_fixtures.append(fix)
+    base = Fixture.objects.filter(season=current_season).select_related(
+        'home_team__club', 'away_team__club', 'season'
+    )
+
+    # No result submitted and 14+ days past
+    overdue_fixtures = base.filter(date_time__lt=fourteen_ago, status__in=bad_statuses)
+
+    # No result submitted and 7–14 days past
+    outstanding_fixtures = base.filter(
+        date_time__gte=fourteen_ago, date_time__lt=seven_ago, status__in=bad_statuses
+    )
+
+    # Proposed date has now passed without acceptance
+    proposed_fixtures = base.filter(date_time__lt=right_now, status='Proposed')
 
     for fix in overdue_fixtures:
         try:
             Penalty.objects.get(team=fix.home_team, penalty_type='Late Submission', fixture=fix)
         except ObjectDoesNotExist:
-            subject = 'Late Results Submission - Penalty Applied'
-            recipients = get_recipients(fix, fix.home_team)
-            body = "Hi,\n\nThe result of the match " + str(fix) + " has still not been submitted and is now two weeks late so a penalty has been applied to your team." \
-            + "\nPlease contact the League Committee at GlosBadCorrespondence@outlook.com if there are extenuating circumstances you would like to raise." \
-            + "\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***"
-
-            if test:
-                recipients = ['schofieldmark@gmail.com']
-
-            send_mail(subject, body, sender, recipients)
-
-            if test:
-                break
-
-            p = Penalty(season=fix.season, team=fix.home_team, penalty_value=constants.PENALTY_LATE_SUBMISSION, penalty_type='Late Submission', player='', fixture=fix)
-            p.save()
+            email_notification('late_result_penalty', fixture=fix)
+            if not test:
+                Penalty.objects.create(
+                    season=fix.season, team=fix.home_team,
+                    penalty_value=constants.PENALTY_LATE_SUBMISSION,
+                    penalty_type='Late Submission', player='', fixture=fix
+                )
 
     for fix in outstanding_fixtures:
-        subject = 'Results Submission Outstanding'
-        recipients = get_recipients(fix, fix.home_team)
-        body = "Hi,\n\nThe result of the match " + str(fix) + " has not been yet been submitted despite it being scheduled for at least a week ago. If the result is not submitted" \
-        + " within 14 days of the match date, your club's team will get an automatic penalty. If the match has been postponed or rescheduled, please update it on the league website to avoid" \
-        + " a penalty being applied.\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***"
-
-        if test:
-            recipients = ['schofieldmark@gmail.com']
-
-        send_mail(subject, body, sender, recipients)
+        email_notification('outstanding_results', fixture=fix)
 
     for fix in proposed_fixtures:
-        subject = 'Proposed Match Date Passed'
-        recipients = get_recipients(fix, fix.away_team)
-        body = "Hi,\n\nThe match " + str(fix) + ' is still in a "Proposed" state meaning that the home team have proposed a new date for the fixture but your club have not' \
-        + " confirmed it. This date is also now in the past so please either accept the date if the match was played so that the home team can submit the result or reject" \
-        + " the date if the match was not played so that the home team can submit a new date.\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league" \
-        + " website***"
+        email_notification('proposed_date_passed', fixture=fix)
 
-        if test:
-            recipients = ['schofieldmark@gmail.com']
+    if saturday:
 
-        send_mail(subject, body, sender, recipients)
+        # Postponed fixtures grouped by home club
+        postponed = base.filter(status='Postponed')
+        postponed_clubs = Club.objects.filter(
+            id__in=postponed.values('home_team__club')
+        ).distinct()
+        for club in postponed_clubs:
+            club_postponed = postponed.filter(home_team__club=club)
+            email_notification(
+                'postponed_not_rescheduled',
+                fixture=club_postponed.first(),
+                club=club,
+                postponed_fixtures=club_postponed,
+            )
 
-    if saturday or test:
+        # All still-open proposed fixtures
+        for fix in base.filter(status='Proposed'):
+            email_notification('proposed_not_accepted', fixture=fix)
 
-        for clubname in postponed_fixtures.keys():
-            club = Club.objects.get(name=clubname)
-            subject = 'Postponed Matches not yet Rescheduled'
-            recipients = get_recipients(fix, None, club=club)
-            body = "Hi,\n\nThis is your weekly reminder of postponed home matches that have yet to be rescheduled. Please ensure a new date is found for these matches as" \
-            + " soon as possible noting that the league rules state that matches must be rearranged within 21 days of the original date.\n\n"
-            for fix in postponed_fixtures[clubname]:
-                body += str(fix) + '\n'
-            body += "\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***"
+        # Upcoming fixtures in the next 14 days
+        upcoming = base.filter(
+            date_time__gte=right_now,
+            date_time__lte=right_now + timedelta(14),
+            status__in=['Unplayed', 'Rearranged', 'Proposed'],
+        )
 
-            if test:
-                recipients = ['schofieldmark@gmail.com']
-
-            send_mail(subject, body, sender, recipients)
-
-        for fix in all_proposed_fixtures:
-            subject = 'Reschedule Proposals Not Yet Accepted'
-            recipients = get_recipients(fix, fix.away_team)
-            body = "Hi,\n\nThe home team for following match have proposed a new date/venue but your team has yet to accept the new details." \
-            + " Please accept (or reject) the proposed details via the league website (if rejecting, please also contact the other club to say why).\n\n" \
-            + str(fix) + "\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***"
-            html = "Hi,<br><br>The home team for the following match have proposed a new date/venue but your team has yet to accept the new details." \
-            + " Please accept (or reject) the proposed details by clicking on the link below (if rejecting, please also contact the other club to say why).<br><br>" \
-            + '<a href="https://gloubadleague.pythonanywhere.com/fixtures/' + str(fix.id) + '/update/div">' + str(fix) + "</a><br><br>Regards<br><br>League Committee" \
-            + "<br><br>***This is an automated email from the league website***"
-
-            if test:
-                recipients = ['schofieldmark@gmail.com']
-
-            send_mail(subject, body, sender, recipients, html_message = html)
-
-        next_week = right_now + timedelta(14)
-        upcoming_fixtures = Fixture.objects.filter(season=current_season).filter(date_time__lte=next_week).filter(date_time__gte=right_now).filter(status__in=['Unplayed','Rearranged','Proposed'])
-
-        clubs = [fix.home_team.club for fix in upcoming_fixtures]
-        clubs += [fix.away_team.club for fix in upcoming_fixtures]
-        clubs = list(set(clubs))
+        clubs = Club.objects.filter(
+            Q(id__in=upcoming.values('home_team__club')) |
+            Q(id__in=upcoming.values('away_team__club'))
+        ).distinct()
 
         for club in clubs:
             if not club.club_notifications:
                 continue
-            club_fix = upcoming_fixtures.filter(Q(home_team__club=club)|Q(away_team__club=club))
-            subject = 'Upcoming Club Fixtures'
-            recipients = get_recipients(fix, None, club=club)
-            body = "Hi,\n\nHere are the fixtures for your club in the next TWO WEEKS (time period has been extended to give more notice for games earlier in the week):\n\n"
-            for fix in club_fix:
-                body += fix.date_time.strftime("%d/%m/%Y %H:%M") + ' - ' + str(fix) + '\n'
-            body += "\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***"
-            html = "Hi,<br><br>Here are the fixtures for your club in the next TWO WEEKS (time period has been extended to give more notice for games earlier in the week):<br><br>"
-            for fix in club_fix:
-                html += fix.date_time.strftime("%d/%m/%Y %H:%M") + ' - <a href="https://gloubadleague.pythonanywhere.com/fixtures/' + str(fix.id) + '/fix">' + str(fix) + '</a><br>'
-            html += "<br><br>Regards<br><br>League Committee<br><br>***This is an automated email from the league website***"
-
-            if test:
-                recipients = ['schofieldmark@gmail.com']
-
-            send_mail(subject, body, sender, recipients, html_message = html)
-
+            club_fix = upcoming.filter(Q(home_team__club=club) | Q(away_team__club=club))
+            email_notification('upcoming_fixtures', fixtures=club_fix, obj=club, obj_type='club')
             if test:
                 break
 
-        teams = [fix.home_team for fix in upcoming_fixtures]
-        teams += [fix.away_team for fix in upcoming_fixtures]
-        teams = list(set(teams))
+        teams = Team.objects.filter(
+            Q(id__in=upcoming.values('home_team')) |
+            Q(id__in=upcoming.values('away_team'))
+        ).select_related('club')
 
         for team in teams:
-
             if not team.captain_email or not team.club.captain_notifications:
                 continue
-
-            team_fix = upcoming_fixtures.filter(Q(home_team=team)|Q(away_team=team))
-            subject = 'Upcoming Team Fixtures'
-            recipients = [team.captain_email]
-            body = "Hi,\n\nHere are the fixtures for your team in the next TWO WEEKS (time period has been extended to give more notice for games earlier in the week):\n\n"
-            for fix in team_fix:
-                body += fix.date_time.strftime("%d/%m/%Y %H:%M") + ' - ' + str(fix) + '\n'
-            body += "\n\nRegards\n\nLeague Committee\n\n***This is an automated email from the league website***"
-            html = "Hi,<br><br>Here are the fixtures for your team in the next TWO WEEKS (time period has been extended to give more notice for games earlier in the week):<br><br>"
-            for fix in team_fix:
-                html += fix.date_time.strftime("%d/%m/%Y %H:%M") + ' - <a href="https://gloubadleague.pythonanywhere.com/fixtures/' + str(fix.id) + '/fix">' + str(fix) + '</a><br>'
-            html += "<br><br>Regards<br><br>League Committee<br><br>***This is an automated email from the league website***"
-
-            if test:
-                recipients = ['schofieldmark@gmail.com']
-
-            send_mail(subject, body, sender, recipients, html_message = html)
-
+            team_fix = upcoming.filter(Q(home_team=team) | Q(away_team=team))
+            email_notification('upcoming_fixtures', fixtures=team_fix, obj=team, obj_type='team')
             if test:
                 break
 
-run(False)
+run(settings.DEBUG)
