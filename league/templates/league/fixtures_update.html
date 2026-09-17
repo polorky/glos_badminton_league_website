@@ -140,7 +140,9 @@
                 ⚠️ <b>{{ error }}</b>
             {% endfor %}
         </div>
-        <p><b>{{ resform.score_check }}  Override score validation</b> - if a game was shortened, please tick this box (please double check that all the other scores are correct)</p>
+        <label>
+            <input type="checkbox" name="score_check"> Override score validation - please check all other scores are correct
+        </label>
     {% endif %}
     <br>
     <input class="button" type="submit" value="Submit Result">

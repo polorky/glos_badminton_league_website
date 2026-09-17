@@ -136,7 +136,6 @@ class RescheduleForm(ModelForm):
 class FixtureForm(ModelForm):
 
     player_name_check = forms.BooleanField(required=False)
-    score_check = forms.BooleanField(required=False)
     away_player1 = forms.CharField(max_length=30, required=False)
     away_player2 = forms.CharField(max_length=30, required=False)
     away_player3 = forms.CharField(max_length=30, required=False)
@@ -160,14 +159,14 @@ class FixtureForm(ModelForm):
         hps = [v for k, v in cd.items() if 'home_player' in k]
         for hp in hps:
             if not hp and not cd['player_name_check']:
-                player_errors.append('You have not entered all home players')
+                player_errors.append('You have not entered all home players. Please tick the box below if this is deliberate')
         valid_hps = [player for player in hps if player]
-
+        
         if len(valid_hps) != len(list(set(valid_hps))):
             raise ValidationError(['player','You have duplicated home player(s)'])
         
         # Check away players are not duplicated, are right gender and exist - CAN BE OVERRIDDEN
-        players_found, player_errors = find_away_players(cd, self.instance)
+        players_found, player_errors = find_away_players(cd, self.instance, player_errors)
 
         # If errors and overrides not checked, raise error
         if player_errors and not cd['player_name_check']:
@@ -193,7 +192,11 @@ class LevelFixtureForm(FixtureForm):
         fields = ['home_points','away_points','home_player1','home_player2','home_player3','home_player4']
 
 class BaseScoreFormSet(BaseFormSet):
-    
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.score_check = bool(self.data.get('score_check')) if self.data else False
+
     def clean(self):
         super().clean()
 
@@ -206,12 +209,12 @@ class BaseScoreFormSet(BaseFormSet):
                 all_scores.append([cd['forfeit'], cd['forfeit']])
             else:
                 all_scores.append([cd['home_score'], cd['away_score']])
-        
+
         # Check game scores - CAN BE OVERRIDDEN
         game_errors = self.check_game_results(all_scores)
 
         # If game errors and game override not checked, raise error
-        if game_errors and not cd['score_check']:
+        if game_errors and not self.score_check:
             raise ValidationError([game_errors])
         
     def check_game_results(self, game_results):

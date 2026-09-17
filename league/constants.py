@@ -32,8 +32,8 @@ PENALTY_LATE_SUBMISSION = 5
 MAX_PLAYS_FOR_HIGHER_TEAMS = 3
 
 # Player related constants
-PLAYER_NAME_FUZZY_MATCH_RATIO = 85
-PLAYER_NAME_FUZZY_SUGGEST_RATIO = 60
+PLAYER_NAME_FUZZY_MATCH_RATIO = 90
+PLAYER_NAME_FUZZY_SUGGEST_RATIO = 70
 ALTERNATE_NAMES = (('David','Dave'),('Stuart','Stu'),('Richard','Rich'),('Alexander','Alex'),('Christopher','Chris'),('Andrew','Andy'),('Daniel','Dan'),('Matthew','Matt'),
 ('Michael','Mike'),('Oliver','Oli'),('Oliver','Ollie'),('Phillip','Phil'),('Philip','Phil'),('Robert','Rob'),('Simon','Si'),('Thomas','Tom'),('William','Will'),
 ('Rebecca','Becky'))

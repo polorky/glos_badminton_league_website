@@ -11,7 +11,7 @@ from django.views.decorators.csrf import requires_csrf_token
 
 from .models import *
 from .forms import *
-from .utilities.player import verify_away_players, correct_duplicate_player, get_player_stats, get_player_appearances
+from .utilities.player import verify_away_players, check_player_eligibility, correct_duplicate_player, get_player_stats, get_player_appearances
 from .utilities.download import download_fixtures, parse_fixtures
 from .utilities.team import get_performances
 from .utilities.fixture import get_fixture_stats, get_scores, create_season_fixtures
@@ -374,7 +374,9 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             fixture.save()
 
             # Check for illegal players and apply any penalties
-            fixture.check_player_eligibility()
+            check_player_eligibility(fixture)
+
+            # Email to confirm submission
             email_notification('result', fixture=fixture)
 
             context['pagename'] = 'submitted'

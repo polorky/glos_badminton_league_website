@@ -5,7 +5,7 @@ from .email import email_notification
 from league.models import Team, PendingPlayerVerification, Penalty
 
 # Player related functions
-def find_away_players(data, fixture):
+def find_away_players(data, fixture, player_errors):
     '''
         Validation function for checking away player names
         Looks for existing players that match or closely match
@@ -15,8 +15,6 @@ def find_away_players(data, fixture):
 
     match_type = fixture.division.type
     club = fixture.away_team.club
-
-    player_errors = []
 
     bypass_validation = data['player_name_check']
 
@@ -49,7 +47,7 @@ def find_away_players(data, fixture):
             # If player still not found - add error unless validation is being bypassed
             if not bypass_validation and (not player or suggest_only):
                 player_errors.append((f"Away Player {player_title[-1]} has not been recognised, please double check. "
-                f"If you are sure that you have entered the name correctly please tick the box below"))
+                                      f"If you are sure that you have entered the name correctly please tick the box below"))
                 continue
 
         # If player already found, report duplicate
@@ -233,16 +231,17 @@ def attempt_fuzzy_match(player_name, club):
     suggest_only = False
 
     # Iterate through club players
-    for player in Player.objects.filter(club=club):
+    for club_player in Player.objects.filter(club=club):
         # Check whether fuzzy ratio of current player it higher than the current max
-        if fuzz.ratio(player_name.upper(), player.name.upper()) > fuzzy_max[1]:
+        if fuzz.ratio(player_name.upper(), club_player.name.upper()) > fuzzy_max[1]:
             # If so, update the current max
-            fuzzy_max = (player, fuzz.ratio(player_name.upper(), player.name.upper()))
+            fuzzy_max = (club_player, fuzz.ratio(player_name.upper(), club_player.name.upper()))
 
-    # If fuzzy_max is not above acceptable threshold
+    # If fuzzy_max is above acceptable threshold
     if fuzzy_max[1] >= constants.PLAYER_NAME_FUZZY_MATCH_RATIO:
         player = fuzzy_max[0]
     else:
+        # If fuzzy_max is above the suggestion threshold, return the player but flag as suggest_only
         if fuzzy_max[1] >= constants.PLAYER_NAME_FUZZY_SUGGEST_RATIO:
             player = fuzzy_max[0]
             suggest_only = True
