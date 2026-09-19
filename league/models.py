@@ -215,7 +215,7 @@ class Player(models.Model):
     def check_eligibility(self, team):
         '''
             Checks how many times player has played for teams above given one
-            Return true if ok to play for given team or false if not eligible any more
+            Return True if ok to play for given team or False if not eligible any more
         '''
 
         # Check if player has played in the wrong level league
@@ -233,7 +233,11 @@ class Player(models.Model):
         return self.get_higher_plays(team).count() <= constants.MAX_PLAYS_FOR_HIGHER_TEAMS
 
     def get_higher_plays(self, team):
-        
+        '''
+            Returns queryset of fixtures player has played for teams above the given one
+        '''
+
+        # Get all fixtures player has played in
         current_season = Season.objects.get(current=True)
         season_q = Q(season=current_season)
 
@@ -248,6 +252,7 @@ class Player(models.Model):
             Q(away_player5=self) | Q(away_player6=self)
         )
 
+        # Return fixtures where player has played for teams above the given one in the same league
         return Fixture.objects.filter(
             Q(season_q & home_player_q & Q(home_team__number__lt=team.number) & Q(division__type=team.type)) |
             Q(season_q & away_player_q & Q(away_team__number__lt=team.number) & Q(division__type=team.type))

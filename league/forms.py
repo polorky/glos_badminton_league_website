@@ -3,7 +3,7 @@ from django import forms
 from .models import Fixture, Club, ClubNight, Player, Venue, Team, TeamNomination
 from django.core.exceptions import ValidationError
 import league.constants as constants
-from .utilities.player import find_away_players
+from .utilities.validation import PlayerValidation
 from django.forms import BaseModelFormSet
 
 class ClubForm(ModelForm):
@@ -153,26 +153,19 @@ class FixtureForm(ModelForm):
         if cd.get('home_points') + cd.get('away_points') != tp:
             raise ValidationError(['points','Points do not add up to the correct amount'])
 
-        player_errors = []
+        # Create validation object to validate players
+        v = PlayerValidation(self.data, self.instance)
 
-        # Check all home players are entered and different - CAN BE BLANK BUT NOT DUPLICATED
-        hps = [v for k, v in cd.items() if 'home_player' in k]
-        for hp in hps:
-            if not hp and not cd['player_name_check']:
-                player_errors.append('You have not entered all home players. Please tick the box below if this is deliberate')
-        valid_hps = [player for player in hps if player]
-        
-        if len(valid_hps) != len(list(set(valid_hps))):
-            raise ValidationError(['player','You have duplicated home player(s)'])
-        
-        # Check away players are not duplicated, are right gender and exist - CAN BE OVERRIDDEN
-        players_found, player_errors = find_away_players(cd, self.instance, player_errors)
+        # If critical errors, raise error
+        if v.critical_errors:
+            raise ValidationError(['player', v.critical_errors])
 
-        # If errors and overrides not checked, raise error
-        if player_errors and not cd['player_name_check']:
-            raise ValidationError(['player',player_errors])
+        # If overridable errors and override not checked, raise error
+        if v.overridable_errors and not cd['player_name_check']:
+            raise ValidationError(['player', v.overridable_errors])
 
-        cd['players_found'] = players_found
+        # Add players found to cleaned data for use in view
+        cd['players_found'] = v.players_found
 
         return cd
 
@@ -200,53 +193,41 @@ class BaseScoreFormSet(BaseFormSet):
     def clean(self):
         super().clean()
 
+        # Collate all scores into a list of lists for validation
         all_scores = []
         for form in self.forms:
             cd = form.cleaned_data
+            # If form is empty, raise error - CANNOT BE OVERRIDDEN
             if not cd:
                 raise ValidationError(['Some games scores (or forfeits) are missing.',])
             if cd['forfeit']:
+                # If forfeit selected, ensure no scores entered - CANNOT BE OVERRIDDEN
+                if cd['home_score'] or cd['away_score']:
+                    raise ValidationError(['Game scores cannot be entered if a forfeit has been selected.',])
+                # Double forfeits to ensure right number of scores when stored as string in database
                 all_scores.append([cd['forfeit'], cd['forfeit']])
             else:
                 all_scores.append([cd['home_score'], cd['away_score']])
 
         # Check game scores - CAN BE OVERRIDDEN
-        game_errors = self.check_game_results(all_scores)
+        game_errors, score = self.check_game_results(all_scores)
 
         # If game errors and game override not checked, raise error
         if game_errors and not self.score_check:
             raise ValidationError([game_errors])
+
+        # Check final score matches game results - CANNOT BE OVERRIDDEN
+        if score[0] != int(self.data.get('home_points')) or score[1] != int(self.data.get('away_points')):
+            raise ValidationError(['The final score using the game results you have entered does not '
+                                   'match the score you entered at the top of the page'])
         
     def check_game_results(self, game_results):
         '''
         Validate the scores submitted for matches
         '''
 
-        def check_scores(pair, errors):
-            '''
-            Checks numeric values for a rubber's scores
-            '''
-
-            # If one score is 21 and other score is not 23 but is over 19, raise error
-            if pair[0] == '21' and pair[1] != '23' and int(pair[1]) > 19:
-                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
-            elif pair[1] == '21' and pair[0] != '23' and int(pair[0]) > 19:
-                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
-
-            # If one of the scores is over 21, check setting...
-            if int(pair[0]) > 21 or int(pair[1]) > 21:
-                # Difference must be two unless one score is 30, if not raise error
-                if abs(int(pair[0]) - int(pair[1])) != 2 and pair[0] != '30' and pair[1] != '30':
-                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
-                # If one score hit 30 the other one must be 28 or 29, if not raise error
-                elif pair[0] == '30' and pair[1] not in ['28','29']:
-                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
-                elif pair[1] == '30' and pair[0] not in ['28','29']:
-                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
-
-            return errors
-
         errors = []
+        score = [0, 0]
 
         for i, pair in enumerate(game_results):
 
@@ -255,14 +236,44 @@ class BaseScoreFormSet(BaseFormSet):
             rubber = str(i % 2 + 1)
 
             # Check numeric values match expected scoring
-            if pair[0] not in ('FH','FA'):
-                errors = check_scores(pair, errors)
+            if pair[0] == 'FH':
+                score[1] += 1
+                continue
+            elif pair[0] == 'FA':
+                score[0] += 1
+                continue
 
-            # Check scores aren't the same
+            # Check scores aren't the same (no games should be blank)
             if int(pair[0]) == int(pair[1]):
                 errors.append('Game ' + game + ' rubber ' + rubber + ' - scores the same, please check')
+            # Work out which team won the game and add to score
+            elif int(pair[0]) > int(pair[1]):
+                score[0] += 1
+            else:
+                score[1] += 1
+            
+            # If both scores are under 21, raise error
+            if int(pair[0]) < 21 and int(pair[1]) < 21:
+                errors.append('Game ' + game + ' rubber ' + rubber + ' - scores both under 21, please check')
 
-        return errors
+            # If one score is 21 and other score is not 23 but is over 19, raise error
+            if pair[0] == 21 and pair[1] != 23 and pair[1] > 19:
+                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
+            elif pair[1] == 21 and pair[0] != 23 and pair[0] > 19:
+                errors.append('Game ' + game + ' rubber ' + rubber + ' - score looks wrong, please check')
+
+            # If one of the scores is over 21, check setting...
+            if pair[0] > 21 or pair[1] > 21:
+                # Difference must be two unless one score is 30, if not raise error
+                if abs(pair[0] - pair[1]) != 2 and pair[0] != 30 and pair[1] != 30:
+                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
+                # If one score hit 30 the other one must be 28 or 29, if not raise error
+                elif pair[0] == 30 and pair[1] not in [28, 29]:
+                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
+                elif pair[1] == 30 and pair[0] not in [28, 29]:
+                    errors.append('Game ' + game + ' rubber ' + rubber + ' - setting score looks wrong, please check')
+
+        return errors, score
 
 class ScoreForm(Form):
     home_score = IntegerField(
