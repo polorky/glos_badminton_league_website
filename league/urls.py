@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from league.utilities.player import VerifyPlayerView
+from league.utilities.player import VerifyPlayerView, AuthVerifyPlayerView
 
 urlpatterns = [
     path("divisions/<str:pagename>/<str:season>", views.DivisionsView.as_view(), name='divisions'),
@@ -30,6 +30,7 @@ urlpatterns = [
     path('clubadmin/club/<str:update>', views.ClubAdminView.as_view(), name='club_admin'),
     path('nominations/<str:pagename>', views.NominationsView.as_view(), name='nominations'),
     path('nominations/<str:pagename>/<str:id>/', views.NominationsView.as_view(), name='nom_change'),
+    path('verify-player/auth/<int:pk>/', AuthVerifyPlayerView, name='verify_player_auth'),
     path('verify-player/<str:token>/', VerifyPlayerView, name='verify_player_select'),
     path('verify-player/<str:token>/<str:action>/', VerifyPlayerView, name='verify_player'),
 

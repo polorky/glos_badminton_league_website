@@ -564,6 +564,7 @@ class Performance(models.Model):
     position = models.CharField(max_length=100)
 
 class PendingPlayerVerification(models.Model):
+    # When an away player is not recognised, this model is used to verify the correct player
     fixture = models.ForeignKey(Fixture, on_delete=models.CASCADE)
     player_field = models.CharField(max_length=20)
     submitted_name = models.CharField(max_length=50)

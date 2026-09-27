@@ -956,6 +956,10 @@ class ClubAdminView(GenericViewMixin, TemplateView):
         penalties = Penalty.objects.filter(team__club=club).filter(season=Season.objects.get(current=True))
         team_dict = get_clubs_teams(club)
 
+        pending_verifications = PendingPlayerVerification.objects.filter(
+            fixture__away_team__club=club, resolved=False
+        ).select_related('fixture__home_team', 'fixture__away_team', 'fixture__division')
+
         context.update({
             'status': 'admin',
             'clubform': ClubForm(instance=club),
@@ -968,7 +972,9 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             'teams': team_dict,
             'penalties': penalties,
             'entry_fee': constants.TEAM_ENTRY_FEE,
-            'total_fee': constants.TEAM_ENTRY_FEE * team_dict['Lengths']['All']})
+            'total_fee': constants.TEAM_ENTRY_FEE * team_dict['Lengths']['All'],
+            'pending_verifications': pending_verifications,
+        })
 
         return context
 

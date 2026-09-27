@@ -37,7 +37,7 @@
     <h3>Submit Match Result</h3>
     <br>
     {% if errors %}
-        <div class="banner banner-warning"  style="background-color: rgb(230, 176, 176);">
+        <div class="banner banner-error">
             ⚠️ <b>There are errors on the form</b> — please scroll down for further details.
         </div>
         <br>
@@ -52,7 +52,7 @@
     {% if resform.non_field_errors %}
       {% if resform.non_field_errors.0 == "points" %}
         <br>
-        <div class="banner banner-warning" style="background-color: rgb(230, 176, 176);">
+        <div class="banner banner-error">
             ⚠️ <b>{{ resform.non_field_errors.1 }}</b>
         </div>
       {% endif %}
@@ -98,7 +98,7 @@
 
     {% if resform.non_field_errors and resform.non_field_errors.0 == "player" %}
         <br>
-        <div class="banner banner-warning" style="background-color: rgb(230, 176, 176);">
+        <div class="banner banner-error">
         {% for error in resform.non_field_errors %}
             {% if error != "player" %}
                 ⚠️ <b>{{ error }}</b>
@@ -135,7 +135,7 @@
 
     {% if resformset.non_form_errors %}
         <br>
-        <div class="banner banner-warning" style="background-color: rgb(230, 176, 176);">
+        <div class="banner banner-error">
             {% for error in resformset.non_form_errors %}
                 ⚠️ <b>{{ error }}</b>
             {% endfor %}

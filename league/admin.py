@@ -56,7 +56,7 @@ class SettingsAdmin(admin.ModelAdmin):
     list_display = ('league_status',)
 
 class PendingPlayerVerificationAdmin(admin.ModelAdmin):
-    list_display = ('fixture','submitted_name','level','suggested_player')
+    list_display = ('fixture','resolved','submitted_name','level','suggested_player')
     list_filter = ['fixture__season','level']
     search_fields = ['submitted_name']
 

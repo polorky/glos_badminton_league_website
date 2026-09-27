@@ -406,6 +406,17 @@ main .banner-warning a {
     font-weight: 500;
 }
 
+main .banner-error {
+    background: rgb(230, 176, 176);
+    border: 0.5px solid black;
+    color: black;
+}
+
+main .banner-error a {
+    color: black;
+    font-weight: 500;
+}
+
 main .banner-success {
     background: #eaf3de;
     border: 0.5px solid #639922;

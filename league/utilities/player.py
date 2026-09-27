@@ -1,22 +1,126 @@
 import league.constants as constants
-from rapidfuzz import fuzz
 from django.core import signing
 from .email import email_notification
 from league.models import Team, PendingPlayerVerification, Penalty
 
 # PLAYER VERIFICATION VIEW
+def _get_user_club(user):
+    """Return the Club for a logged-in Administrator or Member, or None."""
+    from league.models import Administrator, Member
+    if not user.is_authenticated:
+        return None
+    try:
+        return user.administrator.club
+    except Exception:
+        pass
+    try:
+        return user.member.club
+    except Exception:
+        return None
+
+
+def _load_verification(verification_id):
+    return PendingPlayerVerification.objects.select_related(
+        'fixture__away_team__club', 'fixture__home_team__club',
+        'fixture__division', 'suggested_player'
+    ).get(id=verification_id)
+
+
+def _resolve(verification, player):
+    verification.resolved_player = player
+    verification.resolved = True
+    verification.save()
+    setattr(verification.fixture, verification.player_field, player)
+    verification.fixture.save()
+
+
+def _handle_post(request, verification, post_url):
+    from django.shortcuts import render
+    from league.models import Player
+
+    club = verification.fixture.away_team.club
+    choice = request.POST.get('choice', '')
+    player_name = request.POST.get('player_name', '').strip()
+    error = None
+
+    if choice == 'new':
+        if not player_name:
+            error = 'Please enter a name for the new player.'
+        else:
+            player = Player.objects.create(club=club, name=player_name, level=verification.level)
+    elif choice.startswith('existing_'):
+        try:
+            player = Player.objects.get(id=choice[9:], club=club)
+        except (Player.DoesNotExist, ValueError):
+            error = 'Invalid player selected.'
+    else:
+        error = 'Please select a player or choose to create a new one.'
+
+    if not error:
+        _resolve(verification, player)
+        return render(request, 'league/verify_player.html', {
+            'view': 'confirmed',
+            'player': player,
+            'fixture': verification.fixture,
+        })
+
+    roster = Player.objects.filter(club=club, level=verification.level).order_by('name')
+    return render(request, 'league/verify_player.html', {
+        'view': 'select',
+        'verification': verification,
+        'post_url': post_url,
+        'roster': roster,
+        'error': error,
+    })
+
+
 def VerifyPlayerView(request, token, action=''):
     from django.shortcuts import render
     from league.models import Player
 
+    post_url = f'/verify-player/{token}/'
+
     try:
         data = signing.loads(token, max_age=86400 * 7)
-        verification = PendingPlayerVerification.objects.select_related(
-            'fixture__away_team__club', 'fixture__home_team__club',
-            'fixture__division', 'suggested_player'
-        ).get(id=data['verification_id'])
+        verification = _load_verification(data['verification_id'])
     except signing.SignatureExpired:
-        return render(request, 'league/verify_player.html', {'view': 'expired'})
+        # Decode without age check to extract the verification ID for the auth fallback
+        try:
+            data = signing.loads(token)
+            v_id = data['verification_id']
+        except signing.BadSignature:
+            return render(request, 'league/verify_player.html', {'view': 'invalid'})
+
+        auth_url = f'/verify-player/auth/{v_id}/'
+        user_club = _get_user_club(request.user)
+        if user_club:
+            # Already logged in — go straight to form if the club is correct
+            try:
+                verification = _load_verification(v_id)
+            except PendingPlayerVerification.DoesNotExist:
+                return render(request, 'league/verify_player.html', {'view': 'already_resolved'})
+            if not verification.resolved and user_club == verification.fixture.away_team.club:
+                if request.method == 'POST':
+                    return _handle_post(request, verification, auth_url)
+                roster = Player.objects.filter(
+                    club=user_club, level=verification.level
+                ).order_by('name')
+                return render(request, 'league/verify_player.html', {
+                    'view': 'select',
+                    'verification': verification,
+                    'post_url': auth_url,
+                    'roster': roster,
+                })
+            if verification.resolved:
+                return render(request, 'league/verify_player.html', {
+                    'view': 'already_resolved',
+                    'player': verification.resolved_player,
+                })
+
+        return render(request, 'league/verify_player.html', {
+            'view': 'expired',
+            'login_url': f'/login/?next={auth_url}',
+        })
     except (signing.BadSignature, PendingPlayerVerification.DoesNotExist):
         return render(request, 'league/verify_player.html', {'view': 'invalid'})
 
@@ -29,59 +133,14 @@ def VerifyPlayerView(request, token, action=''):
     club = verification.fixture.away_team.club
 
     if request.method == 'POST':
-        choice = request.POST.get('choice', '')
-        player_name = request.POST.get('player_name', '').strip()
-        error = None
-
-        if choice == 'new':
-            if not player_name:
-                error = 'Please enter a name for the new player.'
-            else:
-                player = Player.objects.create(
-                    club=club,
-                    name=player_name,
-                    level=verification.level
-                )
-        elif choice.startswith('existing_'):
-            try:
-                player = Player.objects.get(id=choice[9:], club=club)
-            except (Player.DoesNotExist, ValueError):
-                error = 'Invalid player selected.'
-        else:
-            error = 'Please select a player or choose to create a new one.'
-
-        if not error:
-            verification.resolved_player = player
-            verification.resolved = True
-            verification.save()
-            setattr(verification.fixture, verification.player_field, player)
-            verification.fixture.save()
-            return render(request, 'league/verify_player.html', {
-                'view': 'confirmed',
-                'player': player,
-                'fixture': verification.fixture,
-            })
-
-        roster = Player.objects.filter(club=club, level=verification.level).order_by('name')
-        return render(request, 'league/verify_player.html', {
-            'view': 'select',
-            'verification': verification,
-            'token': token,
-            'roster': roster,
-            'error': error,
-        })
+        return _handle_post(request, verification, post_url)
 
     # GET — handle actions from email link
     if action == 'correct' and verification.suggested_player:
-        player = verification.suggested_player
-        verification.resolved_player = player
-        verification.resolved = True
-        verification.save()
-        setattr(verification.fixture, verification.player_field, player)
-        verification.fixture.save()
+        _resolve(verification, verification.suggested_player)
         return render(request, 'league/verify_player.html', {
             'view': 'confirmed',
-            'player': player,
+            'player': verification.suggested_player,
             'fixture': verification.fixture,
         })
 
@@ -89,9 +148,48 @@ def VerifyPlayerView(request, token, action=''):
     return render(request, 'league/verify_player.html', {
         'view': 'select',
         'verification': verification,
-        'token': token,
+        'post_url': post_url,
         'roster': roster,
         'wrong_suggestion': verification.suggested_player if action == 'incorrect' else None,
+    })
+
+
+def AuthVerifyPlayerView(request, pk):
+    from django.shortcuts import render, redirect
+    from league.models import Player
+
+    if not request.user.is_authenticated:
+        return redirect(f'/login/?next=/verify-player/auth/{pk}/')
+
+    user_club = _get_user_club(request.user)
+    if not user_club:
+        return render(request, 'league/verify_player.html', {'view': 'invalid'})
+
+    try:
+        verification = _load_verification(pk)
+    except PendingPlayerVerification.DoesNotExist:
+        return render(request, 'league/verify_player.html', {'view': 'invalid'})
+
+    if verification.resolved:
+        return render(request, 'league/verify_player.html', {
+            'view': 'already_resolved',
+            'player': verification.resolved_player,
+        })
+
+    if user_club != verification.fixture.away_team.club:
+        return render(request, 'league/verify_player.html', {'view': 'invalid'})
+
+    post_url = f'/verify-player/auth/{pk}/'
+
+    if request.method == 'POST':
+        return _handle_post(request, verification, post_url)
+
+    roster = Player.objects.filter(club=user_club, level=verification.level).order_by('name')
+    return render(request, 'league/verify_player.html', {
+        'view': 'select',
+        'verification': verification,
+        'post_url': post_url,
+        'roster': roster,
     })
 
 

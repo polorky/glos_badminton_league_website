@@ -90,6 +90,14 @@
 
     {% endif %}
 
+    {% if pending_verifications %}
+        <div class="banner banner-warning">
+            ⚠️ <b>Player verification required.</b>
+            There {{ pending_verifications|length|pluralize:"is,are" }} {{ pending_verifications|length }} unverified away player{{ pending_verifications|length|pluralize }} from recent matches.
+            <a href="#" onclick="switchTab('verifications'); return false;">View &amp; verify</a>
+        </div>
+    {% endif %}
+
     {# ---- Tab navigation ---- #}
     <div class="tab-bar">
         <button class="tab-btn active" data-tab="roster">Player Roster</button>
@@ -129,6 +137,13 @@
             {% endif %}
 
             <button class="tab-btn" data-tab="other">Other</button>
+
+            {% if pending_verifications %}
+                <button class="tab-btn" data-tab="verifications">
+                    Player Verifications
+                    <span class="badge badge-pending">{{ pending_verifications|length }}</span>
+                </button>
+            {% endif %}
         {% endif %}
     </div>
 
@@ -412,6 +427,34 @@
 
     </div>
 
+    {# ======== PLAYER VERIFICATIONS TAB ======== #}
+    {% if pending_verifications %}
+    <div id="tab-verifications" class="tab-content">
+        <br>
+        <p>The following away players from recent matches could not be automatically matched to your club's roster. Please confirm the correct player for each one.</p>
+        <br>
+        <div class="table-wrap">
+            <table class="table">
+                <tr>
+                    <th>Fixture</th>
+                    <th>Position</th>
+                    <th>Name submitted</th>
+                    <th>Action</th>
+                </tr>
+                {% for v in pending_verifications %}
+                <tr>
+                    <td>{{ v.fixture }}</td>
+                    <td>{{ v.player_field }}</td>
+                    <td>{{ v.submitted_name }}</td>
+                    <td><a href="/verify-player/auth/{{ v.pk }}/" class="button">Verify</a></td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        <br>
+    </div>
+    {% endif %}
+
 {% endif %}
 
 {% endblock content %}
@@ -419,12 +462,17 @@
 {% block extra_scripts %}
 <script>
     // Tab switching
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        const btn = document.querySelector(`[data-tab="${tabId}"]`);
+        if (btn) btn.classList.add('active');
+        const content = document.getElementById('tab-' + tabId);
+        if (content) content.classList.add('active');
+    }
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            this.classList.add('active');
-            document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+            switchTab(this.dataset.tab);
         });
     });
 
@@ -439,12 +487,7 @@
         // Switch to correct tab
         const tabContent = targetEl.closest('.tab-content');
         if (tabContent) {
-            const tabId = tabContent.id.replace('tab-', '');
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            const btn = document.querySelector(`[data-tab="${tabId}"]`);
-            if (btn) btn.classList.add('active');
-            tabContent.classList.add('active');
+            switchTab(tabContent.id.replace('tab-', ''));
         }
         targetEl.scrollIntoView({ behavior: 'smooth' });
     }
