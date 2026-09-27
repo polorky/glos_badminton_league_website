@@ -40,7 +40,7 @@ def _handle_post(request, verification, post_url):
 
     club = verification.fixture.away_team.club
     choice = request.POST.get('choice', '')
-    player_name = request.POST.get('player_name', '').strip()
+    player_name = request.POST.get('player_name', '').strip().title()
     error = None
 
     if choice == 'new':
