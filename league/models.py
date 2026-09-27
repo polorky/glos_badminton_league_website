@@ -568,7 +568,7 @@ class PendingPlayerVerification(models.Model):
     fixture = models.ForeignKey(Fixture, on_delete=models.CASCADE)
     player_field = models.CharField(max_length=20)
     submitted_name = models.CharField(max_length=50)
-    level = models.CharField(max_length=10,choices=(("Mixed","Mixed"),("Womens","Women's"),("Open","Open")))
+    level = models.CharField(max_length=10,choices=(("Womens","Women's"),("Open","Open")))
     suggested_player = models.ForeignKey(Player, null=True, blank=True, on_delete=models.SET_NULL)
     token = models.CharField(max_length=64, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
