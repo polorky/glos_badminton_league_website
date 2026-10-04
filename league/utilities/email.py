@@ -112,7 +112,7 @@ class RescheduleEmail(LeagueEmail):
         fix = self.kwargs['fixture']
         self.subject = f'{fix} - New Date Proposed'
         self.recipients = self.get_team_recipients('away')
-        fix_url = f'{BASE_URL}/fixtures/{fix.id}/update/div'
+        fix_url = f'{BASE_URL}/fixtures/update/{fix.id}/update/div'
         self.body = (f'Hi,\n\nThe home team have proposed a new date/venue for the match {fix} '
                      f'originally scheduled for {fix.old_date_time.strftime("%d/%m/%Y, %H:%M:%S")}. '
                      f'The proposed new date is {fix.date_time.strftime("%d/%m/%Y, %H:%M:%S")} '
@@ -307,7 +307,7 @@ class ProposedFixturesEmail(LeagueEmail):
         self.html = (f"Hi,<br><br>The home team for the following match have proposed a new date/venue but your team has yet to "
                      f"accept the new details. Please accept (or reject) the proposed details by clicking on the link below (if "
                      f"rejecting, please also contact the other club to say why).<br><br>"
-                     f'<a href="https://gloubadleague.pythonanywhere.com/fixtures/{fix.id}/update/div">{fix}</a>')
+                     f'<a href="https://gloubadleague.pythonanywhere.com/fixtures/update/{fix.id}/update/div">{fix}</a>')
 
 
 class UpcomingFixturesEmail(LeagueEmail):

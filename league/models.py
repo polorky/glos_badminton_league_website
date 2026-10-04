@@ -56,7 +56,7 @@ class Division(models.Model):
         return f'{self.get_type_display()} {self.number}'
 
     def get_division_url(self):
-        type_dict = {'Mixed':'X', 'Womens':'W', 'Open':'M'}
+        type_dict = {'Mixed':'X', 'Womens':'W', 'Open':'O'}
         return f"{type_dict[self.type]}{self.number}"
 
 class Club(models.Model):
@@ -357,40 +357,6 @@ class Team(models.Model):
                 final_str += f'{pos} - {round(count/len(fixtures)*100,1)}% ({count})'
 
         return final_str
-
-    def get_nomination_stats(self):
-
-        season = Season.objects.get(current=True)
-
-        fixtures = (Fixture.objects
-                    .filter(season=season)
-                    .filter(Q(home_team=self) | Q(away_team=self))
-                    .filter(status='Played'))
-
-        total_matches = fixtures.count()
-        nominations = TeamNomination.objects.filter(team=self, season=season)
-
-        positions = {}
-        for nomination in nominations:
-            if nomination.position not in positions:
-                positions[nomination.position] = []
-            positions[nomination.position].append(nomination.player)
-
-        stats = {}
-
-        for position, players in positions.items():
-            played = sum(
-                1 for fix in fixtures
-                if any(player in fix.get_players() for player in players)
-            )
-            stats[position] = {
-                'players': players,
-                'played': played,
-                'total': total_matches,
-                'percent': round(played / total_matches * 100, 1) if total_matches else 0,
-            }
-
-        return stats
 
 class TeamNomination(models.Model):
     team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='nominations')

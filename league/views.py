@@ -40,7 +40,8 @@ def csrf_failure(request, reason=""):
 ##############################################################################################################################################
 
 class GenericViewMixin:
-    type_dict = {'X':'Mixed','W':'Womens','L':'Womens','M':'Open'}
+    # Conversions for abbreviations - includes legacy 'L' and 'M' previously used for Ladies' and Men's
+    type_dict = {'X':'Mixed','W':'Womens','L':'Womens','O':'Open','M':'Open'}
 
     def get_context_data(self, **kwargs):
         '''Checks the user level, gets current season and league settings'''
@@ -279,6 +280,7 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         context['errors'] = False
 
         pagename = self.kwargs.get('pagename','')
+        context['pagename'] = pagename
 
         # Get relevant fixture
         fixid = self.kwargs['fixid']
@@ -294,7 +296,8 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         # Proposed reschedule date and location by home team
         elif pagename == "rescheduled":
 
-            self._reschedule_match(fixture)
+            if not self._reschedule_match(fixture):
+                context['pagename'] = 'reschedule'
 
         # Match conceded
         elif pagename == "concededhome" or pagename == "concededaway":
@@ -321,6 +324,8 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             fixture.status = 'Proposed'
             fixture.save()
             email_notification('reschedule', fixture=fixture)
+            return True
+        return False
 
     def _conceded_match(self, pagename, fixture):
 

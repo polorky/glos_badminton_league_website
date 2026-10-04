@@ -217,14 +217,14 @@
     <br>
     <p>If this date and venue is acceptable to your club, please click the button below:</p>
     <br>
-    <form action="/fixtures/{{ fixture.id }}/confirmed/{{ source }}" method="post">
+    <form action="/fixtures/update/{{ fixture.id }}/confirmed/{{ source }}" method="post">
     {% csrf_token %}
     <input class="button" type="submit" value="Confirm New Date/Venue">
     </form>
     <br>
     <p>If the details are not those you were expecting or your team can no longer make the new date, click the button below to reject them:</p>
     <br>
-    <form action="/fixtures/{{ fixture.id }}/rejected/{{ source }}" method="post">
+    <form action="/fixtures/update/{{ fixture.id }}/rejected/{{ source }}" method="post">
     {% csrf_token %}
     <input class="button" type="submit" value="Reject New Date/Venue">
     </form>
@@ -233,6 +233,17 @@
 
     <br>
     <p>The match has been successfully rescheduled. Any further changes will have to be proposed again by the home team</p>
+    <br>
+    {% if source == "fix" %}
+        <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% elif pagename == "rejected" %}
+
+    <br>
+    <p>The proposed date has been rejected and the fixture returned to postponed status. Any further changes will have to be proposed again by the home team</p>
     <br>
     {% if source == "fix" %}
         <a href="/fixtures/home">Back to all fixtures</a>
