@@ -213,7 +213,7 @@ def verify_away_players(fixture, players_found):
             setattr(fixture, player_title, player_dict['player'])
             fixture.save()
         else:
-            level = div_type if div_type != 'Mixed' else mixed_player_type[int(player_title[-1])]
+            level = div_type if div_type != 'Mixed' else mixed_player_type[int(player_title[-1]) - 1]
             verification = PendingPlayerVerification.objects.create(
                 fixture=fixture,
                 player_field=player_title,
