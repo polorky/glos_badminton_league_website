@@ -212,7 +212,7 @@ class FixturesView(GenericViewMixin, TemplateView):
             batched_games = get_scores(fixture)
 
             # Work out number of rubbers expected per game
-            if fixture.division.type == "Mixed" and fixture.season.mixed_scoring == "point per rubber":
+            if fixture.division.type == "Mixed" and fixture.season.mixed_scoring == "point per game":
                 rubber_number = 3
             else:
                 rubber_number = 2
