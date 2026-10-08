@@ -197,7 +197,7 @@ class FixturesView(GenericViewMixin, TemplateView):
             # Check fixture exists
             try:
                 fixture = Fixture.objects.get(id=pagename)
-            except ObjectDoesNotExist:
+            except (ObjectDoesNotExist, ValueError):
                 return {'view':'doesnotexist'}
 
             # Get players in user is club admin
@@ -212,7 +212,7 @@ class FixturesView(GenericViewMixin, TemplateView):
             batched_games = get_scores(fixture)
 
             # Work out number of rubbers expected per game
-            if fixture.division.type == "Mixed" and fixture.season.mixed_scoring == "point per game":
+            if fixture.division.type == "Mixed" and fixture.season.mixed_scoring == "point per rubber":
                 rubber_number = 3
             else:
                 rubber_number = 2
