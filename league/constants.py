@@ -9,7 +9,7 @@ LEVEL_PLAYERS = 4
 TEAM_ENTRY_FEE = 5 # in pounds
 
 # Scoring formats
-SCORING_MIXED = 'point per game' # Current scoring format for mixed league (used as default for new seasons)
+SCORING_MIXED = 'point per rubber' # Current scoring format for mixed league (used as default for new seasons)
 SCORING_LEVEL = 'point per rubber' # Current scoring format for level league
 # Note level scoring is hard coded for seasons as it has not historically been changed
 SCORING_OPTIONS = (('point per game','point per game'),('point per rubber','point per rubber')) # Used only to note mixed scoring format for seasons as it has changed
