@@ -22,6 +22,4 @@ def user_login(request):
 def user_logout(request):
 
     logout(request)
-    next_url = request.META.get('HTTP_REFERER', '/')
-
-    return HttpResponseRedirect(next_url)
+    return HttpResponseRedirect('/')

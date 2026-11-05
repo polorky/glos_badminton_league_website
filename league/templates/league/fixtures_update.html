@@ -295,6 +295,73 @@
         <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
     {% endif %}
 
+{% elif pagename == "amend" %}
+
+    <h1>{{ fixture }}</h1>
+    <br>
+    <h3>Amend Match Scores</h3>
+    <br>
+    {% if errors %}
+        <div class="banner banner-error">
+            ⚠️ <b>There are errors on the form</b> — please scroll down for further details.
+        </div>
+        <br>
+    {% endif %}
+
+    <form action="/fixtures/update/{{ fixture.id }}/amend/{{ source }}" method="post">
+    {% csrf_token %}
+    <input type="hidden" name="home_points" value="{{ fixture.home_points }}">
+    <input type="hidden" name="away_points" value="{{ fixture.away_points }}">
+    <h3>Individual Game Scores</h3>
+    <p>TIP: use the Tab key to move between fields</p>
+    <table style="max-width:54em;">
+        <tr><th rowspan="2">Game</th><th colspan="2">Rubber 1 (R1)</th><th colspan="2">Rubber 2 (R2)</th><th colspan="2">Forfeits</th></tr>
+        <tr><th>H</th><th>A</th><th>H</th><th>A</th><th>R1 Forfeit</th><th>R2 Forfeit</th></tr>
+        {{ resformset.management_form }}
+        {% for game in games_fields %}
+            <tr>
+                <td>{{ game.0 }}</td>
+                <td>{{ game.1.0.home_score }}</td>
+                <td>{{ game.1.0.away_score }}</td>
+                <td>{{ game.1.1.home_score }}</td>
+                <td>{{ game.1.1.away_score }}</td>
+                <td>{{ game.1.0.forfeit }}</td>
+                <td>{{ game.1.1.forfeit }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+    {% if resformset.non_form_errors %}
+        <br>
+        <div class="banner banner-error">
+            {% for error in resformset.non_form_errors %}
+                ⚠️ <b>{{ error }}</b>
+            {% endfor %}
+        </div>
+        <label>
+            <input type="checkbox" name="score_check"> Override score validation - please check all other scores are correct
+        </label>
+    {% endif %}
+    <br>
+    <input class="button" type="submit" value="Amend Scores">
+    </form>
+    <br>
+    {% if source == "fix" %}
+    <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+    <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
+{% elif pagename == "amended" %}
+
+    <br>
+    <p>The scores have been successfully amended. An email has been sent to the away team notifying them of the changes.</p>
+    <br>
+    {% if source == "fix" %}
+        <a href="/fixtures/home">Back to all fixtures</a>
+    {% else %}
+        <a href="/divisions/{{ fixture.division.get_division_url }}">Back to {{ fixture.division }}</a>
+    {% endif %}
+
 {% elif pagename == "unupdateable" %}
 
     <br>

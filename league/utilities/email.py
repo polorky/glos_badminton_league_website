@@ -106,6 +106,35 @@ class ResultEmail(LeagueEmail):
                      f'the league by replying to this email.')
 
 
+class AmendResultEmail(LeagueEmail):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        fix = self.kwargs['fixture']
+        diff = self.kwargs['diff']
+        self.subject = f'{fix} - Score Amendment'
+        self.recipients = self.get_team_recipients('away')
+        self.recipients.append(SENDER)
+        fix_url = f'{BASE_URL}/fixtures/{fix.id}'
+
+        if diff:
+            diff_text = '\n'.join(diff)
+            diff_html = '<br>'.join(diff)
+        else:
+            diff_text = 'No individual game scores were changed.'
+            diff_html = 'No individual game scores were changed.'
+
+        self.body = (
+            f'Hi,\n\nThe home team have amended the scores for {fix}.\n\n'
+            f'Changes made:\n{diff_text}\n\n'
+            f'You can view the updated result on this page: {fix_url}'
+        )
+        self.html = (
+            f'Hi,<br><br>The home team have amended the scores for {fix}.<br><br>'
+            f'Changes made:<br>{diff_html}<br><br>'
+            f'You can view the updated result <a href="{fix_url}">here</a>.'
+        )
+
+
 class RescheduleEmail(LeagueEmail):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -206,6 +235,7 @@ class PostponedEmail(LeagueEmail):
                      f'date/venue.')
 
 
+# Not currently used
 class NominationPenEmail(LeagueEmail):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -232,6 +262,7 @@ class EligibilityPenEmail(LeagueEmail):
         fix = self.kwargs['fixture']
         self.subject = 'Eligibility Penalty Applied'
         self.recipients = self.get_recipients(kwargs['team'])
+        self.recipients.append(SENDER)
         self.body = (f'Hi,\n\nFollowing the submission of the result for the match {fix}, it has been '
                      f'identified that player {kwargs["player_name"]} was ineligible to play and so your '
                      f"club's team has been penalised {constants.PENALTY_INELIGIBLE_PLAYER} points. Please "
@@ -250,6 +281,7 @@ class LateResultPenEmail(LeagueEmail):
         fix = kwargs.get('fixture')
         self.subject = 'Late Results Submission - Penalty Applied'
         self.recipients = self.get_team_recipients('home')
+        self.recipients.append(SENDER)
         self.body = (f"Hi,\n\nThe result of the match {fix} has still not been submitted and is now two "
                      f"weeks late so a penalty has been applied to your team.\nPlease contact the League "
                      f"Committee at {FIXTURES_EMAIL} if there are extenuating circumstances "
@@ -329,7 +361,9 @@ class UpcomingFixturesEmail(LeagueEmail):
 class NominationSubmittedEmail(LeagueEmail):
     def __init__(self, nom, **kwargs):
         super().__init__(**kwargs)
-        nom_url = f'{BASE_URL}/nominations/admin/{nom.id}'
+        nom_path = f'/nominations/admin/{nom.id}'
+        nom_url = f'{BASE_URL}{nom_path}'
+        link_url = f'{BASE_URL}/login?next={nom_path}'
         self.subject = 'Nomination Change Request'
         self.recipients = self.get_admin_recipients()
         self.body = (f'Hi,\n\n{nom.team.club} has submitted a request to change a nomination for the team {nom.team}. '
@@ -337,7 +371,7 @@ class NominationSubmittedEmail(LeagueEmail):
                      f'\n\n{nom_url}\n\nPlease approve/reject the request via that page, if rejecting it please contact '
                      f'the club directly to explain why.')
         self.html = (f'Hi,<br><br>{nom.team.club} has submitted a request to change a nomination for the team {nom.team}. '
-                     f'Please <a href={nom_url}>click here</a> to view the players involved and their current '
+                     f'Please <a href={link_url}>click here</a> to view the players involved and their current '
                      f'playing stats. Please approve/reject the request via that page, if rejecting it please contact '
                      f'the club directly to explain why.')
 
@@ -373,12 +407,13 @@ class NominationRejectedEmail(LeagueEmail):
 
 EMAIL_CLASSES = {
     'result': ResultEmail,
+    'amend_result': AmendResultEmail,
     'postponed': PostponedEmail,
     'reschedule': RescheduleEmail,
     'confirmed': RearrangedEmail,
     'rejected': RejectedEmail,
     'playernotfound': PlayerNotFoundEmail,
-    'nomination_penalty': NominationPenEmail,
+    'nomination_penalty': NominationPenEmail, # Not currently used
     'eligibility_penalty': EligibilityPenEmail,
     'late_result_penalty': LateResultPenEmail,
     'outstanding_results': OutstandingResultsEmail,

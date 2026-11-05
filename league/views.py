@@ -133,7 +133,7 @@ class DivisionsView(GenericViewMixin, TemplateView):
             prev_season, next_season = get_adj_seasons(context['current_season'])
             prev_div = Division.objects.filter(number=division.number - 1, type=division.type)
             next_div = Division.objects.filter(number=division.number + 1, type=division.type)
-            fix_list = [(fix,fix.updateable(context['user'])) for fix in fixtures]
+            fix_list = [(fix, fix.updateable(context['user']), fix.amendable(context['user'])) for fix in fixtures]
 
             # If no fixtures found and not current season, division did not exist in requested season
             exist = bool(fixtures) or division.active
@@ -188,7 +188,7 @@ class FixturesView(GenericViewMixin, TemplateView):
 
             context.update({
                 'view': 'home',
-                'fixtures': [(fix,fix.updateable(context['user'])) for fix in fixtures],
+                'fixtures': [(fix, fix.updateable(context['user']), fix.amendable(context['user'])) for fix in fixtures],
             })
 
         # Otherwise return requested fixture for viewing
@@ -257,6 +257,20 @@ class FixUpdateView(GenericViewMixin, TemplateView):
             # Instantiate result forms
             context = self._setup_result_forms(context, fixture)
 
+        elif pagename == 'amend':
+
+            if not fixture.amendable(context['user']):
+                context['pagename'] = 'unupdateable'
+            else:
+                initial = self._get_score_initial(fixture)
+                if fixture.division.type == "Mixed":
+                    resform = MixedFixtureForm(instance=fixture)
+                    resformset = AmendMixedScoreFormSet(initial=initial)
+                else:
+                    resform = LevelFixtureForm(instance=fixture)
+                    resformset = AmendLevelScoreFormSet(initial=initial)
+                context = self._setup_result_forms(context, fixture, resform, resformset)
+
         elif pagename == 'reschedule':
 
             # Instantiate reschedule form
@@ -308,7 +322,12 @@ class FixUpdateView(GenericViewMixin, TemplateView):
         elif pagename == "submit":
 
             context = self._process_result(context, fixture)
-        
+
+        # Score amendment by home team for played fixture
+        elif pagename == "amend":
+
+            context = self._process_amendment(context, fixture)
+
         return self.render_to_response(context)
 
     def _reschedule_match(self, fixture):
@@ -434,6 +453,57 @@ class FixUpdateView(GenericViewMixin, TemplateView):
 
         return context
 
+    def _get_score_initial(self, fixture):
+        parts = fixture.game_results.split(',')
+        initial = []
+        for i in range(0, len(parts), 2):
+            h, a = parts[i], parts[i+1]
+            if h in ('FH', 'FA'):
+                initial.append({'forfeit': h, 'home_score': '', 'away_score': ''})
+            else:
+                initial.append({'forfeit': '', 'home_score': int(h), 'away_score': int(a)})
+        return initial
+
+    def _build_score_diff(self, old_results, new_results, fixture):
+        old_parts = old_results.split(',')
+        new_parts = new_results.split(',')
+        game_names = constants.GAME_NAMES_MIXED if fixture.division.type == "Mixed" else constants.GAME_NAMES_LEVEL
+        changes = []
+        for i, game_name in enumerate(game_names):
+            for r in range(2):
+                idx = 4 * i + 2 * r
+                if idx + 1 >= min(len(old_parts), len(new_parts)):
+                    break
+                old_r = f"{old_parts[idx]}-{old_parts[idx+1]}"
+                new_r = f"{new_parts[idx]}-{new_parts[idx+1]}"
+                if old_r != new_r:
+                    changes.append(f"{game_name} R{r+1}: {old_r} → {new_r}")
+        return changes
+
+    def _process_amendment(self, context, fixture):
+        if fixture.division.type == "Mixed":
+            resformset = AmendMixedScoreFormSet(self.request.POST)
+        else:
+            resformset = AmendLevelScoreFormSet(self.request.POST)
+
+        if resformset.is_valid():
+            old_results = fixture.game_results
+            game_results = [self._get_game_result(form.cleaned_data) for form in resformset if form.cleaned_data]
+            fixture.game_results = ','.join(game_results)
+            fixture.save()
+            diff = self._build_score_diff(old_results, fixture.game_results, fixture)
+            email_notification('amend_result', fixture=fixture, diff=diff)
+            context['pagename'] = 'amended'
+        else:
+            context['errors'] = True
+            if fixture.division.type == "Mixed":
+                resform = MixedFixtureForm(instance=fixture)
+            else:
+                resform = LevelFixtureForm(instance=fixture)
+            context = self._setup_result_forms(context, fixture, resform, resformset)
+
+        return context
+
 @method_decorator(login_required, name='dispatch')
 class FixtureDatesView(GenericViewMixin, TemplateView):
     template_name = "league/fixture_dates.html"
@@ -543,7 +613,7 @@ class ClubsView(GenericViewMixin, TemplateView):
             teams = Team.objects.filter(active=True).filter(club=club).order_by("type", "number")
             ex_teams = Team.objects.filter(active=False).filter(club=club).order_by("type", "number")
             club_fixtures = Fixture.objects.filter(season=context['current_season']).filter(Q(home_team__club=club)|Q(away_team__club=club)).order_by("date_time")
-            fix_list = [(fix,fix.updateable(context['user'])) for fix in club_fixtures]
+            fix_list = [(fix, fix.updateable(context['user']), fix.amendable(context['user'])) for fix in club_fixtures]
 
             # Get list of venues used
             home_fix = Fixture.objects.filter(season=context['current_season']).filter(home_team__club=club)
@@ -648,7 +718,7 @@ class TeamsView(GenericViewMixin, TemplateView):
 
             # Get fixtures
             fixtures = Fixture.objects.filter(season=context['current_season']).filter(Q(home_team=team)|Q(away_team=team)).order_by('date_time')
-            fix_list = [(fix,fix.updateable(context['user'])) for fix in fixtures]
+            fix_list = [(fix, fix.updateable(context['user']), fix.amendable(context['user'])) for fix in fixtures]
 
             # Get performances
             performances = Performance.objects.filter(team=team).order_by('season__year').reverse()
@@ -1001,7 +1071,7 @@ class ClubAdminView(GenericViewMixin, TemplateView):
             if playerform.is_valid():
                 name = playerform.cleaned_data['name']
                 level = playerform.cleaned_data['level']
-                if Player.objects.filter(club=club, name=name, level=level).exists():
+                if Player.objects.filter(club=club, name=name).exists():
                     context.update({'status': 'playerduplicated'})
                 else:
                     Player.objects.create(club=club,name=name,level=level)
@@ -1342,8 +1412,8 @@ class NominationsView(GenericViewMixin, TemplateView):
             'view': 'admin',
             'nom': nom,
             'current_nom': current_nom,
-            'new_player_stats': get_player_appearances(nom.player),
-            'cur_player_stats': get_player_appearances(current_nom.player),
+            'new_player_stats': {nom.player: get_player_appearances(nom.player)},
+            'cur_player_stats': {current_nom.player: get_player_appearances(current_nom.player)},
             'teams': get_clubs_teams(nom.player.club),
         }
 

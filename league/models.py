@@ -446,6 +446,17 @@ class Fixture(models.Model):
         # Otherwise fixture is updateable
         return True
 
+    def amendable(self, user):
+        if not user:
+            return False
+        if user.is_staff:
+            return True
+        try:
+            admin = Administrator.objects.get(user=user)
+        except ObjectDoesNotExist:
+            admin = Member.objects.get(user=user)
+        return admin.club == self.home_team.club and self.status == 'Played'
+
     def get_players(self,side='both'):
         '''
             Simply returns list of players that played in fixture - can be home, away or all players depending on input

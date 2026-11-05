@@ -218,8 +218,8 @@ class BaseScoreFormSet(BaseFormSet):
 
         # Check final score matches game results - CANNOT BE OVERRIDDEN
         if score[0] != int(self.data.get('home_points')) or score[1] != int(self.data.get('away_points')):
-            raise ValidationError(['The final score using the game results you have entered does not '
-                                   'match the score you entered at the top of the page'])
+            raise ValidationError(['The final score calculatedusing the game results you have entered does not '
+                                   'equal the overall score entered previously.'])
         
     def check_game_results(self, game_results):
         '''
@@ -293,6 +293,8 @@ class ScoreForm(Form):
 # Formsets for different match types
 MixedScoreFormSet = formset_factory(ScoreForm, extra=18, formset=BaseScoreFormSet)  # 9 games x 2 rubbers
 LevelScoreFormSet = formset_factory(ScoreForm, extra=12, formset=BaseScoreFormSet)  # 6 games x 2 rubbers
+AmendMixedScoreFormSet = formset_factory(ScoreForm, extra=0, formset=BaseScoreFormSet)  # pre-populated, no extra blanks
+AmendLevelScoreFormSet = formset_factory(ScoreForm, extra=0, formset=BaseScoreFormSet)  # pre-populated, no extra blanks
 
 class ClubNightForm(ModelForm):
 
