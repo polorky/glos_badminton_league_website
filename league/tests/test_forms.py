@@ -292,7 +292,7 @@ class TestBaseScoreFormSet(TestCase):
         rubbers = [('21', '15')] * 8 + [('15', '21')] * 4  # computed → 8-4
         fs = LevelScoreFormSet(data=self._data(rubbers, home_points=7, away_points=5, score_check=True))
         self.assertFalse(fs.is_valid())
-        self.assertIn('does not match', str(fs.non_form_errors()))
+        self.assertIn('does not equal', str(fs.non_form_errors()))
 
     # --- overridable errors ---
 
