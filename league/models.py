@@ -422,7 +422,7 @@ class Fixture(models.Model):
             return False
 
         # If user is staff, can update everything
-        if user.is_staff:
+        if user.is_staff and self.status not in ['Played', 'Conceded (H)', 'Conceded (A)']:
             return True
 
         try:
