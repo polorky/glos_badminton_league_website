@@ -422,8 +422,11 @@ class Fixture(models.Model):
             return False
 
         # If user is staff, can update everything
-        if user.is_staff and self.status not in ['Played', 'Conceded (H)', 'Conceded (A)']:
-            return True
+        if user.is_staff:
+            if self.status in ['Played', 'Conceded (H)', 'Conceded (A)']:
+                return False
+            else:
+                return True
 
         try:
             admin = Administrator.objects.get(user=user)
