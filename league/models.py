@@ -207,9 +207,9 @@ class Player(models.Model):
         if noms[1]:
             noms_strings[1] = f'{noms[1][0].team.number}{cardinal_dict.get(noms[1][0].team.number, "th")}'
         elif pends[1]:
-            noms_strings[0] = f'{pends[0][0].team.number}{cardinal_dict.get(pends[0][0].team.number, "th")} (P)'
+            noms_strings[1] = f'{pends[1][0].team.number}{cardinal_dict.get(pends[1][0].team.number, "th")} (P)'
         elif olds[1]:
-            noms_strings[0] = f'{olds[0][0].team.number}{cardinal_dict.get(olds[0][0].team.number, "th")} (R)'
+            noms_strings[1] = f'{olds[1][0].team.number}{cardinal_dict.get(olds[1][0].team.number, "th")} (R)'
         return noms_strings
 
     def check_eligibility(self, team):
