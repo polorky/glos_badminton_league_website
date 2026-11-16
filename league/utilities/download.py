@@ -44,8 +44,9 @@ def build_dataframe(fixtures, is_admin):
             fixDict['Game Breakdown'].append(fix.game_results)
 
     df = pd.DataFrame(fixDict)
-    df['Date and Time'] = df['Date and Time'].dt.tz_localize(None)
-    df['Original Date and Time'] = df['Original Date and Time'].apply(localiseDT)
+    if not df.empty:
+        df['Date and Time'] = df['Date and Time'].dt.tz_localize(None)
+        df['Original Date and Time'] = df['Original Date and Time'].apply(localiseDT)
 
     return df
 
