@@ -1318,11 +1318,14 @@ class NominationsView(GenericViewMixin, TemplateView):
         # If season live...
         elif context['settings'].league_status == 'live':
             # If team update request, return unavailable
-            if pagename == 'teamupdate':   
+            if pagename == 'teamupdate':
                 context.update({'view':'unavailable'})
             # Otherwise return specific individual nomination form
             elif pagename == 'indiupdate':
                 context.update(self._indiupdate_context(context))
+
+        if pagename == 'submitted':
+            context.update({'view': 'nom_submitted'})
 
         return context
 
@@ -1524,9 +1527,7 @@ class NominationsView(GenericViewMixin, TemplateView):
         )
         email_notification('nomination_submitted', nom)
 
-        context.update({'view': 'nom_submitted'})
-        
-        return self.render_to_response(context)
+        return redirect('/nominations/submitted')
 
     def _save_nominations(self, formset, team, positions):
         for position, form in zip(positions, formset):
